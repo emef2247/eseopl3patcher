@@ -99,6 +99,11 @@ int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State
 
 // --- OPL3 initialization sequence ---
 void opl3_init(dynbuffer_t *music_data) {
+
+    // Port 1 initialization (missing in old code)
+    forward_write(music_data, 1, 0x05, 0x01);  // Set register 0x05 on port 1
+    forward_write(music_data, 1, 0x04, 0x00);  // Set register 0x04 on port 1
+
     // --- Port 0 Initialization ---
     // $01: LSI TEST register (should be 0 in normal operation)
     forward_write(music_data, 0, 0x01, 0x00);
