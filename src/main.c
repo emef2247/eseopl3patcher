@@ -278,10 +278,15 @@ int main(int argc, char *argv[]) {
     fwrite(gd3.data, 1, gd3.size, wf);
     fclose(wf);
 
+    double percentage;
+    if (detune <= 1.0)
+        percentage = detune * 100.0;
+    else
+        percentage = detune;
     printf("Converted VGM written to: %s\n", output_path);
     printf("Detune value: %g (%g%%)\n", detune, percentage);
     printf("Wait value: %d\n", opl3_keyon_wait);
-    
+
     // Free resources
     buffer_free(&music_data);
     buffer_free(&gd3);
