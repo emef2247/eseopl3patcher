@@ -279,8 +279,9 @@ int main(int argc, char *argv[]) {
     fclose(wf);
 
     printf("Converted VGM written to: %s\n", output_path);
-    printf("Detune value: %.2f\n", detune);
+    printf("Detune value: %g (%g%%)\n", detune, percentage);
     printf("Wait value: %d\n", opl3_keyon_wait);
+    
     // Free resources
     buffer_free(&music_data);
     buffer_free(&gd3);
