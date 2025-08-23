@@ -1,6 +1,6 @@
 # eseopl3patcher
 
-A tool to convert YM3812(OPL2) VGM files to YMF262(OPL3) VGM files
+A tool to convert a YM3812(OPL2) VGM file to a YMF262(OPL3) VGM file
 
 ## Overview
 
