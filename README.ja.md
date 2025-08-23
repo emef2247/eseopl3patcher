@@ -13,11 +13,13 @@ eseopl3patcherは、YM3812（OPL2）用に作られたVGMファイルを、OPL3�
 - GD3タグに変換情報・実行者情報を自動追記
 - コマンドラインから簡単操作
 
-## 特徴の入力:
+## 入力パラメータ
 
 - VGMファイル（YM3812/OPL2形式）
-- デチューン比率（小数, 例: 2.5）  
-- KeyOn後のウェイト（整数, 例: 1）  
+- デチューン比率（パーセンテージ。例: 2.5なら2.5%デチューン）
+    - **注意**: `1.0`と指定した場合は`100%`として扱われます（後方互換のため、1.0 = 100%です）。  
+      例: `2.5` = 2.5%、`1.0` = 100%、`0.5` = 50%
+- KeyOn後のウェイト（整数, 例: 1）
 - このプログラムの実行者（ここで指定した文字列がGD3のCreator欄に追記されます）
 
 ## 使い方
@@ -32,10 +34,16 @@ eseopl3patcher sample.vgm 2.5 1 "YourName"
 ```
 
 - `<input.vgm>` : 変換するVGMファイル（YM3812/OPL2形式）
-- `<detune_ratio>` : デチューン比率（小数, 例: 2.5）
+- `<detune_ratio>` : デチューン比率（パーセンテージ。例: 2.5なら2.5%。1.0は100%として扱われます）
 - `<keyon_wait>` : KeyOn後のウェイト（整数, 例: 1）
 - `<operator>` : このプログラムの実行者（ここで指定した文字列がGD3のCreator欄に追記されます）
 - `-o output.vgm` : 出力ファイル名（省略時は自動生成）
+
+## ダウンロード
+
+[![Download for Linux and Windows](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
+
+Linux用・Windows用のビルド済みバイナリは [最新リリースページ](https://github.com/emef2247/eseopl3patcher/releases/latest) からダウンロードできます。
 
 ## ライセンス
 

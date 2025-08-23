@@ -1,21 +1,25 @@
-# Compiler and flags
-CC = gcc
-CFLAGS = -Wall -O2 -I./src
+CC=gcc
+CFLAGS=-O2 -Wall -Iinclude
+SRCS=$(wildcard src/*.c)
+OBJS=$(SRCS:.c=.o)
+TARGET=eseopl3patcher
 
-# Object files
-OBJS = src/main.o src/vgm_helpers.o src/opl3_convert.o src/gd3_util.o src/vgm_header.o
+# Windows cross-compile settings
+CC_WIN=x86_64-w64-mingw32-gcc
+TARGET_WIN=eseopl3patcher.exe
 
-# Target
-TARGET = eseopl3patcher
+# Default: build for Linux
+all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+$(TARGET): $(SRCS)
+	$(CC) $(CFLAGS) -o $@ $^
 
-# Pattern rules
-src/%.o: src/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+# Windows build
+win: $(SRCS)
+	$(CC_WIN) $(CFLAGS) -o $(TARGET_WIN) $^
 
-.PHONY: clean
-
+# Clean build artifacts
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(TARGET) $(TARGET_WIN) src/*.o
+
+.PHONY: all win clean

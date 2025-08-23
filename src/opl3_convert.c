@@ -12,6 +12,8 @@ typedef struct {
 } OPL3State;
 
 // --- Detune helper ---
+// detune: percentage value (e.g., 2.5 means +2.5% detune, 100.0 is +100%)
+// If the user specifies 1.0, interpret as 100% (multiply by 100 internally)
 void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *outA, uint8_t *outB) {
     if (ch >= 6 && state->rhythm_mode) {
         *outA = regA;
@@ -19,7 +21,11 @@ void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double d
         return;
     }
     uint16_t fnum = ((regB & 3) << 8) | regA;
-    double delta = detune * (fnum / 256.0);
+    // If detune is less than or equal to 1.0, treat as "1.0 == 100%"
+    double detune_percent = (detune <= 1.0) ? detune * 100.0 : detune;
+    // Calculate delta as a percentage of fnum
+    // Example: detune_percent=2.5 means +2.5% detune, delta = fnum * (2.5 / 100.0)
+    double delta = fnum * (detune_percent / 100.0);
     int fnum_detuned = (int)(fnum + delta + 0.5);
 
     if (fnum_detuned < 0) fnum_detuned = 0;
