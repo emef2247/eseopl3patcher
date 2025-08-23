@@ -22,6 +22,19 @@ eseopl3patcher is a command-line tool that converts VGM files made for YM3812 (O
 - KeyOn wait (integer, e.g. 1)
 - Operator of this program (the string specified here will be appended to the GD3 Creator field)
 
+### About Detune Ratio (+/- specification)
+
+- You can specify positive or negative values for the detune ratio.
+    - A positive value (e.g., 2.5) will be added to the FNumber, resulting in a higher pitch.
+    - A negative value (e.g., -2.5) will be subtracted from the FNumber, resulting in a lower pitch.
+- Example values:
+    - `2.5` … Adds +2.5% to the FNumber
+    - `-2.5` … Subtracts -2.5% from the FNumber
+
+> **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
+
+- Note: Specifying a detune value of 1.0 will be treated as 100% for backward compatibility.
+
 ## Usage
 
 ```sh
