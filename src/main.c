@@ -279,6 +279,20 @@ int main(int argc, char *argv[]) {
     fclose(wf);
 
     printf("Converted VGM written to: %s\n", output_path);
+    
+    // Print summary
+    printf("Output file: %s\n", output_path);
+    
+    // Calculate percentage based on detune value
+    double percentage;
+    if (detune == 1.0) {
+        percentage = detune * 100.0;
+    } else {
+        percentage = detune;
+    }
+    
+    printf("Detune value: %g (%g%%)\n", detune, percentage);
+    printf("Wait value: %d\n", opl3_keyon_wait);
 
     // Free resources
     buffer_free(&music_data);
