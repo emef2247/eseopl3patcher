@@ -242,14 +242,14 @@ void opl3_init(dynbuffer_t *music_data) {
     forward_write(music_data, 0, 0xBD, 0xC0);
 
     // $C0-$C8: Operator specific frequencies (DAM, DVB, RYT, etc.)
-    forward_write(music_data, 0, 0xC0, 0x3A);
-    forward_write(music_data, 0, 0xC1, 0x36);
-    forward_write(music_data, 0, 0xC2, 0x38);
-    forward_write(music_data, 0, 0xC3, 0x38);
-    forward_write(music_data, 0, 0xC4, 0x3E);
-    forward_write(music_data, 0, 0xC5, 0x3C);
-    forward_write(music_data, 0, 0xC6, 0x3A);
-    forward_write(music_data, 0, 0xC7, 0x3C);
+    forward_write(music_data, 0, 0xC0, 0x1A);
+    forward_write(music_data, 0, 0xC1, 0x26);
+    forward_write(music_data, 0, 0xC2, 0x18);
+    forward_write(music_data, 0, 0xC3, 0x28);
+    forward_write(music_data, 0, 0xC4, 0x1E);
+    forward_write(music_data, 0, 0xC5, 0x2C);
+    forward_write(music_data, 0, 0xC6, 0x1A);
+    forward_write(music_data, 0, 0xC7, 0x2C);
     forward_write(music_data, 0, 0xC8, 0x1A);
 
     // $E0-$F5: Extended registers
@@ -386,15 +386,15 @@ void opl3_init(dynbuffer_t *music_data) {
     forward_write(music_data, 1, 0xBD, 0x00);
 
     // $C0-$C8: Operator specific frequencies
-    forward_write(music_data, 1, 0xC0, 0x36);
-    forward_write(music_data, 1, 0xC1, 0x2A);
-    forward_write(music_data, 1, 0xC2, 0x3C);
-    forward_write(music_data, 1, 0xC3, 0x38);
-    forward_write(music_data, 1, 0xC4, 0x3A);
-    forward_write(music_data, 1, 0xC5, 0x2A);
-    forward_write(music_data, 1, 0xC6, 0x3E);
-    forward_write(music_data, 1, 0xC7, 0x38);
-    forward_write(music_data, 1, 0xC8, 0x3A);
+    forward_write(music_data, 1, 0xC0, 0x26);
+    forward_write(music_data, 1, 0xC1, 0x1A);
+    forward_write(music_data, 1, 0xC2, 0x2C);
+    forward_write(music_data, 1, 0xC3, 0x18);
+    forward_write(music_data, 1, 0xC4, 0x2A);
+    forward_write(music_data, 1, 0xC5, 0x1A);
+    forward_write(music_data, 1, 0xC6, 0x2E);
+    forward_write(music_data, 1, 0xC7, 0x18);
+    forward_write(music_data, 1, 0xC8, 0x2A);
 
     // $E0-$ED: Extended registers
     forward_write(music_data, 1, 0xE0, 0x00);
