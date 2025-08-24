@@ -8,7 +8,12 @@
 #include "gd3_util.h"
 
 #define DEFAULT_DETUNE 1.0
-#define DEFAULT_WAIT 1
+#define DEFAULT_WAIT 0
+
+// Read little-endian 32-bit integer from buffer
+static uint32_t read_le_uint32(const unsigned char *ptr) {
+    return (uint32_t)ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16) | ((uint32_t)ptr[3] << 24);
+}
 
 // Check if file ends with ".vgm" or has no extension (for vgz-uncompressed)
 static bool has_vgm_extension_or_none(const char *filename) {
@@ -27,36 +32,53 @@ static void make_default_output_name(const char *input, char *output, size_t out
     snprintf(output, outlen, "%.*sOPL3.vgm", (int)len, input);
 }
 
-// Parse command line for -o output option
-static const char* get_output_path(int argc, char *argv[], const char *input_path) {
-    for (int i = 5; i < argc-1; ++i) {
-        if (strcmp(argv[i], "-o") == 0) {
-            return argv[i+1];
-        }
-    }
-    static char default_out[256];
-    make_default_output_name(input_path, default_out, sizeof(default_out));
-    return default_out;
-}
-
-// Read little-endian 32-bit integer from buffer
-static uint32_t read_le_uint32(const unsigned char *ptr) {
-    return (uint32_t)ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16) | ((uint32_t)ptr[3] << 24);
-}
-
 int main(int argc, char *argv[]) {
-    // Check usage
-    if (argc < 5) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> <wait> <creator> [-o output.vgm]\n", argv[0]);
+    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm]
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm]\n", argv[0]);
         return 1;
     }
-
-    // Parse command line arguments
+    // Parse required arguments
     const char *input_vgm = argv[1];
     double detune = atof(argv[2]);
-    int opl3_keyon_wait = atoi(argv[3]);
-    const char *creator = argv[4];
-    const char *output_path = get_output_path(argc, argv, input_vgm);
+
+    // Wait is optional, default is DEFAULT_WAIT
+    int opl3_keyon_wait = DEFAULT_WAIT;
+
+    const char *creator = "eseopl3patcher";
+    const char *output_path = NULL;
+
+    // Parse optional arguments (wait, creator, -o output)
+    for (int i = 3; i < argc; ++i) {
+        // Handle -o option
+        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            output_path = argv[i + 1];
+            i++; // Skip output filename
+            continue;
+        }
+        // If this argument starts with '-', skip (unknown option)
+        if (argv[i][0] == '-') continue;
+        // If this argument is a number and wait is not yet set, use as wait
+        char *endptr;
+        int val = (int)strtol(argv[i], &endptr, 10);
+        if (*endptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
+            opl3_keyon_wait = val;
+            continue;
+        }
+        // If creator not set (other than default), use this argument
+        if (creator == NULL || strcmp(creator, "eseopl3patcher") == 0) {
+            creator = argv[i];
+            continue;
+        }
+        // Otherwise, ignore
+    }
+
+    // If output_path not set, generate default
+    if (!output_path) {
+        static char default_out[256];
+        make_default_output_name(input_vgm, default_out, sizeof(default_out));
+        output_path = default_out;
+    }
 
     // Check file extension
     if (!has_vgm_extension_or_none(input_vgm)) {
@@ -91,7 +113,6 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse VGM header fields
-    // Calculate data offset (relative to 0x34) and header size
     uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(vgm_data + 0x34) : 0;
     uint32_t orig_header_size = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
     if (orig_header_size < 0x40) orig_header_size = 0x100; // fallback for broken files
@@ -106,7 +127,7 @@ int main(int argc, char *argv[]) {
     uint32_t orig_loop_offset = read_le_uint32(vgm_data + 0x1C);
     uint32_t orig_loop_address = 0;
     if (orig_loop_offset != 0xFFFFFFFF) {
-        orig_loop_address = orig_loop_offset + 0x04; // In VGM, loop offset is relative to 0x04
+        orig_loop_address = orig_loop_offset + 0x04;
     }
 
     // Prepare output music data buffer and status
@@ -119,7 +140,7 @@ int main(int argc, char *argv[]) {
 
     bool is_replicate_reg_ymf262 = true;
     long read_done_byte = data_start;
-    uint32_t additional_bytes = 0; // Number of bytes added for Port 1 output
+    uint32_t additional_bytes = 0;
 
     // Track loop start position in generated music_data
     long loop_start_in_music_data = -1;
@@ -209,14 +230,14 @@ int main(int argc, char *argv[]) {
     snprintf(creator_append, sizeof(creator_append), ",modified by %s", creator);
 
     char note_append[512];
-     snprintf(note_append, sizeof(note_append),
-    " -- This data is converted from YM3812 to YMF262 (OPL3) format. "
-    "The YM3812 commands are directly mapped to Port 0 (ch0-ch8). "
-    "At the same time, the same commands are mapped to Port 1 (ch9-ch17), "
-    "with their F-NUMBER values detuned by %.2f%%. "
-    "This configuration utilizes all OPL3 channels to achieve a chorus effect. "
-    "-- Channels 9-17 (Port1) F-NUMBERs are detuned by %.2f%%. KEY ON/OFF wait %d --",
-    detune, detune, opl3_keyon_wait);
+    snprintf(note_append, sizeof(note_append),
+        " -- This data is converted from YM3812 to YMF262 (OPL3) format. "
+        "The YM3812 commands are directly mapped to Port 0 (ch0-ch8). "
+        "At the same time, the same commands are mapped to Port 1 (ch9-ch17), "
+        "with their F-NUMBER values detuned by %.2f%%. "
+        "This configuration utilizes all OPL3 channels to achieve a chorus effect. "
+        "-- Channels 9-17 (Port1) F-NUMBERs are detuned by %.2f%%. KEY ON/OFF wait %d --",
+        detune, detune, opl3_keyon_wait);
 
     dynbuffer_t gd3;
     buffer_init(&gd3);
@@ -230,13 +251,13 @@ int main(int argc, char *argv[]) {
 
     // Use larger of original header size or 0x100 (VGM_HEADER_SIZE)
     uint32_t header_size = (orig_header_size > 0x100) ? orig_header_size : 0x100;
-    uint32_t new_eof_offset = music_data_size + header_size + gd3_size - 1; // last byte index (0-origin)
-    uint32_t vgm_eof_offset_field = new_eof_offset - 0x04; // EOF offset field (relative to 0x04)
-    uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14; // GD3 offset field (relative to 0x14)
-    uint32_t data_offset = header_size - 0x34; // Data offset field (relative to 0x34)
+    uint32_t new_eof_offset = music_data_size + header_size + gd3_size - 1;
+    uint32_t vgm_eof_offset_field = new_eof_offset - 0x04;
+    uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
+    uint32_t data_offset = header_size - 0x34;
 
     // Calculate new loop offset: set to header_size + music_data offset (if loop exists)
-    uint32_t new_loop_offset = 0xFFFFFFFF; // Default: invalid
+    uint32_t new_loop_offset = 0xFFFFFFFF;
     if (loop_start_in_music_data >= 0) {
         new_loop_offset = header_size + (uint32_t)loop_start_in_music_data;
     }
@@ -247,13 +268,13 @@ int main(int argc, char *argv[]) {
     // Build new VGM header
     build_vgm_header(
         header_buf,
-        vgm_data,                // Original VGM header (at least orig_header_size bytes)
-        vstat.new_total_samples, // 0x18: total samples (newly measured)
-        vgm_eof_offset_field,    // 0x04: EOF offset
-        gd3_offset_field_value,  // 0x14: GD3 offset
-        data_offset,             // 0x34: Data offset
-        0x00000171,              // 0x08: Version (always 0x00000171)
-        additional_bytes         // Additional bytes for port 1
+        vgm_data,
+        vstat.new_total_samples,
+        vgm_eof_offset_field,
+        gd3_offset_field_value,
+        data_offset,
+        0x00000171,
+        additional_bytes
     );
 
     // Overwrite loop offset field with correct value
@@ -286,12 +307,13 @@ int main(int argc, char *argv[]) {
     printf("Converted VGM written to: %s\n", output_path);
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
+    printf("Creator: %s\n", creator);
 
     // Free resources
     buffer_free(&music_data);
     buffer_free(&gd3);
     free(vgm_data);
     free(header_buf);
-    
+
     return 0;
 }
