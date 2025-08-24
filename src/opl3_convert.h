@@ -18,7 +18,7 @@ typedef struct {
 void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *outA, uint8_t *outB);
 
 // Apply register value to OPL3/OPL2 ports
-void apply_to_ports(
+int apply_to_ports(
     dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state,
     int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait);
 

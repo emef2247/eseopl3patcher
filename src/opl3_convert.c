@@ -57,8 +57,25 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         }
         vgm_wait_samples(music_data, vstat, opl3_keyon_wait);
     } else if (regType[0] == 'C') {
-        forward_write(music_data, 0, 0xC0 + ch, val | 0x10);
-        forward_write(music_data, 1, 0xC0 + ch, val | 0x20); port1_bytes += 3;
+        // Stereo panning implementation based on channel number
+        // Even channels: port0->right, port1->left
+        // Odd channels: port0->left, port1->right
+        // This creates alternating stereo placement for a stereo effect
+        
+        uint8_t port0_panning, port1_panning;
+        
+        if (ch % 2 == 0) {
+            // Even channel: port0 gets right channel, port1 gets left channel
+            port0_panning = 0x20;  // Right channel (bit 5)
+            port1_panning = 0x10;  // Left channel (bit 4)
+        } else {
+            // Odd channel: port0 gets left channel, port1 gets right channel
+            port0_panning = 0x10;  // Left channel (bit 4)
+            port1_panning = 0x20;  // Right channel (bit 5)
+        }
+        
+        forward_write(music_data, 0, 0xC0 + ch, val | port0_panning);
+        forward_write(music_data, 1, 0xC0 + ch, val | port1_panning); port1_bytes += 3;
     }
     return port1_bytes;
 }
