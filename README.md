@@ -56,6 +56,8 @@ eseopl3patcher sample.vgm 2.5 1 "YourName"
 
 [![Download for Linux and Windows](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
 
+日本語版は[こちら ](https://github.com/emef2247/eseopl3patcher/blob/main/README.ja.md#使い方) 
+
 You can download pre-built binaries for **Linux** and **Windows** from the [latest release page](https://github.com/emef2247/eseopl3patcher/releases/latest).
 
 ## License
