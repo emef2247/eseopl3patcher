@@ -17,8 +17,7 @@ eseopl3patcher is a command-line tool that converts VGM files made for YM3812 (O
 
 - VGM file (YM3812/OPL2 format)
 - Detune ratio (percentage, e.g. 2.5 means +2.5% detune)
-    - **Note**: If you specify `1.0`, it will be treated as `100%` detune (for backward compatibility, 1.0 = 100%).  
-      For example: `2.5` = 2.5%, `1.0` = 100%, `0.5` = 50%.
+    - Specify the detune value as a percentage. For example: `2.5` = 2.5%, `0.5` = 0.5%, `10` = 10%.
 - KeyOn wait (integer, e.g. 1)
 - Operator of this program (the string specified here will be appended to the GD3 Creator field)
 
@@ -32,8 +31,6 @@ eseopl3patcher is a command-line tool that converts VGM files made for YM3812 (O
     - `-2.5` … Subtracts -2.5% from the FNumber
 
 > **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
-
-- Note: Specifying a detune value of 1.0 will be treated as 100% for backward compatibility.
 
 ## Usage
 

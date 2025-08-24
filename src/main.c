@@ -209,9 +209,14 @@ int main(int argc, char *argv[]) {
     snprintf(creator_append, sizeof(creator_append), ",modified by %s", creator);
 
     char note_append[512];
-    snprintf(note_append, sizeof(note_append),
-        " -- This data is converted from YM3812 to YMF262 (OPL3) format. The YM3812 commands are directly mapped to Port 0 (ch0-ch8). At the same time, the same commands are mapped to Port 1 (ch9-ch17), with their F-NUMBER values detuned by %.2f%%. This configuration utilizes all OPL3 channels to achieve a chorus effect. -- Channels 9-17 (Port1) F-NUMBERs are detuned by %.2f%%. KEY ON/OFF wait %d --",
-        detune, detune, opl3_keyon_wait);
+     snprintf(note_append, sizeof(note_append),
+    " -- This data is converted from YM3812 to YMF262 (OPL3) format. "
+    "The YM3812 commands are directly mapped to Port 0 (ch0-ch8). "
+    "At the same time, the same commands are mapped to Port 1 (ch9-ch17), "
+    "with their F-NUMBER values detuned by %.2f%%. "
+    "This configuration utilizes all OPL3 channels to achieve a chorus effect. "
+    "-- Channels 9-17 (Port1) F-NUMBERs are detuned by %.2f%%. KEY ON/OFF wait %d --",
+    detune, detune, opl3_keyon_wait);
 
     dynbuffer_t gd3;
     buffer_init(&gd3);
@@ -278,13 +283,8 @@ int main(int argc, char *argv[]) {
     fwrite(gd3.data, 1, gd3.size, wf);
     fclose(wf);
 
-    double percentage;
-    if (detune <= 1.0)
-        percentage = detune * 100.0;
-    else
-        percentage = detune;
     printf("Converted VGM written to: %s\n", output_path);
-    printf("Detune value: %g (%g%%)\n", detune, percentage);
+    printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
 
     // Free resources

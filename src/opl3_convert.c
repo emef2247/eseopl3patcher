@@ -21,11 +21,8 @@ void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double d
         return;
     }
     uint16_t fnum = ((regB & 3) << 8) | regA;
-    // If detune is less than or equal to 1.0, treat as "1.0 == 100%"
-    double detune_percent = (detune <= 1.0) ? detune * 100.0 : detune;
-    // Calculate delta as a percentage of fnum
-    // Example: detune_percent=2.5 means +2.5% detune, delta = fnum * (2.5 / 100.0)
-    double delta = fnum * (detune_percent / 100.0);
+    // detune is always interpreted as a percent value (e.g., 0.2 means 0.2%)
+    double delta = fnum * (detune / 100.0);
     int fnum_detuned = (int)(fnum + delta + 0.5);
 
     if (fnum_detuned < 0) fnum_detuned = 0;
