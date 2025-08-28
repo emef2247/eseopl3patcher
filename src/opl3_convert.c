@@ -141,12 +141,8 @@ void opl3_init(dynbuffer_t *music_data) {
     forward_write(music_data, 0, 0xEB, 0x00);
     forward_write(music_data, 0, 0xEC, 0x00);
     forward_write(music_data, 0, 0xED, 0x00);
-    forward_write(music_data, 0, 0xF0, 0x00);
-    forward_write(music_data, 0, 0xF1, 0x00);
-    forward_write(music_data, 0, 0xF2, 0x00);
-    forward_write(music_data, 0, 0xF3, 0x00);
-    forward_write(music_data, 0, 0xF4, 0x00);
-    forward_write(music_data, 0, 0xF5, 0x00);
+    forward_write(music_data, 0, 0xEE, 0x00);
+    forward_write(music_data, 0, 0xEF, 0x00);
 
     // $C0-$C8: Operator specific frequencies
     forward_write(music_data, 1, 0xC0, 0x36);
@@ -172,6 +168,9 @@ void opl3_init(dynbuffer_t *music_data) {
     forward_write(music_data, 1, 0xEB, 0x00);
     forward_write(music_data, 1, 0xEC, 0x00);
     forward_write(music_data, 1, 0xED, 0x00);
+    forward_write(music_data, 1, 0xEE, 0x00);
+    forward_write(music_data, 1, 0xEF, 0x00); 
+
     // $F0-$F5: Final frequency / key-on
     forward_write(music_data, 1, 0xF0, 0x02);
     forward_write(music_data, 1, 0xF1, 0x01);
