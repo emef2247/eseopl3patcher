@@ -57,8 +57,8 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         }
         vgm_wait_samples(music_data, vstat, opl3_keyon_wait);
     } else if (regType[0] == 'C') {
-        forward_write(music_data, 0, 0xC0 + ch, val | 0x10);
-        forward_write(music_data, 1, 0xC0 + ch, val | 0x20); port1_bytes += 3;
+        forward_write(music_data, 0, 0xC0 + ch, val | 0x50);
+        forward_write(music_data, 1, 0xC0 + ch, val | 0xA0); port1_bytes += 3;
     }
     return port1_bytes;
 }
@@ -103,79 +103,60 @@ int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State
 // --- OPL3 initialization sequence ---
 void opl3_init(dynbuffer_t *music_data) {
 
-    // Port 1 initialization (missing in old code)
-    forward_write(music_data, 1, 0x05, 0x01);  // Set register 0x05 on port 1
-    forward_write(music_data, 1, 0x04, 0x00);  // Set register 0x04 on port 1
+    // -------------------------
+    // New OPL3 Global Registers (Port1 only)
+    // -------------------------
+    // 0x104 : 4-Operator Connections
+    //   bit0 = Enable 4-OP mode for CH0 + CH3
+    //   bit1 = Enable 4-OP mode for CH1 + CH4
+    //   bit2 = Enable 4-OP mode for CH2 + CH5
+    //   bit3–7 = Reserved
+    // 0x105 : OPL3 mode / stereo enable
+    //   bit0 = OPL3 enable (must be 1 for OPL3 mode)
+    //   bit1 = Left/Right output enable (stereo control)
+    //   bit2–7 = Reserved
+    forward_write(music_data, 1, 0x05, 0x01);  // OPL3 enable (OPL3 mode set)
+    forward_write(music_data, 1, 0x04, 0x00);  // Waveform select (default)
 
-    // --- Port 0 Initialization ---
-    // $01: LSI TEST register (should be 0 in normal operation)
-    forward_write(music_data, 0, 0x01, 0x00);
-    // $08: NTS (Note Select); selects F-NUMBER LSB source
-    forward_write(music_data, 0, 0x08, 0x00);
+    // --- Port 0 General Initialization ---
+    // LSI TEST and Note Select registers
+    forward_write(music_data, 0, 0x01, 0x00);  // LSI TEST register (should be 0)
+    forward_write(music_data, 0, 0x08, 0x00);  // NTS (Note Select)
 
-    // --- Port 1 Initialization ---
-    // $01: LSI TEST register (should be 0 in normal operation)
-    forward_write(music_data, 1, 0x01, 0x00);
+    // --- Port 1 LSI TEST Initialization ---
+    forward_write(music_data, 1, 0x01, 0x00);  // LSI TEST register (should be 0)
 
-    // $C0-$C8: Operator specific frequencies (DAM, DVB, RYT, etc.)
-    forward_write(music_data, 0, 0xC0, 0x50);
-    forward_write(music_data, 0, 0xC1, 0x50);
-    forward_write(music_data, 0, 0xC2, 0x50);
-    forward_write(music_data, 0, 0xC3, 0x50);
-    forward_write(music_data, 0, 0xC4, 0x50);
-    forward_write(music_data, 0, 0xC5, 0x50);
-    forward_write(music_data, 0, 0xC6, 0x50);
-    forward_write(music_data, 0, 0xC7, 0x50);
-    forward_write(music_data, 0, 0xC8, 0x50);
+    // -------------------------
+    // Channel-Level Control
+    // -------------------------
+    // 0xC0–0xC8 : Channel control (Feedback & Algorithm)
+    //   bit0–2 = Algorithm (carrier/modulator connection)
+    //   bit3–5 = Feedback (modulation feedback level)
+    //   bit4 = Left (CHA)
+    //   bit5 = Right (CHB)
+    //   bit6 = Left (CHC)
+    //   bit7 = Right (CHD)
+    for (uint8_t ch = 0; ch <= 8; ++ch) {
+        forward_write(music_data, 0, 0xC0 + ch, 0x50);  // Port 0: default value
+        forward_write(music_data, 1, 0xC0 + ch, 0xA0);  // Port 1: default value
+    }
 
-    // $C0-$C8: Operator specific frequencies
-    forward_write(music_data, 1, 0xC0, 0xA0);
-    forward_write(music_data, 1, 0xC1, 0xA0);
-    forward_write(music_data, 1, 0xC2, 0xA0);
-    forward_write(music_data, 1, 0xC3, 0xA0);
-    forward_write(music_data, 1, 0xC4, 0xA0);
-    forward_write(music_data, 1, 0xC5, 0xA0);
-    forward_write(music_data, 1, 0xC6, 0xA0);
-    forward_write(music_data, 1, 0xC7, 0xA0);
-    forward_write(music_data, 1, 0xC8, 0xA0);
+    // 0xE0–0xF5 : Waveform Select (0–7)
+    //   000 = Sine
+    //   001 = Half-sine
+    //   010 = Absolute-sine
+    //   011 = Quarter-sine
+    //   100 = Log-sawtooth
+    //   101 = Exp-sawtooth
+    //   110 = Square
+    //   111 = Derived waveform (complex)
+    const uint8_t ext_regs[] = {0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF};
+    for (size_t i = 0; i < sizeof(ext_regs)/sizeof(ext_regs[0]); ++i) {
+        forward_write(music_data, 0, ext_regs[i], 0x00);  // Port 0
+        forward_write(music_data, 1, ext_regs[i], 0x00);  // Port 1
+    }
 
-    // $E0-$F5: Extended registers
-    forward_write(music_data, 0, 0xE0, 0x00);
-    forward_write(music_data, 0, 0xE1, 0x00);
-    forward_write(music_data, 0, 0xE2, 0x00);
-    forward_write(music_data, 0, 0xE3, 0x00);
-    forward_write(music_data, 0, 0xE4, 0x00);
-    forward_write(music_data, 0, 0xE5, 0x00);
-    forward_write(music_data, 0, 0xE8, 0x00);
-    forward_write(music_data, 0, 0xE9, 0x00);
-    forward_write(music_data, 0, 0xEA, 0x00);
-    forward_write(music_data, 0, 0xEB, 0x00);
-    forward_write(music_data, 0, 0xEC, 0x00);
-    forward_write(music_data, 0, 0xED, 0x00);
-    forward_write(music_data, 0, 0xEE, 0x00);
-    forward_write(music_data, 0, 0xEF, 0x00);
-
-    // $E0-$ED: Extended registers
-    forward_write(music_data, 1, 0xE0, 0x00);
-    forward_write(music_data, 1, 0xE1, 0x00);
-    forward_write(music_data, 1, 0xE2, 0x00);
-    forward_write(music_data, 1, 0xE3, 0x00);
-    forward_write(music_data, 1, 0xE4, 0x00);
-    forward_write(music_data, 1, 0xE5, 0x00);
-    forward_write(music_data, 1, 0xE8, 0x00);
-    forward_write(music_data, 1, 0xE9, 0x00);
-    forward_write(music_data, 1, 0xEA, 0x00);
-    forward_write(music_data, 1, 0xEB, 0x00);
-    forward_write(music_data, 1, 0xEC, 0x00);
-    forward_write(music_data, 1, 0xED, 0x00);
-    forward_write(music_data, 1, 0xEE, 0x00);
-    forward_write(music_data, 1, 0xEF, 0x00); 
-
-    // $F0-$F5: Final frequency / key-on
-    forward_write(music_data, 1, 0xF0, 0x00);
-    forward_write(music_data, 1, 0xF1, 0x00);
-    forward_write(music_data, 1, 0xF2, 0x00);
-    forward_write(music_data, 1, 0xF3, 0x00);
-    forward_write(music_data, 1, 0xF4, 0x00);
-    forward_write(music_data, 1, 0xF5, 0x00);
+    for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
+        forward_write(music_data, 1, reg, 0x00);
+    }
 }
