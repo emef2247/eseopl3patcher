@@ -66,12 +66,12 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         
         if (ch % 2 == 0) {
             // Even channel: port0 gets right channel, port1 gets left channel
-            port0_panning = 0x20;  // Right channel (bit 5)
-            port1_panning = 0x10;  // Left channel (bit 4)
+            port0_panning = 0x50;  // Right channel (bit 5)
+            port1_panning = 0xA0;  // Left channel (bit 4)
         } else {
             // Odd channel: port0 gets left channel, port1 gets right channel
-            port0_panning = 0x10;  // Left channel (bit 4)
-            port1_panning = 0x20;  // Right channel (bit 5)
+            port0_panning = 0x50;  // Left channel (bit 4)
+            port1_panning = 0xA0;  // Right channel (bit 5)
         }
         
         forward_write(music_data, 0, 0xC0 + ch, val | port0_panning);
