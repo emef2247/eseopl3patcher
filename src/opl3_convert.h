@@ -5,11 +5,12 @@
 #include <stdbool.h>
 #include "vgm_helpers.h"
 
+#define OPL3_NUM_CHANNELS 18
 // --- Channel registers state ---
 typedef struct {
-    uint8_t regA[9];
-    uint8_t regB[9];
-    uint8_t regC[9];
+    uint8_t regA[OPL3_NUM_CHANNELS];
+    uint8_t regB[OPL3_NUM_CHANNELS];
+    uint8_t regC[OPL3_NUM_CHANNELS];
     bool rhythm_mode;
     bool opl3_mode_initialized;
 } OPL3State;
