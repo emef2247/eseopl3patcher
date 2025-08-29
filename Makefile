@@ -12,11 +12,11 @@ TARGET_WIN=eseopl3patcher.exe
 all: $(TARGET)
 
 $(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 # Windows build
 win: $(SRCS)
-	$(CC_WIN) $(CFLAGS) -o $(TARGET_WIN) $^
+	$(CC_WIN) $(CFLAGS) -o $(TARGET_WIN) $^ -lm
 
 # Clean build artifacts
 clean:

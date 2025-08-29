@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "vgm_helpers.h"
+#include <math.h>
 
 // --- Channel registers state ---
 typedef struct {
@@ -10,6 +11,22 @@ typedef struct {
     bool rhythm_mode;
     bool opl3_mode_initialized;
 } OPL3State;
+
+// TL (Total Level) attenuation using v_ratio
+uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
+    if (v_ratio == 1.0) return orig_val;
+    // TL is lower 6 bits
+    uint8_t tl = orig_val & 0x3F;
+    double dB = 0.0;
+    if (v_ratio < 1.0) {
+        dB = -20.0 * log10(v_ratio); // 20*log10(ratio) [dB]
+    }
+    // 1 step = 0.75dB
+    int add = (int)(dB / 0.75 + 0.5); // to round off
+    int new_tl = tl + add;
+    if (new_tl > 63) new_tl = 63;
+    return (orig_val & 0xC0) | (new_tl & 0x3F);
+}
 
 // --- Detune helper ---
 // detune: percentage value (e.g., 2.5 means +2.5% detune, 100.0 is +100%)
@@ -32,9 +49,9 @@ void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double d
     *outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
 
-// --- Port writes for reg types ---
 // Return: number of bytes output to port1
-int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait) {
+// v_ratio0/v_ratio1: volume ratio for port0/port1 (0.0~1.0)
+int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait, int stereo_mix, double v_ratio0, double v_ratio1) {
     int port1_bytes = 0;
     if (regType[0] == 'A') {
         if ((state->regB[ch] & 0x20)) {
@@ -57,8 +74,37 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         }
         vgm_wait_samples(music_data, vstat, opl3_keyon_wait);
     } else if (regType[0] == 'C') {
-        forward_write(music_data, 0, 0xC0 + ch, val | 0x50);
-        forward_write(music_data, 1, 0xC0 + ch, val | 0xA0); port1_bytes += 3;
+        // Stereo panning implementation based on channel number
+        // Even channels: port0->right, port1->left
+        // Odd channels: port0->left, port1->right
+        // This creates alternating stereo placement for a stereo effect
+        uint8_t port0_panning, port1_panning;
+        if (stereo_mix) {
+            // Apply stereo panning
+            if (ch % 2 == 0) {
+                // Even channel: port0 gets right channel, port1 gets left channel
+                port0_panning = 0x50;  // Right channel (bit 4 and bit 6)
+                port1_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+            } else {
+                // Odd channel: port0 gets left channel, port1 gets right channel
+                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
+            }
+        } else {
+                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
+        }
+    
+        forward_write(music_data, 0, 0xC0 + ch, val | port0_panning);
+        forward_write(music_data, 1, 0xC0 + ch, val | port1_panning); port1_bytes += 3;
+    } else if (regType[0] == 'T') {
+        // TL (Total Level) register: apply volume attenuation
+        // TL register: 0x40-0x55 (per operator) -- here we assume regType 'T' is used for TL register
+        // TL is 6 bits (0-63), lower value = higher volume
+        uint8_t val0 = apply_tl_with_ratio(val, v_ratio0);
+        uint8_t val1 = apply_tl_with_ratio(val, v_ratio1);
+        forward_write(music_data, 0, 0x40 + ch, val0);
+        forward_write(music_data, 1, 0x40 + ch, val1); port1_bytes += 3;
     }
     return port1_bytes;
 }
@@ -71,28 +117,32 @@ void handle_bd(dynbuffer_t *music_data, OPL3State *state, uint8_t val) {
 
 // --- Main OPL3/OPL2 reg write handler ---
 // Return: bytes output to port1
-int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait) {
+int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int stereo_mix, double v_ratio0, double v_ratio1) {
     int port1_bytes = 0;
+
     if (reg == 0x01) {
         // TODO: OPL3 mode change
     } else if (reg == 0x05) {
         // TODO: OPL3 mode change
     } else if (reg == 0x02 || reg == 0x03 || reg == 0x04 || reg == 0x08) {
         forward_write(music_data, 0, reg, val);
+    } else if (reg >= 0x40 && reg <= 0x55) {
+        int ch = reg - 0x40;
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "T", val, detune, opl3_keyon_wait, stereo_mix, v_ratio0, v_ratio1);
     } else if (reg == 0xBD) {
         handle_bd(music_data, state, val);
     } else if (reg >= 0xA0 && reg <= 0xA8) {
         int ch = reg - 0xA0;
         state->regA[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "A", val, detune, opl3_keyon_wait);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "A", val, detune, opl3_keyon_wait, stereo_mix, v_ratio0, v_ratio1);
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         int ch = reg - 0xB0;
         state->regB[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "B", val, detune, opl3_keyon_wait);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "B", val, detune, opl3_keyon_wait, stereo_mix, v_ratio0, v_ratio1);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         state->regC[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "C", val, detune, opl3_keyon_wait);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "C", val, detune, opl3_keyon_wait, stereo_mix, v_ratio0, v_ratio1);
     } else {
         forward_write(music_data, 0, reg, val);
         forward_write(music_data, 1, reg, val); port1_bytes += 3;
@@ -101,7 +151,7 @@ int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State
 }
 
 // --- OPL3 initialization sequence ---
-void opl3_init(dynbuffer_t *music_data) {
+void opl3_init(dynbuffer_t *music_data, int stereo_mode) {
 
     // -------------------------
     // New OPL3 Global Registers (Port1 only)
@@ -136,11 +186,24 @@ void opl3_init(dynbuffer_t *music_data) {
     //   bit5 = Right (CHB)
     //   bit6 = Left (CHC)
     //   bit7 = Right (CHD)
-    for (uint8_t ch = 0; ch <= 8; ++ch) {
-        forward_write(music_data, 0, 0xC0 + ch, 0x50);  // Port 0: default value
-        forward_write(music_data, 1, 0xC0 + ch, 0xA0);  // Port 1: default value
-    }
+    // $C0-$C8: Port0 ch0-ch8, Port1 ch9-ch17
+    for (uint8_t i = 0; i < 9; ++i) {
+        // Port0: ch = i (0-8)
+        if (stereo_mode) {
+            uint8_t value0 = (i % 2 == 0) ? 0xA0 : 0x50;
+            forward_write(music_data, 0, 0xC0 + i, value0);
+        } else {
+            forward_write(music_data, 0, 0xC0 + i, 0x50);
+        }
 
+        // Port1: ch = i + 9 (9-17)
+        if (stereo_mode) {
+            uint8_t value1 = ((i + 9) % 2 == 0) ? 0xA0 : 0x50;
+            forward_write(music_data, 1, 0xC0 + i, value1);
+        } else {
+            forward_write(music_data, 1, 0xC0 + i, 0xA0);
+        }
+    }
     // 0xE0–0xF5 : Waveform Select (0–7)
     //   000 = Sine
     //   001 = Half-sine
