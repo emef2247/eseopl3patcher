@@ -330,7 +330,7 @@ int main(int argc, char *argv[]) {
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
     printf("Creator: %s\n", creator);
-    printf("Stereo Mix: %d\n", ch_panning);
+    printf("Channel Panning Mode: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
 
