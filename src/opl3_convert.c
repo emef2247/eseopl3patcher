@@ -1,16 +1,25 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include "vgm_helpers.h"
 #include <math.h>
+#include "opl3_convert.h"
+#include "opl3_voice.h"
 
-// --- Channel registers state ---
-typedef struct {
-    uint8_t regA[9];
-    uint8_t regB[9];
-    uint8_t regC[9];
-    bool rhythm_mode;
-    bool opl3_mode_initialized;
-} OPL3State;
+// Add a global/static voice DB (or pass as argument/contextually as needed)
+static OPL3VoiceDB g_voice_db;
+static uint8_t g_opl3_reg_104 = 0; // OPL3 4op mode register image (0x104)
+
+// Call this at program startup
+void voice_db_global_init() {
+    opl3_voice_db_init(&g_voice_db);
+    g_opl3_reg_104 = 0;
+}
+
+// Call this at program shutdown
+void voice_db_global_free() {
+    opl3_voice_db_free(&g_voice_db);
+}
 
 // TL (Total Level) attenuation using v_ratio
 uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
@@ -73,7 +82,28 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
             forward_write(music_data, 1, 0xB0 + ch, detunedB); port1_bytes += 3;
         }
         vgm_wait_samples(music_data, vstat, opl3_keyon_wait);
+
+        // Check for KeyOn event (B register)
+        // KeyOn is bit 5 of register B
+        int is_keyon = (val & 0x20) != 0;
+        int reg = ch + 0xB0;
+        printf("B register write: reg=0x%02X, ch=%d, val=0x%02X is_keyon=%d\n", reg, ch, val, is_keyon);
+        if (is_keyon) {
+            // Extract current voice parameters and update voice DB
+            OPL3VoiceParam voice_param;
+            extract_voice_param(state, ch, g_opl3_reg_104, &voice_param);
+            int voice_id = opl3_voice_db_find_or_add(&g_voice_db, &voice_param);
+
+            // (Optional) Logging
+            printf("KeyOn detected ch=%d, voice_id=%d\n", ch, voice_id);
+
+            // (Optional) You can now store voice_id with event log, etc.
+            // (e.g., event_list_add(..., voice_id, ...))
+        }
     } else if (regType[0] == 'C') {
+        int reg = ch + 0xC0;
+        int is_keyon = (state->regB[ch] & 0x20) != 0;
+        printf("C register write: reg=0x%02X, ch=%d, val=0x%02X is_keyon=%d\n", reg, ch, val, is_keyon);
         // Stereo panning implementation based on channel number
         // Even channels: port0->right, port1->left
         // Odd channels: port0->left, port1->right
@@ -98,6 +128,9 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         forward_write(music_data, 0, 0xC0 + ch, val | port0_panning);
         forward_write(music_data, 1, 0xC0 + ch, val | port1_panning); port1_bytes += 3;
     } else if (regType[0] == 'T') {
+        int reg = ch + 0x40;
+        int is_keyon = (state->regB[ch] & 0x20) != 0;
+        printf("C register write: reg=0x%02X, ch=%d, val=0x%02X is_keyon=%d\n", reg, ch, val, is_keyon);
         // TL (Total Level) register: apply volume attenuation
         // TL register: 0x40-0x55 (per operator) -- here we assume regType 'T' is used for TL register
         // TL is 6 bits (0-63), lower value = higher volume
