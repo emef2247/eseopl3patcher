@@ -37,9 +37,9 @@ static void make_default_output_name(const char *input, char *output, size_t out
 }
 
 int main(int argc, char *argv[]) {
-    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-channel_panning n] [-vr0 f] [-vr1 f]
+    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f]
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-channel_panning n] [-vr0 f] [-vr1 f]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f]\n", argv[0]);
         return 1;
     }
     // Parse required arguments
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     const char *output_path = NULL;
 
     // --- New argument defaults ---
-    int channel_panning = DEFAULT_CH_PANNING;   // Default: stereo mix ON
+    int ch_panning = DEFAULT_CH_PANNING;   // Default: Channel panning mode: ON
     double v_ratio0 = DEFAULT_VOLUME_RATIO0; // Default: 100% volume
     double v_ratio1 = DEFAULT_VOLUME_RATIO1; // Default: 60% volume
 
@@ -65,9 +65,9 @@ int main(int argc, char *argv[]) {
             i++; // Skip output filename
             continue;
         }
-        // Handle -channel_panning option
-        if (strcmp(argv[i], "-channel_panning") == 0 && i + 1 < argc) {
-            channel_panning = atoi(argv[i + 1]);
+        // Handle -ch_panning option
+        if (strcmp(argv[i], "-ch_panning") == 0 && i + 1 < argc) {
+            ch_panning = atoi(argv[i + 1]);
             i++;
             continue;
         }
@@ -190,11 +190,11 @@ int main(int argc, char *argv[]) {
             if (is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
                     // Initialize OPL3 registers (music_data will grow here)
-                    opl3_init(&music_data, channel_panning);
+                    opl3_init(&music_data, ch_panning);
                     state.opl3_mode_initialized = true;
                 }
                 // duplicate_write_opl3 returns additional bytes written for Port 1
-                additional_bytes += duplicate_write_opl3(&music_data, &vstat, &state, reg, val, detune, opl3_keyon_wait, channel_panning, v_ratio0, v_ratio1);
+                additional_bytes += duplicate_write_opl3(&music_data, &vstat, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
             } else {
                 forward_write(&music_data, 0, reg, val);
             }
@@ -258,8 +258,8 @@ int main(int argc, char *argv[]) {
 
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
-        ", Converted from YM3812 to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d CH Panning:%d port0 volume:%.2f%% port1 volume:%.2f%%",
-        detune, opl3_keyon_wait, channel_panning, v_ratio0 * 100, v_ratio1 * 100);
+        ", Converted from YM3812 to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
+        detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
     dynbuffer_t gd3;
     buffer_init(&gd3);
@@ -330,7 +330,7 @@ int main(int argc, char *argv[]) {
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
     printf("Creator: %s\n", creator);
-    printf("Stereo Mix: %d\n", channel_panning);
+    printf("Stereo Mix: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
 

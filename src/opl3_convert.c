@@ -51,7 +51,7 @@ void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double d
 
 // Return: number of bytes output to port1
 // v_ratio0/v_ratio1: volume ratio for port0/port1 (0.0~1.0)
-int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait, int channel_panning, double v_ratio0, double v_ratio1) {
+int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1) {
     int port1_bytes = 0;
     if (regType[0] == 'A') {
         if ((state->regB[ch] & 0x20)) {
@@ -79,7 +79,7 @@ int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *stat
         // Odd channels: port0->left, port1->right
         // This creates alternating stereo placement for a stereo effect
         uint8_t port0_panning, port1_panning;
-        if (channel_panning) {
+        if (ch_panning) {
             // Apply stereo panning
             if (ch % 2 == 0) {
                 // Even channel: port0 gets right channel, port1 gets left channel
@@ -117,7 +117,7 @@ void handle_bd(dynbuffer_t *music_data, OPL3State *state, uint8_t val) {
 
 // --- Main OPL3/OPL2 reg write handler ---
 // Return: bytes output to port1
-int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int channel_panning, double v_ratio0, double v_ratio1) {
+int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1) {
     int port1_bytes = 0;
 
     if (reg == 0x01) {
@@ -128,21 +128,21 @@ int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State
         forward_write(music_data, 0, reg, val);
     } else if (reg >= 0x40 && reg <= 0x55) {
         int ch = reg - 0x40;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "T", val, detune, opl3_keyon_wait, channel_panning, v_ratio0, v_ratio1);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "T", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else if (reg == 0xBD) {
         handle_bd(music_data, state, val);
     } else if (reg >= 0xA0 && reg <= 0xA8) {
         int ch = reg - 0xA0;
         state->regA[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "A", val, detune, opl3_keyon_wait, channel_panning, v_ratio0, v_ratio1);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "A", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         int ch = reg - 0xB0;
         state->regB[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "B", val, detune, opl3_keyon_wait, channel_panning, v_ratio0, v_ratio1);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "B", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         state->regC[ch] = val;
-        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "C", val, detune, opl3_keyon_wait, channel_panning, v_ratio0, v_ratio1);
+        port1_bytes += apply_to_ports(music_data, vstat, state, ch, "C", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else {
         forward_write(music_data, 0, reg, val);
         forward_write(music_data, 1, reg, val); port1_bytes += 3;
