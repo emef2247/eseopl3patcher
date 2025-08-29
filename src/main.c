@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
         orig_gd3_ver = 0x00000100;
     }
     char creator_append[128];
-    snprintf(creator_append, sizeof(creator_append), ",modified by %s", creator);
+    snprintf(creator_append, sizeof(creator_append), ",%s", creator);
 
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
