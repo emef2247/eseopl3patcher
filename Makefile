@@ -22,4 +22,11 @@ win: $(SRCS)
 clean:
 	rm -f $(TARGET) $(TARGET_WIN) src/*.o
 
-.PHONY: all win clean
+
+release: eseopl3patcher eseopl3patcher.exe
+	@mkdir -p release_temp
+	@if [ -f eseopl3patcher ]; then mv -f eseopl3patcher release_temp/; fi
+	@if [ -f eseopl3patcher.exe ]; then mv -f eseopl3patcher.exe release_temp/; fi
+	@echo "Moved eseopl3patcher(.exe) to release_temp/"
+
+.PHONY: all release win clean

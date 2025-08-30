@@ -10,7 +10,7 @@
 
 #define DEFAULT_DETUNE 1.0
 #define DEFAULT_WAIT 0
-#define DEFAULT_CH_PANNING 0 
+#define DEFAULT_CH_PANNING 0
 #define DEFAULT_VOLUME_RATIO0 1.0
 #define DEFAULT_VOLUME_RATIO1 0.6
 
@@ -52,10 +52,10 @@ int main(int argc, char *argv[]) {
     const char *p_creator = "eseopl3patcher";
     const char *p_output_path = NULL;
 
-    // --- New argument defaults ---
-    int ch_panning = DEFAULT_CH_PANNING;   // Default: Channel panning mode: ON
-    double v_ratio0 = DEFAULT_VOLUME_RATIO0; // Default: 100% volume
-    double v_ratio1 = DEFAULT_VOLUME_RATIO1; // Default: 60% volume
+    // New argument defaults
+    int ch_panning = DEFAULT_CH_PANNING;      // Default: Channel panning mode: ON
+    double v_ratio0 = DEFAULT_VOLUME_RATIO0;  // Default: 100% volume
+    double v_ratio1 = DEFAULT_VOLUME_RATIO1;  // Default: 60% volume
 
     // Parse optional arguments
     for (int i = 3; i < argc; ++i) {
@@ -157,10 +157,15 @@ int main(int argc, char *argv[]) {
         orig_loop_address = orig_loop_offset + 0x04;
     }
 
-    // Prepare output music data buffer and status
-    dynbuffer_t music_data;
-    buffer_init(&music_data);
-    vgm_status_t vstat = {0};
+    // Prepare VGMContext
+    VGMContext vgmctx;
+    vgm_buffer_init(&vgmctx.buffer);
+    vgm_timestamp_init(&vgmctx.timestamp, 44100.0);
+    vgmctx.status.total_samples = 0;
+    memset(&vgmctx.header, 0, sizeof(vgmctx.header));
+    vgmctx.gd3.data = NULL;
+    vgmctx.gd3.size = 0;
+
     OPL3State state = {0};
     state.rhythm_mode = false;
     state.opl3_mode_initialized = false;
@@ -169,14 +174,14 @@ int main(int argc, char *argv[]) {
     long read_done_byte = data_start;
     uint32_t additional_bytes = 0;
 
-    // Track loop start position in generated music_data
-    long loop_start_in_music_data = -1;
+    // Track loop start position in generated buffer
+    long loop_start_in_buffer = -1;
 
     // Main VGM data conversion loop
     while (read_done_byte < filesize) {
-        // Detect loop start: when reaching the original loop address, record music_data.size
+        // Detect loop start: when reaching the original loop address, record buffer.size
         if (orig_loop_offset != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
-            loop_start_in_music_data = music_data.size;
+            loop_start_in_buffer = vgmctx.buffer.size;
         }
 
         unsigned char cmd = p_vgm_data[read_done_byte];
@@ -189,20 +194,20 @@ int main(int argc, char *argv[]) {
 
             if (is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
-                    // Initialize OPL3 registers (music_data will grow here)
-                    opl3_init(&music_data, ch_panning);
+                    // Initialize OPL3 registers (buffer will grow here)
+                    opl3_init(&vgmctx.buffer, ch_panning, &state);
                     state.opl3_mode_initialized = true;
                 }
                 // duplicate_write_opl3 returns additional bytes written for Port 1
-                additional_bytes += duplicate_write_opl3(&music_data, &vstat, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, NULL, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
             } else {
-                forward_write(&music_data, 0, reg, val);
+                forward_write(&vgmctx.buffer, 0, reg, val);
             }
             continue;
         }
         // Short wait command (0x70-0x7F)
         else if (cmd >= 0x70 && cmd <= 0x7F) {
-            vgm_wait_short(&music_data, &vstat, cmd);
+            vgm_wait_short_ctx(&vgmctx, cmd);
             read_done_byte++;
             continue;
         }
@@ -215,31 +220,31 @@ int main(int argc, char *argv[]) {
             uint8_t lo = p_vgm_data[read_done_byte + 1];
             uint8_t hi = p_vgm_data[read_done_byte + 2];
             uint16_t samples = lo | (hi << 8);
-            vgm_wait_samples(&music_data, &vstat, samples);
+            vgm_wait_samples_ctx(&vgmctx, samples);
             read_done_byte += 3;
             continue;
         }
         // Wait 60Hz (0x62)
         else if (cmd == 0x62) {
-            vgm_wait_60hz(&music_data, &vstat);
+            vgm_wait_60hz_ctx(&vgmctx);
             read_done_byte++;
             continue;
         }
         // Wait 50Hz (0x63)
         else if (cmd == 0x63) {
-            vgm_wait_50hz(&music_data, &vstat);
+            vgm_wait_50hz_ctx(&vgmctx);
             read_done_byte++;
             continue;
         }
         // End of sound data (0x66)
         else if (cmd == 0x66) {
-            vgm_append_byte(&music_data, cmd);
+            vgm_append_byte(&vgmctx.buffer, cmd);
             read_done_byte++;
             break;
         }
         // Other commands: copy as-is
         else {
-            vgm_append_byte(&music_data, cmd);
+            vgm_append_byte(&vgmctx.buffer, cmd);
             read_done_byte++;
             continue;
         }
@@ -261,27 +266,27 @@ int main(int argc, char *argv[]) {
         ", Converted from YM3812 to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
         detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
-    dynbuffer_t gd3;
-    buffer_init(&gd3);
+    VGMBuffer gd3;
+    vgm_buffer_init(&gd3);
     build_new_gd3_chunk(&gd3, p_gd3_fields, orig_gd3_ver, creator_append, note_append);
 
     for (int i = 0; i < GD3_FIELDS; ++i) free(p_gd3_fields[i]);
 
     // Calculate output header and offsets
-    uint32_t music_data_size = (uint32_t)music_data.size;
+    uint32_t buffer_size = (uint32_t)vgmctx.buffer.size;
     uint32_t gd3_size = (uint32_t)gd3.size;
 
     // Use larger of original header size or 0x100 (VGM_HEADER_SIZE)
     uint32_t header_size = (orig_header_size > 0x100) ? orig_header_size : 0x100;
-    uint32_t new_eof_offset = music_data_size + header_size + gd3_size - 1;
+    uint32_t new_eof_offset = buffer_size + header_size + gd3_size - 1;
     uint32_t vgm_eof_offset_field = new_eof_offset - 0x04;
-    uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
+    uint32_t gd3_offset_field_value = header_size + buffer_size - 0x14;
     uint32_t data_offset = header_size - 0x34;
 
-    // Calculate new loop offset: set to header_size + music_data offset (if loop exists)
+    // Calculate new loop offset: set to header_size + buffer offset (if loop exists)
     uint32_t new_loop_offset = 0xFFFFFFFF;
-    if (loop_start_in_music_data >= 0) {
-        new_loop_offset = header_size + (uint32_t)loop_start_in_music_data;
+    if (loop_start_in_buffer >= 0) {
+        new_loop_offset = header_size + (uint32_t)loop_start_in_buffer;
     }
 
     // Allocate header buffer
@@ -291,7 +296,7 @@ int main(int argc, char *argv[]) {
     build_vgm_header(
         p_header_buf,
         p_vgm_data,
-        vstat.new_total_samples,
+        vgmctx.status.total_samples,
         vgm_eof_offset_field,
         gd3_offset_field_value,
         data_offset,
@@ -311,19 +316,34 @@ int main(int argc, char *argv[]) {
     set_opl3_clock(p_header_buf, OPL3_CLOCK);
     set_ym3812_clock(p_header_buf, 0);
 
-    // Write output VGM file: header, music data, GD3 chunk
+    // Copy header and GD3 info into VGMContext for export
+    memcpy(vgmctx.header.raw, p_header_buf, (header_size > sizeof(vgmctx.header.raw) ? sizeof(vgmctx.header.raw) : header_size));
+    vgmctx.header.version = 0x00000171;
+    vgmctx.header.data_offset = data_offset;
+    vgmctx.header.gd3_offset = gd3_offset_field_value;
+    vgmctx.header.loop_offset = new_loop_offset;
+    vgmctx.header.loop_samples = 0;
+    vgmctx.header.total_samples = vgmctx.status.total_samples;
+    vgmctx.header.eof_offset = vgm_eof_offset_field;
+    // GD3
+    vgmctx.gd3.data = gd3.data;
+    vgmctx.gd3.size = gd3.size;
+
+    // Write output VGM file: header, buffer, GD3 chunk
     FILE *p_wf = fopen(p_output_path, "wb");
     if (!p_wf) {
         fprintf(stderr, "Failed to open output file for writing: %s\n", p_output_path);
-        buffer_free(&music_data);
-        buffer_free(&gd3);
+        vgm_buffer_free(&vgmctx.buffer);
+        vgm_buffer_free(&gd3);
         free(p_vgm_data);
         free(p_header_buf);
         return 1;
     }
-    fwrite(p_header_buf, 1, header_size, p_wf);
-    fwrite(music_data.p_data, 1, music_data.size, p_wf);
-    fwrite(gd3.p_data, 1, gd3.size, p_wf);
+    VGMBuffer outbuf;
+    vgm_buffer_init(&outbuf);
+    vgm_export_header_and_gd3(&vgmctx, &outbuf);
+    fwrite(outbuf.data, 1, outbuf.size, p_wf);
+    fwrite(vgmctx.buffer.data, 1, vgmctx.buffer.size, p_wf); // Write music data
     fclose(p_wf);
 
     printf("Converted VGM written to: %s\n", p_output_path);
@@ -335,8 +355,9 @@ int main(int argc, char *argv[]) {
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
 
     // Free resources
-    buffer_free(&music_data);
-    buffer_free(&gd3);
+    vgm_buffer_free(&vgmctx.buffer);
+    vgm_buffer_free(&outbuf);
+    // gd3.data is freed by vgm_buffer_free(&gd3) above as it's now in vgmctx.gd3.data
     free(p_vgm_data);
     free(p_header_buf);
 
