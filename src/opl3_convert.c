@@ -9,7 +9,7 @@
 #include "opl3_debug_util.h"
 
 // Write register value and update state flags
-void opl3_write_reg(OPL3State *p_state, dynbuffer_t *p_music_data, int port, uint8_t reg, uint8_t value) {
+void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value) {
     uint16_t addr = reg + (port ? 0x100 : 0x000);
     if (addr < OPL3_REGISTER_SIZE) {
         p_state->reg[addr] = value;
@@ -87,8 +87,9 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regB, ctx->val);
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regA, ctx->p_state->reg[addr_regA]);
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regB, ctx->val);
-            vgm_wait_samples(ctx->p_music_data, ctx->p_vstat, ctx->opl3_keyon_wait);
-
+            if (ctx->p_vstat) {
+                vgm_wait_samples(ctx->p_music_data, ctx->p_vstat, ctx->opl3_keyon_wait);
+            }
             // Apply detune if requested and write to port 1 (chorus effect)
             uint8_t detunedA, detunedB;
             detune_if_fm(ctx->p_state, ctx->ch, ctx->p_state->reg[addr_regA], ctx->p_state->reg[addr_regB], ctx->detune, &detunedA, &detunedB);
@@ -96,7 +97,9 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
             if (!(ctx->ch >= 6 && ctx->ch <= 8 && ctx->p_state->rhythm_mode)) {
                 opl3_write_reg(ctx->p_state, ctx->p_music_data, 1, addr_regB, detunedB); port1_bytes += 3;
             }
-            vgm_wait_samples(ctx->p_music_data, ctx->p_vstat, ctx->opl3_keyon_wait);
+            if (ctx->p_vstat) {
+                vgm_wait_samples(ctx->p_music_data, ctx->p_vstat, ctx->opl3_keyon_wait);
+            }
             // Only extract and register voice parameters when KeyOn (bit5) is set
             if (ctx->val & 0x20) {
                 // Extract and register voice parameters
@@ -145,15 +148,15 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
 }
 
 // Rhythm mode register handler
-void handle_bd(dynbuffer_t *p_music_data, OPL3State *p_state, uint8_t val) {
+void handle_bd(VGMBuffer *p_music_data, OPL3State *p_state, uint8_t val) {
     p_state->rhythm_mode = (val & 0x20) != 0;
     opl3_write_reg(p_state, p_music_data, 0, 0xBD, val);
 }
 
 // Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring)
 int duplicate_write_opl3(
-    dynbuffer_t *p_music_data,
-    vgm_status_t *p_vstat,
+    VGMBuffer *p_music_data,
+    VGMStatus *p_vstat,
     OPL3State *p_state,
     uint8_t reg, uint8_t val,
     double detune, int opl3_keyon_wait, int ch_panning,
@@ -195,7 +198,7 @@ int duplicate_write_opl3(
 }
 
 // OPL3 initialization sequence
-void opl3_init(dynbuffer_t *p_music_data, int stereo_mode, OPL3State *p_state) {
+void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state) {
     memset(p_state->reg, 0, OPL3_REGISTER_SIZE);
     p_state->rhythm_mode = false;
     p_state->opl3_mode_initialized = false;

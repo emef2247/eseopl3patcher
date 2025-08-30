@@ -45,4 +45,10 @@ void opl3_event_list_init(OPL3EventList *p_list);
 void opl3_event_list_free(OPL3EventList *p_list);
 void opl3_event_list_add(OPL3EventList *p_list, const OPL3Event *p_event);
 
+// KeyOn/KeyOff helper for OPL3 channel state
+typedef struct {
+    uint8_t keyon;     // Current KeyOn bit (0 or 1)
+    uint8_t prev_keyon;// Previous KeyOn bit (0 or 1)
+} OPL3KeyOnStatus;
+
 #endif // OPL3_EVENT_H

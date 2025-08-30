@@ -19,8 +19,7 @@ static void write_le_uint32(unsigned char *p_ptr, uint32_t val) {
 
 // Helper: decode UTF-16LE string to newly allocated UTF-8 string
 static char *utf16le_to_utf8(const uint8_t *p_utf16, size_t bytes) {
-    // Worst case: each UTF-16 code unit becomes 3 UTF-8 bytes + null
-    char *p_utf8 = (char*)malloc(bytes * 2 + 1);
+    char *p_utf8 = (char*)malloc(bytes * 2 + 1); // Worst case: each UTF-16 code unit becomes 3 UTF-8 bytes + null
     size_t out = 0;
     for (size_t in = 0; in + 1 < bytes; in += 2) {
         uint16_t w = p_utf16[in] | (p_utf16[in+1] << 8);
@@ -121,7 +120,7 @@ int extract_gd3_fields(const unsigned char *p_vgm_data, long filesize,
 //  8: ReleaseDate
 //  9: Creator (ConvertedBy)
 // 10: Notes
-void build_new_gd3_chunk(dynbuffer_t *p_gd3_buf,
+void build_new_gd3_chunk(VGMBuffer *p_gd3_buf,
                          char *p_gd3_fields[GD3_FIELDS],
                          uint32_t orig_ver,
                          const char *p_append_creator,
@@ -162,7 +161,7 @@ void build_new_gd3_chunk(dynbuffer_t *p_gd3_buf,
     };
     write_le_uint32(header + 4, orig_ver ? orig_ver : 0x00000100);
     write_le_uint32(header + 8, (uint32_t)total_utf16);
-    buffer_append(p_gd3_buf, header, 12);
+    vgm_buffer_append(p_gd3_buf, header, 12);
 
     // GD3 fields (UTF-16LE, null-terminated)
     for (int i = 0; i < GD3_FIELDS; ++i) {
@@ -170,7 +169,7 @@ void build_new_gd3_chunk(dynbuffer_t *p_gd3_buf,
         size_t len = utf8_to_utf16le(p_new_fields[i], NULL);
         uint8_t *p_tmp = (uint8_t*)malloc(len);
         utf8_to_utf16le(p_new_fields[i], p_tmp);
-        buffer_append(p_gd3_buf, p_tmp, len);
+        vgm_buffer_append(p_gd3_buf, p_tmp, len);
         free(p_tmp);
         free(p_new_fields[i]);
     }

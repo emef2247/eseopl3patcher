@@ -5,17 +5,21 @@
 #include <stdbool.h>
 #include "vgm_helpers.h"
 #include "opl3_voice.h"
+#include "opl3_event.h"
 
 #define OPL3_NUM_CHANNELS 18
 #define OPL3_REGISTER_SIZE 0x200 // 0x100 registers per port, 2 ports
 
-// OPL3State structure holds all OPL3 emulation state, including voice DB.
+// OPL3State structure holds all OPL3 emulation state, including voice DB and event DB.
 typedef struct OPL3State {
     uint8_t reg[OPL3_REGISTER_SIZE]; // Full OPL3 register mirror (0x000-0x1FF)
     bool rhythm_mode;                // Rhythm mode flag, updated on BD writes
     bool opl3_mode_initialized;      // OPL3 mode flag, updated on 0x105 writes
     OPL3VoiceDB voice_db;            // Voice database
-    // Add more fields as needed (e.g., uint64_t time_stamp)
+    OPL3EventList event_list;        // Event database (KeyOn/KeyOff etc.)
+    OPL3KeyOnStatus keyon_status[OPL3_NUM_CHANNELS]; // Per-channel KeyOn state
+    uint32_t timestamp;              // Current timestamp in samples or ticks
+    // Add more fields as needed (e.g., other aggregate state)
 } OPL3State;
 
 // OPL3 register type for conversion logic (meaningful, not just A/B/C/T)
@@ -30,22 +34,22 @@ typedef enum {
 
 // Conversion context for register write (not OPL3-specific, for conversion logic)
 typedef struct {
-    dynbuffer_t *p_music_data;
-    vgm_status_t *p_vstat;
-    OPL3State *p_state;
-    int ch;
-    opl3_regtype_t reg_type;
-    uint8_t reg;        // Actual register offset (e.g. 0xA0.., 0xB0.., etc)
-    uint8_t val;
-    double detune;
-    int opl3_keyon_wait;
-    int ch_panning;
-    double v_ratio0;
-    double v_ratio1;
+    VGMBuffer *p_music_data;   // Pointer to VGM dynamic buffer
+    VGMStatus *p_vstat;        // Pointer to VGM status (sample count)
+    OPL3State *p_state;        // Pointer to OPL3 state
+    int ch;                    // Channel index
+    opl3_regtype_t reg_type;   // Register type (for conversion logic)
+    uint8_t reg;               // Actual register offset (e.g. 0xA0.., 0xB0.., etc)
+    uint8_t val;               // Register value
+    double detune;             // Detune value (for chorus/detune effect)
+    int opl3_keyon_wait;       // KeyOn/Off wait (in samples)
+    int ch_panning;            // Channel panning mode
+    double v_ratio0;           // Volume ratio for port 0
+    double v_ratio1;           // Volume ratio for port 1
 } opl3_convert_ctx_t;
 
 // Write a value to the OPL3 register mirror and update internal state flags.
-void opl3_write_reg(OPL3State *p_state, dynbuffer_t *p_music_data, int port, uint8_t reg, uint8_t value);
+void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value);
 
 // Detune helper for FM channels (used for frequency detune effects)
 void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB);
@@ -57,12 +61,12 @@ opl3_regtype_t opl3_judge_regtype(uint8_t reg);
 int apply_to_ports(const opl3_convert_ctx_t *ctx);
 
 // Rhythm mode register handler
-void handle_bd(dynbuffer_t *p_music_data, OPL3State *p_state, uint8_t val);
+void handle_bd(VGMBuffer *p_music_data, OPL3State *p_state, uint8_t val);
 
 // Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring)
 int duplicate_write_opl3(
-    dynbuffer_t *p_music_data,
-    vgm_status_t *p_vstat,
+    VGMBuffer *p_music_data,
+    VGMStatus *p_vstat,
     OPL3State *p_state,
     uint8_t reg, uint8_t val,
     double detune, int opl3_keyon_wait, int ch_panning,
@@ -70,6 +74,6 @@ int duplicate_write_opl3(
 );
 
 // OPL3 initialization sequence for both ports
-void opl3_init(dynbuffer_t *p_music_data, int stereo_mode, OPL3State *p_state);
+void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state);
 
 #endif // OPL3_CONVERT_H

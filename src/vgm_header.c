@@ -1,64 +1,90 @@
-#include "vgm_helpers.h"
+#include "vgm_header.h"
 #include <string.h>
 #include <stdlib.h>
 
-// Initialize dynamic buffer
-void buffer_init(dynbuffer_t *p_buf) {
-    p_buf->p_data = NULL;
-    p_buf->size = 0;
-    p_buf->capacity = 0;
-}
+// Build a VGM header for OPL3/OPL2 output
+void build_vgm_header(
+    uint8_t *p_header,
+    const uint8_t *p_orig_vgm_header,
+    uint32_t total_samples,
+    uint32_t eof_offset,
+    uint32_t gd3_offset,
+    uint32_t data_offset,
+    uint32_t version,
+    uint32_t additional_data_bytes
+) {
+    // Copy original header up to VGM_HEADER_SIZE or original size
+    memcpy(p_header, p_orig_vgm_header, VGM_HEADER_SIZE);
 
-// Append bytes to dynamic buffer
-void buffer_append(dynbuffer_t *p_buf, const void *p_data, size_t len) {
-    if (p_buf->size + len > p_buf->capacity) {
-        size_t new_capacity = (p_buf->capacity ? p_buf->capacity * 2 : 256);
-        while (new_capacity < p_buf->size + len) new_capacity *= 2;
-        p_buf->p_data = realloc(p_buf->p_data, new_capacity);
-        p_buf->capacity = new_capacity;
+    // Set version
+    p_header[0x08] = (version) & 0xFF;
+    p_header[0x09] = (version >> 8) & 0xFF;
+    p_header[0x0A] = (version >> 16) & 0xFF;
+    p_header[0x0B] = (version >> 24) & 0xFF;
+
+    // Set EOF offset (0x04)
+    p_header[0x04] = (eof_offset) & 0xFF;
+    p_header[0x05] = (eof_offset >> 8) & 0xFF;
+    p_header[0x06] = (eof_offset >> 16) & 0xFF;
+    p_header[0x07] = (eof_offset >> 24) & 0xFF;
+
+    // Set total # samples (0x18)
+    p_header[0x18] = (total_samples) & 0xFF;
+    p_header[0x19] = (total_samples >> 8) & 0xFF;
+    p_header[0x1A] = (total_samples >> 16) & 0xFF;
+    p_header[0x1B] = (total_samples >> 24) & 0xFF;
+
+    // Set GD3 offset (0x14)
+    p_header[0x14] = (gd3_offset) & 0xFF;
+    p_header[0x15] = (gd3_offset >> 8) & 0xFF;
+    p_header[0x16] = (gd3_offset >> 16) & 0xFF;
+    p_header[0x17] = (gd3_offset >> 24) & 0xFF;
+
+    // Set data offset (0x34)
+    p_header[0x34] = (data_offset) & 0xFF;
+    p_header[0x35] = (data_offset >> 8) & 0xFF;
+    p_header[0x36] = (data_offset >> 16) & 0xFF;
+    p_header[0x37] = (data_offset >> 24) & 0xFF;
+
+    // Set additional_data_bytes if needed (not always used)
+    if (additional_data_bytes) {
+        // This is a placeholder for any additional patching required
     }
-    memcpy(p_buf->p_data + p_buf->size, p_data, len);
-    p_buf->size += len;
 }
 
-// Free dynamic buffer
-void buffer_free(dynbuffer_t *p_buf) {
-    free(p_buf->p_data);
-    p_buf->p_data = NULL;
-    p_buf->size = 0;
-    p_buf->capacity = 0;
+// Set the YMF262 (OPL3) clock value in the VGM header and zero the YM3812 clock
+void set_opl3_clock(uint8_t *p_header, uint32_t opl3_clock) {
+    // OPL3 clock is at 0x50, YM3812 at 0x44
+    p_header[0x50] = (opl3_clock) & 0xFF;
+    p_header[0x51] = (opl3_clock >> 8) & 0xFF;
+    p_header[0x52] = (opl3_clock >> 16) & 0xFF;
+    p_header[0x53] = (opl3_clock >> 24) & 0xFF;
+    // Zero YM3812 clock
+    p_header[0x44] = 0; p_header[0x45] = 0; p_header[0x46] = 0; p_header[0x47] = 0;
 }
 
-// Append a single byte
-void vgm_append_byte(dynbuffer_t *p_buf, uint8_t value) {
-    buffer_append(p_buf, &value, 1);
+// Set the YM3812 clock value in the VGM header and zero the OPL3 clock
+void set_ym3812_clock(uint8_t *p_header, uint32_t ym3812_clock) {
+    // YM3812 clock is at 0x44, OPL3 at 0x50
+    p_header[0x44] = (ym3812_clock) & 0xFF;
+    p_header[0x45] = (ym3812_clock >> 8) & 0xFF;
+    p_header[0x46] = (ym3812_clock >> 16) & 0xFF;
+    p_header[0x47] = (ym3812_clock >> 24) & 0xFF;
+    // Zero OPL3 clock
+    p_header[0x50] = 0; p_header[0x51] = 0; p_header[0x52] = 0; p_header[0x53] = 0;
 }
 
-// Write a register to OPL3 port
-void forward_write(dynbuffer_t *p_buf, int port, uint8_t reg, uint8_t val) {
-    uint8_t cmd = (port == 0) ? 0x5E : 0x5F;
-    uint8_t bytes[3] = {cmd, reg, val};
-    buffer_append(p_buf, bytes, 3);
-}
+/**
+ * Write the VGM header and GD3 block from VGMContext to the output VGMBuffer.
+ * This function appends the header (0x100 bytes), then the GD3 block (if any).
+ */
+void vgm_export_header_and_gd3(const VGMContext *ctx, VGMBuffer *out_buf) {
+    // Write VGM header (always 0x100 bytes)
+    vgm_buffer_append(out_buf, ctx->header.raw, sizeof(ctx->header.raw));
 
-// Wait commands
-void vgm_wait_short(dynbuffer_t *p_buf, vgm_status_t *p_vstat, uint8_t cmd) {
-    vgm_append_byte(p_buf, cmd);
-    p_vstat->new_total_samples += (cmd & 0x0F) + 1;
-}
-
-void vgm_wait_samples(dynbuffer_t *p_buf, vgm_status_t *p_vstat, uint16_t samples) {
-    uint8_t bytes[3] = {0x61, samples & 0xFF, samples >> 8};
-    buffer_append(p_buf, bytes, 3);
-    p_vstat->new_total_samples += samples;
-}
-
-void vgm_wait_60hz(dynbuffer_t *p_buf, vgm_status_t *p_vstat) {
-    vgm_append_byte(p_buf, 0x62);
-    p_vstat->new_total_samples += 735;
-}
-
-void vgm_wait_50hz(dynbuffer_t *p_buf, vgm_status_t *p_vstat) {
-    vgm_append_byte(p_buf, 0x63);
-    p_vstat->new_total_samples += 882;
+    // If GD3 tag exists and has size, write GD3 block after header
+    if (ctx->gd3.data && ctx->gd3.size > 0) {
+        vgm_buffer_append(out_buf, ctx->gd3.data, ctx->gd3.size);
+    }
+    // Optionally, more metadata can be exported here in the future.
 }
