@@ -1,121 +1,64 @@
-#include "vgm_header.h"
+#include "vgm_helpers.h"
 #include <string.h>
-#include <stdint.h>
+#include <stdlib.h>
 
-// Write a uint32_t as little-endian
-static void write_le32(uint8_t *buf, uint32_t value) {
-    buf[0] = (uint8_t)(value & 0xFF);
-    buf[1] = (uint8_t)((value >> 8) & 0xFF);
-    buf[2] = (uint8_t)((value >> 16) & 0xFF);
-    buf[3] = (uint8_t)((value >> 24) & 0xFF);
+// Initialize dynamic buffer
+void buffer_init(dynbuffer_t *p_buf) {
+    p_buf->p_data = NULL;
+    p_buf->size = 0;
+    p_buf->capacity = 0;
 }
 
-// Read a uint32_t as little-endian
-static uint32_t read_le32(const uint8_t *buf) {
-    return (uint32_t)buf[0] | ((uint32_t)buf[1] << 8) | ((uint32_t)buf[2] << 16) | ((uint32_t)buf[3] << 24);
+// Append bytes to dynamic buffer
+void buffer_append(dynbuffer_t *p_buf, const void *p_data, size_t len) {
+    if (p_buf->size + len > p_buf->capacity) {
+        size_t new_capacity = (p_buf->capacity ? p_buf->capacity * 2 : 256);
+        while (new_capacity < p_buf->size + len) new_capacity *= 2;
+        p_buf->p_data = realloc(p_buf->p_data, new_capacity);
+        p_buf->capacity = new_capacity;
+    }
+    memcpy(p_buf->p_data + p_buf->size, p_data, len);
+    p_buf->size += len;
 }
 
-/**
- * Build a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.
- * - The header size is determined by the original VGM header's data_offset (0x34) + 0x34.
- * - Copies the original header, then overwrites specified fields.
- * - If the header size changes, loop offset is updated accordingly using the header size difference.
- * - Clock values are NOT changed; use set_opl3_clock/set_ym3812_clock after this function if needed.
- *
- * @param header                Output buffer for the VGM header (must be at least max(input_header_size, VGM_HEADER_SIZE) bytes)
- * @param orig_vgm_header       Input VGM header (at least up to input_header_size bytes)
- * @param total_samples         New total samples (0x18)
- * @param eof_offset            New EOF offset (0x04)
- * @param gd3_offset            New GD3 offset (relative to 0x14)
- * @param data_offset           New data offset (relative to 0x34, usually 0xCC for 0x100-byte header)
- * @param version               New VGM version (0x08)
- * @param additional_data_bytes Additional bytes for port 1 (if any)
- */
-void build_vgm_header(
-    uint8_t *pHeader,
-    const uint8_t *pOrigVgmHeader,
-    uint32_t total_samples,
-    uint32_t eof_offset,
-    uint32_t gd3_offset,
-    uint32_t data_offset,
-    uint32_t version,
-    uint32_t additional_data_bytes
-) {
-    // Compute original header size from input data_offset
-    uint32_t orig_data_offset = 0;
-    uint32_t orig_header_size = VGM_HEADER_SIZE;
-    if (pOrigVgmHeader) {
-        orig_data_offset = read_le32(pOrigVgmHeader + 0x34);
-        orig_header_size = 0x34 + orig_data_offset;
-        if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
-    }
-
-    // Set new header size and actual data offset
-    uint32_t new_header_size = (orig_header_size > VGM_HEADER_SIZE)
-        ? orig_header_size
-        : VGM_HEADER_SIZE;
-    uint32_t actual_data_offset = new_header_size - 0x34;
-
-    memset(pHeader, 0, new_header_size);
-
-    // Copy the original header if available
-    if (pOrigVgmHeader) {
-        memcpy(pHeader, pOrigVgmHeader, orig_header_size);
-    }
-
-    // Overwrite mandatory header fields
-    pHeader[0] = 'V'; pHeader[1] = 'g'; pHeader[2] = 'm'; pHeader[3] = ' ';
-    write_le32(pHeader + 0x04, eof_offset);    // EOF offset
-    write_le32(pHeader + 0x08, version);       // Version
-    write_le32(pHeader + 0x34, actual_data_offset); // Data offset
-
-    // Adjust GD3 offset (0x14): relative to 0x14. If header size increases, adjust accordingly
-    uint32_t actual_gd3_offset = gd3_offset;
-    if (new_header_size > VGM_HEADER_SIZE) {
-        actual_gd3_offset += (new_header_size - VGM_HEADER_SIZE);
-    }
-    write_le32(pHeader + 0x14, actual_gd3_offset);
-
-    write_le32(pHeader + 0x18, total_samples); // Total samples
-
-    // Read original loop offset, loop samples, and rate
-    uint32_t loop_offset_orig = 0xFFFFFFFF;
-    uint32_t loop_samples_orig = 0;
-    uint32_t rate_orig = 0;
-    if (pOrigVgmHeader) {
-        loop_offset_orig  = read_le32(pOrigVgmHeader + 0x1C);
-        loop_samples_orig = read_le32(pOrigVgmHeader + 0x20);
-        rate_orig         = read_le32(pOrigVgmHeader + 0x24);
-    }
-    uint32_t new_loop_offset = loop_offset_orig;
-
-    // If loop offset is valid, adjust by header size difference (new_header_size - orig_header_size)
-    if (loop_offset_orig != 0xFFFFFFFF) {
-        int32_t header_diff = (int32_t)new_header_size - (int32_t)orig_header_size;
-        new_loop_offset = loop_offset_orig + header_diff;
-        if (additional_data_bytes > 0) {
-            new_loop_offset += additional_data_bytes;
-        }
-    }
-    write_le32(pHeader + 0x1C, new_loop_offset);    // Loop offset
-    write_le32(pHeader + 0x20, loop_samples_orig);  // Loop samples
-    write_le32(pHeader + 0x24, rate_orig);          // Rate
+// Free dynamic buffer
+void buffer_free(dynbuffer_t *p_buf) {
+    free(p_buf->p_data);
+    p_buf->p_data = NULL;
+    p_buf->size = 0;
+    p_buf->capacity = 0;
 }
 
-/**
- * Set the YMF262 (OPL3) clock value in the VGM header
- * @param header Pointer to the VGM header
- * @param opl3_clock The clock value for YMF262 (OPL3)
- */
-void set_opl3_clock(uint8_t *pHeader, uint32_t opl3_clock) {
-    write_le32(pHeader + 0x5C, opl3_clock);    // YMF262 (OPL3) clock
+// Append a single byte
+void vgm_append_byte(dynbuffer_t *p_buf, uint8_t value) {
+    buffer_append(p_buf, &value, 1);
 }
 
-/**
- * Set the YM3812 clock value in the VGM header
- * @param header Pointer to the VGM header
- * @param ym3812_clock The clock value for YM3812
- */
-void set_ym3812_clock(uint8_t *pHeader, uint32_t ym3812_clock) {
-    write_le32(pHeader + 0x50, ym3812_clock);  // YM3812 clock
+// Write a register to OPL3 port
+void forward_write(dynbuffer_t *p_buf, int port, uint8_t reg, uint8_t val) {
+    uint8_t cmd = (port == 0) ? 0x5E : 0x5F;
+    uint8_t bytes[3] = {cmd, reg, val};
+    buffer_append(p_buf, bytes, 3);
+}
+
+// Wait commands
+void vgm_wait_short(dynbuffer_t *p_buf, vgm_status_t *p_vstat, uint8_t cmd) {
+    vgm_append_byte(p_buf, cmd);
+    p_vstat->new_total_samples += (cmd & 0x0F) + 1;
+}
+
+void vgm_wait_samples(dynbuffer_t *p_buf, vgm_status_t *p_vstat, uint16_t samples) {
+    uint8_t bytes[3] = {0x61, samples & 0xFF, samples >> 8};
+    buffer_append(p_buf, bytes, 3);
+    p_vstat->new_total_samples += samples;
+}
+
+void vgm_wait_60hz(dynbuffer_t *p_buf, vgm_status_t *p_vstat) {
+    vgm_append_byte(p_buf, 0x62);
+    p_vstat->new_total_samples += 735;
+}
+
+void vgm_wait_50hz(dynbuffer_t *p_buf, vgm_status_t *p_vstat) {
+    vgm_append_byte(p_buf, 0x63);
+    p_vstat->new_total_samples += 882;
 }

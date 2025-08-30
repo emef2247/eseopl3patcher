@@ -15,25 +15,25 @@
 #define DEFAULT_VOLUME_RATIO1 0.6
 
 // Read little-endian 32-bit integer from buffer
-static uint32_t read_le_uint32(const unsigned char *ptr) {
-    return (uint32_t)ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16) | ((uint32_t)ptr[3] << 24);
+static uint32_t read_le_uint32(const unsigned char *p_ptr) {
+    return (uint32_t)p_ptr[0] | ((uint32_t)p_ptr[1] << 8) | ((uint32_t)p_ptr[2] << 16) | ((uint32_t)p_ptr[3] << 24);
 }
 
 // Check if file ends with ".vgm" or has no extension (for vgz-uncompressed)
-static bool has_vgm_extension_or_none(const char *pFilename) {
-    size_t len = strlen(pFilename);
-    if (len > 4 && strcasecmp(pFilename + len - 4, ".vgm") == 0) return true;
-    const char *basename = strrchr(pFilename, '/');
-    basename = basename ? basename + 1 : pFilename;
-    if (strchr(basename, '.') == NULL) return true;
+static bool has_vgm_extension_or_none(const char *p_filename) {
+    size_t len = strlen(p_filename);
+    if (len > 4 && strcasecmp(p_filename + len - 4, ".vgm") == 0) return true;
+    const char *p_basename = strrchr(p_filename, '/');
+    p_basename = p_basename ? p_basename + 1 : p_filename;
+    if (strchr(p_basename, '.') == NULL) return true;
     return false;
 }
 
 // Generate default output filename based on input name
-static void make_default_output_name(const char *pInput, char *pOutput, size_t outlen) {
-    size_t len = strlen(pInput);
-    if (len > 4 && strcmp(&pInput[len-4], ".vgm") == 0) len -= 4;
-    snprintf(pOutput, outlen, "%.*sOPL3.vgm", (int)len, pInput);
+static void make_default_output_name(const char *p_input, char *p_output, size_t outlen) {
+    size_t len = strlen(p_input);
+    if (len > 4 && strcmp(&p_input[len-4], ".vgm") == 0) len -= 4;
+    snprintf(p_output, outlen, "%.*sOPL3.vgm", (int)len, p_input);
 }
 
 int main(int argc, char *argv[]) {
@@ -43,14 +43,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     // Parse required arguments
-    const char *pInputVgm = argv[1];
+    const char *p_input_vgm = argv[1];
     double detune = atof(argv[2]);
 
     // Wait is optional, default is DEFAULT_WAIT
     int opl3_keyon_wait = DEFAULT_WAIT;
 
-    const char *pCreator = "eseopl3patcher";
-    const char *pOutputPath = NULL;
+    const char *p_creator = "eseopl3patcher";
+    const char *p_output_path = NULL;
 
     // --- New argument defaults ---
     int ch_panning = DEFAULT_CH_PANNING;   // Default: Channel panning mode: ON
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     for (int i = 3; i < argc; ++i) {
         // Handle -o option
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-            pOutputPath = argv[i + 1];
+            p_output_path = argv[i + 1];
             i++; // Skip output filename
             continue;
         }
@@ -86,72 +86,72 @@ int main(int argc, char *argv[]) {
         // If this argument starts with '-', skip (unknown option)
         if (argv[i][0] == '-') continue;
         // If this argument is a number and wait is not yet set, use as wait
-        char *pEndptr;
-        int val = (int)strtol(argv[i], &pEndptr, 10);
-        if (*pEndptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
+        char *endptr;
+        int val = (int)strtol(argv[i], &endptr, 10);
+        if (*endptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
             opl3_keyon_wait = val;
             continue;
         }
         // If creator not set (other than default), use this argument
-        if (pCreator == NULL || strcmp(pCreator, "eseopl3patcher") == 0) {
-            pCreator = argv[i];
+        if (p_creator == NULL || strcmp(p_creator, "eseopl3patcher") == 0) {
+            p_creator = argv[i];
             continue;
         }
         // Otherwise, ignore
     }
 
-    // If pOutputPath not set, generate default
-    if (!pOutputPath) {
+    // If p_output_path not set, generate default
+    if (!p_output_path) {
         static char default_out[256];
-        make_default_output_name(pInputVgm, default_out, sizeof(default_out));
-        pOutputPath = default_out;
+        make_default_output_name(p_input_vgm, default_out, sizeof(default_out));
+        p_output_path = default_out;
     }
 
     // Check file extension
-    if (!has_vgm_extension_or_none(pInputVgm)) {
+    if (!has_vgm_extension_or_none(p_input_vgm)) {
         fprintf(stderr, "Input file must have .vgm extension or no extension (for vgz-uncompressed files)\n");
         return 1;
     }
 
     // Open and read input VGM file
-    FILE *fp = fopen(pInputVgm, "rb");
-    if (!fp) {
-        fprintf(stderr, "Cannot open input file: %s\n", pInputVgm);
+    FILE *p_fp = fopen(p_input_vgm, "rb");
+    if (!p_fp) {
+        fprintf(stderr, "Cannot open input file: %s\n", p_input_vgm);
         return 1;
     }
-    fseek(fp, 0, SEEK_END);
-    long filesize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    fseek(p_fp, 0, SEEK_END);
+    long filesize = ftell(p_fp);
+    fseek(p_fp, 0, SEEK_SET);
 
-    unsigned char *pVgmData = (unsigned char*)malloc(filesize);
-    if (fread(pVgmData, 1, filesize, fp) != (size_t)filesize) {
+    unsigned char *p_vgm_data = (unsigned char*)malloc(filesize);
+    if (fread(p_vgm_data, 1, filesize, p_fp) != (size_t)filesize) {
         fprintf(stderr, "Failed to read entire file!\n");
-        free(pVgmData);
-        fclose(fp);
+        free(p_vgm_data);
+        fclose(p_fp);
         return 1;
     }
-    fclose(fp);
+    fclose(p_fp);
 
     // Verify VGM file signature
-    if (memcmp(pVgmData, "Vgm ", 4) != 0) {
+    if (memcmp(p_vgm_data, "Vgm ", 4) != 0) {
         fprintf(stderr, "Not a valid VGM file.\n");
-        free(pVgmData);
+        free(p_vgm_data);
         return 1;
     }
 
     // Parse VGM header fields
-    uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(pVgmData + 0x34) : 0;
+    uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(p_vgm_data + 0x34) : 0;
     uint32_t orig_header_size = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
-    if (orig_header_size < 0x40) orig_header_size = 0x100; // fallbac   k for broken files
+    if (orig_header_size < 0x40) orig_header_size = 0x100; // fallback for broken files
     long data_start = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
     if (data_start >= filesize) {
         fprintf(stderr, "Invalid VGM data offset.\n");
-        free(pVgmData);
+        free(p_vgm_data);
         return 1;
     }
 
     // Get original loop offset and calculate loop address
-    uint32_t orig_loop_offset = read_le_uint32(pVgmData  + 0x1C);
+    uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
     uint32_t orig_loop_address = 0;
     if (orig_loop_offset != 0xFFFFFFFF) {
         orig_loop_address = orig_loop_offset + 0x04;
@@ -179,12 +179,12 @@ int main(int argc, char *argv[]) {
             loop_start_in_music_data = music_data.size;
         }
 
-        unsigned char cmd = pVgmData[read_done_byte];
+        unsigned char cmd = p_vgm_data[read_done_byte];
 
         // YM3812 register write (0x5A)
         if (cmd == 0x5A) {
-            uint8_t reg = pVgmData[read_done_byte + 1];
-            uint8_t val = pVgmData[read_done_byte + 2];
+            uint8_t reg = p_vgm_data[read_done_byte + 1];
+            uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
             if (is_replicate_reg_ymf262) {
@@ -212,8 +212,8 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "Truncated 0x61 at end of file\n");
                 break;
             }
-            uint8_t lo = pVgmData[read_done_byte + 1];
-            uint8_t hi = pVgmData[read_done_byte + 2];
+            uint8_t lo = p_vgm_data[read_done_byte + 1];
+            uint8_t hi = p_vgm_data[read_done_byte + 2];
             uint16_t samples = lo | (hi << 8);
             vgm_wait_samples(&music_data, &vstat, samples);
             read_done_byte += 3;
@@ -246,15 +246,15 @@ int main(int argc, char *argv[]) {
     }
 
     // GD3 tag handling: read, modify, rebuild
-    char *gd3_fields[GD3_FIELDS] = {NULL};
+    char *p_gd3_fields[GD3_FIELDS] = {NULL};
     uint32_t orig_gd3_ver = 0, orig_gd3_len = 0;
-    if (extract_gd3_fields(pVgmData, filesize, gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
+    if (extract_gd3_fields(p_vgm_data, filesize, p_gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
         fprintf(stderr, "Original GD3 not found, will use empty fields.\n");
-        for (int i = 0; i < GD3_FIELDS; ++i) gd3_fields[i] = strdup("");
+        for (int i = 0; i < GD3_FIELDS; ++i) p_gd3_fields[i] = strdup("");
         orig_gd3_ver = 0x00000100;
     }
     char creator_append[128];
-    snprintf(creator_append, sizeof(creator_append), ",%s", pCreator);
+    snprintf(creator_append, sizeof(creator_append), ",%s", p_creator);
 
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
@@ -263,9 +263,9 @@ int main(int argc, char *argv[]) {
 
     dynbuffer_t gd3;
     buffer_init(&gd3);
-    build_new_gd3_chunk(&gd3, gd3_fields, orig_gd3_ver, creator_append, note_append);
+    build_new_gd3_chunk(&gd3, p_gd3_fields, orig_gd3_ver, creator_append, note_append);
 
-    for (int i = 0; i < GD3_FIELDS; ++i) free(gd3_fields[i]);
+    for (int i = 0; i < GD3_FIELDS; ++i) free(p_gd3_fields[i]);
 
     // Calculate output header and offsets
     uint32_t music_data_size = (uint32_t)music_data.size;
@@ -285,12 +285,12 @@ int main(int argc, char *argv[]) {
     }
 
     // Allocate header buffer
-    uint8_t *header_buf = (uint8_t*)calloc(1, header_size);
+    uint8_t *p_header_buf = (uint8_t*)calloc(1, header_size);
 
     // Build new VGM header
     build_vgm_header(
-        header_buf,
-        pVgmData,
+        p_header_buf,
+        p_vgm_data,
         vstat.new_total_samples,
         vgm_eof_offset_field,
         gd3_offset_field_value,
@@ -301,35 +301,35 @@ int main(int argc, char *argv[]) {
 
     // Overwrite loop offset field with correct value
     if (new_loop_offset != 0xFFFFFFFF) {
-        header_buf[0x1C] = (uint8_t)(new_loop_offset & 0xFF);
-        header_buf[0x1D] = (uint8_t)((new_loop_offset >> 8) & 0xFF);
-        header_buf[0x1E] = (uint8_t)((new_loop_offset >> 16) & 0xFF);
-        header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
+        p_header_buf[0x1C] = (uint8_t)(new_loop_offset & 0xFF);
+        p_header_buf[0x1D] = (uint8_t)((new_loop_offset >> 8) & 0xFF);
+        p_header_buf[0x1E] = (uint8_t)((new_loop_offset >> 16) & 0xFF);
+        p_header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
     }
 
     // Set OPL3 clock and zero YM3812 clock
-    set_opl3_clock(header_buf, OPL3_CLOCK);
-    set_ym3812_clock(header_buf, 0);
+    set_opl3_clock(p_header_buf, OPL3_CLOCK);
+    set_ym3812_clock(p_header_buf, 0);
 
     // Write output VGM file: header, music data, GD3 chunk
-    FILE *wf = fopen(pOutputPath, "wb");
-    if (!wf) {
-        fprintf(stderr, "Failed to open output file for writing: %s\n", pOutputPath);
+    FILE *p_wf = fopen(p_output_path, "wb");
+    if (!p_wf) {
+        fprintf(stderr, "Failed to open output file for writing: %s\n", p_output_path);
         buffer_free(&music_data);
         buffer_free(&gd3);
-        free(pVgmData);
-        free(header_buf);
+        free(p_vgm_data);
+        free(p_header_buf);
         return 1;
     }
-    fwrite(header_buf, 1, header_size, wf);
-    fwrite(music_data.pData, 1, music_data.size, wf);
-    fwrite(gd3.pData, 1, gd3.size, wf);
-    fclose(wf);
+    fwrite(p_header_buf, 1, header_size, p_wf);
+    fwrite(music_data.p_data, 1, music_data.size, p_wf);
+    fwrite(gd3.p_data, 1, gd3.size, p_wf);
+    fclose(p_wf);
 
-    printf("Converted VGM written to: %s\n", pOutputPath);
+    printf("Converted VGM written to: %s\n", p_output_path);
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
-    printf("Creator: %s\n", pCreator);
+    printf("Creator: %s\n", p_creator);
     printf("Channel Panning Mode: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
@@ -337,8 +337,8 @@ int main(int argc, char *argv[]) {
     // Free resources
     buffer_free(&music_data);
     buffer_free(&gd3);
-    free(pVgmData);
-    free(header_buf);
+    free(p_vgm_data);
+    free(p_header_buf);
 
     return 0;
 }
