@@ -55,3 +55,8 @@ dkms.conf
 *.dwo
 *.vgm
 /release_temp
+
+# executables
+
+*.exe
+eseopl3patcher
