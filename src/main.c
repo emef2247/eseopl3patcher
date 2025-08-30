@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
             if (is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
                     // Initialize OPL3 registers (music_data will grow here)
-                    opl3_init(&music_data, ch_panning);
+                    opl3_init(&music_data, ch_panning, &state);
                     state.opl3_mode_initialized = true;
                 }
                 // duplicate_write_opl3 returns additional bytes written for Port 1

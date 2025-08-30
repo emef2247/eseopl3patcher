@@ -35,14 +35,14 @@ typedef struct {
 
 // Dynamic event list for easy appending (expandable array)
 typedef struct {
-    OPL3Event *events;
+    OPL3Event *p_events;
     int count;
     int capacity;
 } OPL3EventList;
 
 // Utility functions
-void opl3_event_list_init(OPL3EventList *pList);
-void opl3_event_list_free(OPL3EventList *pList);
-void opl3_event_list_add(OPL3EventList *pList, const OPL3Event *pEvent);
+void opl3_event_list_init(OPL3EventList *p_list);
+void opl3_event_list_free(OPL3EventList *p_list);
+void opl3_event_list_add(OPL3EventList *p_list, const OPL3Event *p_event);
 
 #endif // OPL3_EVENT_H

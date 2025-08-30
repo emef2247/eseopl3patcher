@@ -1,16 +1,37 @@
+#include "opl3_convert.h"
+#include <string.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "vgm_helpers.h"
 #include <math.h>
+#include "vgm_helpers.h"
+#include "opl3_voice.h"
+#include "opl3_debug_util.h"
 
-// --- Channel registers state ---
-typedef struct {
-    uint8_t regA[9];
-    uint8_t regB[9];
-    uint8_t regC[9];
-    bool rhythm_mode;
-    bool opl3_mode_initialized;
-} OPL3State;
+// Global voice DB (kept for compatibility, but use state->voice_db instead if possible)
+OPL3VoiceDB g_voice_db;
+
+// Free dynamic resources in OPL3State
+void opl3_state_free(OPL3State *p_state) {
+    opl3_voice_db_free(&p_state->voice_db);
+}
+
+// Write register value and update state flags
+void opl3_write_reg(OPL3State *p_state, dynbuffer_t *p_music_data, int port, uint8_t reg, uint8_t value) {
+    uint16_t addr = reg + (port ? 0x100 : 0x000);
+    if (addr < OPL3_REGISTER_SIZE) {
+        p_state->reg[addr] = value;
+    }
+    // Update internal state flags based on register values
+    if (addr == 0xBD || addr == 0x1BD) {
+        p_state->rhythm_mode = (value & 0x20) != 0;
+    }
+    if (addr == 0x105) {
+        p_state->opl3_mode_initialized = (value & 0x01) != 0;
+    }
+    // Actually write to the output as before
+    forward_write(p_music_data, port, reg, value);
+}
 
 // TL (Total Level) attenuation using v_ratio
 uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
@@ -54,25 +75,47 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
 int apply_to_ports(dynbuffer_t *p_music_data, vgm_status_t *p_vstat, OPL3State *p_state, int ch, const char *p_reg_type, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1) {
     int port1_bytes = 0;
     if (p_reg_type[0] == 'A') {
-        if ((p_state->regB[ch] & 0x20)) {
-            forward_write(p_music_data, 0, 0xA0 + ch, val);
-            // port0 only
+        int addr = 0xA0 + ch;
+        if ((p_state->reg[addr] & 0x20)) {
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
         }
     } else if (p_reg_type[0] == 'B') {
-        forward_write(p_music_data, 0, 0xB0 + ch, val);
-        forward_write(p_music_data, 0, 0xA0 + ch, p_state->regA[ch]);
-        forward_write(p_music_data, 0, 0xB0 + ch, val);
+        int addr_regA = 0xA0 + ch;
+        int addr_regB = 0xB0 + ch;
+
+        // Write B register sequence to port 0
+        opl3_write_reg(p_state, p_music_data, 0, addr_regB, val);
+        opl3_write_reg(p_state, p_music_data, 0, addr_regA, p_state->reg[addr_regA]);
+        opl3_write_reg(p_state, p_music_data, 0, addr_regB, val);
 
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
 
+        // Apply detune if requested and write to port 1
         uint8_t detunedA, detunedB;
-        detune_if_fm(p_state, ch, p_state->regA[ch], p_state->regB[ch], detune, &detunedA, &detunedB);
+        detune_if_fm(p_state, ch, p_state->reg[addr_regA], p_state->reg[addr_regB], detune, &detunedA, &detunedB);
 
-        forward_write(p_music_data, 1, 0xA0 + ch, detunedA); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, addr_regA, detunedA); port1_bytes += 3;
         if (!(ch >= 6 && ch <= 8 && p_state->rhythm_mode)) {
-            forward_write(p_music_data, 1, 0xB0 + ch, detunedB); port1_bytes += 3;
+            opl3_write_reg(p_state, p_music_data, 1, addr_regB, detunedB); port1_bytes += 3;
         }
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+
+        // Extract current voice parameters for this channel
+        OPL3VoiceParam vparam;
+        extract_voice_param(p_state, ch, &vparam);
+
+        // Use the voice_db from the state, not a global variable
+        int prev_voice_count = p_state->voice_db.count;
+        int voice_id = opl3_voice_db_find_or_add(&p_state->voice_db, &vparam);
+        if (voice_id >= 0) {
+            if (p_state->voice_db.count > prev_voice_count) {
+                // New voice was added, print it
+                print_opl3_voice_param(p_state, &vparam);
+            }
+        } else {
+            fprintf(stderr, "Error: Failed to find or add voice parameters for channel %d\n", ch);
+        }
+
     } else if (p_reg_type[0] == 'C') {
         // Stereo panning implementation based on channel number
         // Even channels: port0->right, port1->left
@@ -95,16 +138,16 @@ int apply_to_ports(dynbuffer_t *p_music_data, vgm_status_t *p_vstat, OPL3State *
             port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
         }
 
-        forward_write(p_music_data, 0, 0xC0 + ch, val | port0_panning);
-        forward_write(p_music_data, 1, 0xC0 + ch, val | port1_panning); port1_bytes += 3;
+        opl3_write_reg(p_state,p_music_data, 0, 0xC0 + ch, val | port0_panning);
+        opl3_write_reg(p_state,p_music_data, 1, 0xC0 + ch, val | port1_panning); port1_bytes += 3;
     } else if (p_reg_type[0] == 'T') {
         // TL (Total Level) register: apply volume attenuation
         // TL register: 0x40-0x55 (per operator) -- here we assume regType 'T' is used for TL register
         // TL is 6 bits (0-63), lower value = higher volume
         uint8_t val0 = apply_tl_with_ratio(val, v_ratio0);
         uint8_t val1 = apply_tl_with_ratio(val, v_ratio1);
-        forward_write(p_music_data, 0, 0x40 + ch, val0);
-        forward_write(p_music_data, 1, 0x40 + ch, val1); port1_bytes += 3;
+        opl3_write_reg(p_state,p_music_data, 0, 0x40 + ch, val0);
+        opl3_write_reg(p_state,p_music_data, 1, 0x40 + ch, val1); port1_bytes += 3;
     }
     return port1_bytes;
 }
@@ -112,20 +155,26 @@ int apply_to_ports(dynbuffer_t *p_music_data, vgm_status_t *p_vstat, OPL3State *
 // --- Rhythm mode register handler ---
 void handle_bd(dynbuffer_t *p_music_data, OPL3State *p_state, uint8_t val) {
     p_state->rhythm_mode = (val & 0x20) != 0;
-    forward_write(p_music_data, 0, 0xbd, val);
+    opl3_write_reg(p_state,p_music_data, 0, 0xbd, val);
 }
 
 // --- Main OPL3/OPL2 reg write handler ---
-// Return: bytes output to port1
-int duplicate_write_opl3(dynbuffer_t *p_music_data, vgm_status_t *p_vstat, OPL3State *p_state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1) {
+// Return: number of bytes output to port1
+int duplicate_write_opl3(
+    dynbuffer_t *p_music_data,
+    vgm_status_t *p_vstat,
+    OPL3State *p_state,
+    uint8_t reg, uint8_t val,
+    double detune, int opl3_keyon_wait, int ch_panning,
+    double v_ratio0, double v_ratio1
+) {
     int port1_bytes = 0;
-
     if (reg == 0x01) {
         // TODO: OPL3 mode change
     } else if (reg == 0x05) {
         // TODO: OPL3 mode change
     } else if (reg == 0x02 || reg == 0x03 || reg == 0x04 || reg == 0x08) {
-        forward_write(p_music_data, 0, reg, val);
+        opl3_write_reg(p_state,p_music_data, 0, reg, val);
     } else if (reg >= 0x40 && reg <= 0x55) {
         int ch = reg - 0x40;
         port1_bytes += apply_to_ports(p_music_data, p_vstat, p_state, ch, "T", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
@@ -133,25 +182,33 @@ int duplicate_write_opl3(dynbuffer_t *p_music_data, vgm_status_t *p_vstat, OPL3S
         handle_bd(p_music_data, p_state, val);
     } else if (reg >= 0xA0 && reg <= 0xA8) {
         int ch = reg - 0xA0;
-        p_state->regA[ch] = val;
+        p_state->reg[0xA0 + ch] = val;
         port1_bytes += apply_to_ports(p_music_data, p_vstat, p_state, ch, "A", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         int ch = reg - 0xB0;
-        p_state->regB[ch] = val;
+        p_state->reg[0xB0 + ch] = val;
         port1_bytes += apply_to_ports(p_music_data, p_vstat, p_state, ch, "B", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
-        p_state->regC[ch] = val;
+        p_state->reg[0xC0 + ch] = val;
         port1_bytes += apply_to_ports(p_music_data, p_vstat, p_state, ch, "C", val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
     } else {
-        forward_write(p_music_data, 0, reg, val);
-        forward_write(p_music_data, 1, reg, val); port1_bytes += 3;
+        opl3_write_reg(p_state,p_music_data, 0, reg, val);
+        opl3_write_reg(p_state,p_music_data, 1, reg, val); port1_bytes += 3;
     }
     return port1_bytes;
 }
 
 // --- OPL3 initialization sequence ---
-void opl3_init(dynbuffer_t *p_music_data, int stereo_mode) {
+void opl3_init(dynbuffer_t *p_music_data, int stereo_mode, OPL3State *p_state) {
+
+    // --- Initialize the voice database at the very beginning ---
+    // Zero all register values
+    memset(p_state->reg, 0, OPL3_REGISTER_SIZE);
+    p_state->rhythm_mode = false;
+    p_state->opl3_mode_initialized = false;
+    // Initialize the voice database
+    opl3_voice_db_init(&p_state->voice_db);
 
     // -------------------------
     // New OPL3 Global Registers (Port1 only)
@@ -165,16 +222,16 @@ void opl3_init(dynbuffer_t *p_music_data, int stereo_mode) {
     //   bit0 = OPL3 enable (must be 1 for OPL3 mode)
     //   bit1 = Left/Right output enable (stereo control)
     //   bit2–7 = Reserved
-    forward_write(p_music_data, 1, 0x05, 0x01);  // OPL3 enable (OPL3 mode set)
-    forward_write(p_music_data, 1, 0x04, 0x00);  // Waveform select (default)
+    opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable (OPL3 mode set)
+    opl3_write_reg(p_state, p_music_data, 1, 0x04, 0x00);  // Waveform select (default)
 
     // --- Port 0 General Initialization ---
     // LSI TEST and Note Select registers
-    forward_write(p_music_data, 0, 0x01, 0x00);  // LSI TEST register (should be 0)
-    forward_write(p_music_data, 0, 0x08, 0x00);  // NTS (Note Select)
+    opl3_write_reg(p_state, p_music_data, 0, 0x01, 0x00);  // LSI TEST register (should be 0)
+    opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS (Note Select)
 
     // --- Port 1 LSI TEST Initialization ---
-    forward_write(p_music_data, 1, 0x01, 0x00);  // LSI TEST register (should be 0)
+    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);  // LSI TEST register (should be 0)
 
     // -------------------------
     // Channel-Level Control
@@ -191,17 +248,17 @@ void opl3_init(dynbuffer_t *p_music_data, int stereo_mode) {
         // Port0: ch = i (0-8)
         if (stereo_mode) {
             uint8_t value0 = (i % 2 == 0) ? 0xA0 : 0x50;
-            forward_write(p_music_data, 0, 0xC0 + i, value0);
+            opl3_write_reg(p_state,p_music_data, 0, 0xC0 + i, value0);
         } else {
-            forward_write(p_music_data, 0, 0xC0 + i, 0x50);
+            opl3_write_reg(p_state,p_music_data, 0, 0xC0 + i, 0x50);
         }
 
         // Port1: ch = i + 9 (9-17)
         if (stereo_mode) {
             uint8_t value1 = ((i + 9) % 2 == 0) ? 0xA0 : 0x50;
-            forward_write(p_music_data, 1, 0xC0 + i, value1);
+            opl3_write_reg(p_state,p_music_data, 1, 0xC0 + i, value1);
         } else {
-            forward_write(p_music_data, 1, 0xC0 + i, 0xA0);
+            opl3_write_reg(p_state,p_music_data, 1, 0xC0 + i, 0xA0);
         }
     }
     // 0xE0–0xF5 : Waveform Select (0–7)
@@ -215,11 +272,11 @@ void opl3_init(dynbuffer_t *p_music_data, int stereo_mode) {
     //   111 = Derived waveform (complex)
     const uint8_t ext_regs[] = {0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF};
     for (size_t i = 0; i < sizeof(ext_regs)/sizeof(ext_regs[0]); ++i) {
-        forward_write(p_music_data, 0, ext_regs[i], 0x00);  // Port 0
-        forward_write(p_music_data, 1, ext_regs[i], 0x00);  // Port 1
+        opl3_write_reg(p_state,p_music_data, 0, ext_regs[i], 0x00);  // Port 0
+        opl3_write_reg(p_state,p_music_data, 1, ext_regs[i], 0x00);  // Port 1
     }
 
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
-        forward_write(p_music_data, 1, reg, 0x00);
+        opl3_write_reg(p_state,p_music_data, 1, reg, 0x00);
     }
 }

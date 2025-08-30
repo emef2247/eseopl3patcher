@@ -5,24 +5,24 @@
 #include <string.h>
 
 // Initialize event list
-void opl3_event_list_init(OPL3EventList *pList) {
-    pList->count = 0;
-    pList->capacity = 64;
-    pList->events = (OPL3Event*)calloc(pList->capacity, sizeof(OPL3Event));
+void opl3_event_list_init(OPL3EventList *p_list) {
+    p_list->count = 0;
+    p_list->capacity = 64;
+    p_list->p_events = (OPL3Event*)calloc(p_list->capacity, sizeof(OPL3Event));
 }
 
 // Free event list
-void opl3_event_list_free(OPL3EventList *pList) {
-    if (pList->events) free(pList->events);
-    pList->events = NULL;
-    pList->count = pList->capacity = 0;
+void opl3_event_list_free(OPL3EventList *p_list) {
+    if (p_list->p_events) free(p_list->p_events);
+    p_list->p_events = NULL;
+    p_list->count = p_list->capacity = 0;
 }
 
 // Add event to the list (auto-expand)
-void opl3_event_list_add(OPL3EventList *pList, const OPL3Event *pEvent) {
-    if (pList->count >= pList->capacity) {
-        pList->capacity *= 2;
-        pList->events = (OPL3Event*)realloc(pList->events, pList->capacity * sizeof(OPL3Event));
+void opl3_event_list_add(OPL3EventList *p_list, const OPL3Event *p_event) {
+    if (p_list->count >= p_list->capacity) {
+        p_list->capacity *= 2;
+        p_list->p_events = (OPL3Event*)realloc(p_list->p_events, p_list->capacity * sizeof(OPL3Event));
     }
-    pList->events[pList->count++] = *pEvent;
+    p_list->p_events[p_list->count++] = *p_event;
 }
