@@ -16,16 +16,16 @@ typedef struct {
 } OPL3State;
 
 // Detune helper for FM channels
-void detune_if_fm(OPL3State *state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *outA, uint8_t *outB);
+void detune_if_fm(OPL3State *pState, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *pOutA, uint8_t *pOutB);
 
 // Apply register value to OPL3/OPL2 ports
-int apply_to_ports(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, int ch, const char *regType, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1);
+int apply_to_ports(dynbuffer_t *pMusicData, vgm_status_t *vstat, OPL3State *pState, int ch, const char *pRegType, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1);
 
 // Rhythm mode register handler
-void handle_bd(dynbuffer_t *music_data, OPL3State *state, uint8_t val);
+void handle_bd(dynbuffer_t *pMusicData, OPL3State *pState, uint8_t val);
 
 // Main OPL3/OPL2 register write handler (OPL3 chorus effect)
-int duplicate_write_opl3(dynbuffer_t *music_data, vgm_status_t *vstat, OPL3State *state, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1);
+int duplicate_write_opl3(dynbuffer_t *pMusicData, vgm_status_t *vstat, OPL3State *pState, uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1);
 // OPL3 initialization sequence for both ports
-void opl3_init(dynbuffer_t *music_data, int stereo_mode);
+void opl3_init(dynbuffer_t *pMusicData, int stereo_mode);
 #endif // OPL3_CONVERT_H

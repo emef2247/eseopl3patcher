@@ -4,38 +4,38 @@
 #include <stdlib.h>
 
 // Initialize the voice database
-void opl3_voice_db_init(OPL3VoiceDB *db) {
-    db->count = 0;
-    db->capacity = 16;
-    db->voices = (OPL3VoiceParam*)calloc(db->capacity, sizeof(OPL3VoiceParam));
+void opl3_voice_db_init(OPL3VoiceDB *pDb) {
+    pDb->count = 0;
+    pDb->capacity = 16;
+    pDb->pVoices = (OPL3VoiceParam*)calloc(pDb->capacity, sizeof(OPL3VoiceParam));
 }
 
 // Free the voice database
-void opl3_voice_db_free(OPL3VoiceDB *db) {
-    if (db->voices) free(db->voices);
-    db->voices = NULL;
-    db->count = db->capacity = 0;
+void opl3_voice_db_free(OPL3VoiceDB *pDb) {
+    if (pDb->pVoices) free(pDb->pVoices);
+    pDb->pVoices = NULL;
+    pDb->count = pDb->capacity = 0;
 }
 
 // Compare two OPL3VoiceParam
-static int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b) {
-    return memcmp(a, b, sizeof(OPL3VoiceParam));
+static int opl3_voice_param_cmp(const OPL3VoiceParam *pA, const OPL3VoiceParam *pB) {
+    return memcmp(pA, pB, sizeof(OPL3VoiceParam));
 }
 
 // Find or add a new voice, return its Voice ID (0-based)
-int opl3_voice_db_find_or_add(OPL3VoiceDB *db, const OPL3VoiceParam *vp) {
-    for (int i = 0; i < db->count; ++i) {
-        if (opl3_voice_param_cmp(&db->voices[i], vp) == 0) {
+int opl3_voice_db_find_or_add(OPL3VoiceDB *pDb, const OPL3VoiceParam *pVp) {
+    for (int i = 0; i < pDb->count; ++i) {
+        if (opl3_voice_param_cmp(&pDb->pVoices[i], pVp) == 0) {
             return i;
         }
     }
     // Add new voice
-    if (db->count >= db->capacity) {
-        db->capacity *= 2;
-        db->voices = (OPL3VoiceParam*)realloc(db->voices, db->capacity * sizeof(OPL3VoiceParam));
+    if (pDb->count >= pDb->capacity) {
+        pDb->capacity *= 2;
+        pDb->pVoices = (OPL3VoiceParam*)realloc(pDb->pVoices, pDb->capacity * sizeof(OPL3VoiceParam));
     }
-    db->voices[db->count] = *vp;
-    return db->count++;
+    pDb->pVoices[pDb->count] = *pVp;
+    return pDb->count++;
 }
 
 // Check if given channel is in 4op mode (reg_104: OPL3 0x104)
@@ -51,10 +51,10 @@ int is_4op_channel(const uint8_t reg_104, int ch) {
 // Extract voice parameters for the specified channel
 // state: pointer to OPL3State (must contain regA, regB, regC)
 // ch: logical channel (0..17), reg_104: OPL3 0x104 value
-void extract_voice_param(const OPL3State *state, int ch, uint8_t reg_104, OPL3VoiceParam *out) {
-    memset(out, 0, sizeof(OPL3VoiceParam));
+void extract_voice_param(const OPL3State *pState, int ch, uint8_t reg_104, OPL3VoiceParam *pOut) {
+    memset(pOut, 0, sizeof(OPL3VoiceParam));
     int mode = is_4op_channel(reg_104, ch);
-    out->is_4op = mode;
+    pOut->is_4op = mode;
     int ch_main = ch;
     int ch_pair = -1;
     if (mode == 2) {
@@ -71,23 +71,23 @@ void extract_voice_param(const OPL3State *state, int ch, uint8_t reg_104, OPL3Vo
         for (int op = 0; op < 2; ++op) {
             // Operator index for OPL3: slot = ch + op*3
             int op_idx = c + op * 3;
-            OPL3OperatorParam *opp = &out->op[pair * 2 + op];
+            OPL3OperatorParam *opp = &pOut->op[pair * 2 + op];
             // The following assumes state contains regA, regB, regC arrays for 18 channels (port0+port1)
-            opp->am   = (state->regA[op_idx] >> 7) & 1;
-            opp->vib  = (state->regA[op_idx] >> 6) & 1;
-            opp->egt  = (state->regA[op_idx] >> 5) & 1;
-            opp->ksr  = (state->regA[op_idx] >> 4) & 1;
-            opp->mult =  state->regA[op_idx] & 0x0F;
-            opp->ksl  = (state->regB[op_idx] >> 6) & 3;
+            opp->am   = (pState->regA[op_idx] >> 7) & 1;
+            opp->vib  = (pState->regA[op_idx] >> 6) & 1;
+            opp->egt  = (pState->regA[op_idx] >> 5) & 1;
+            opp->ksr  = (pState->regA[op_idx] >> 4) & 1;
+            opp->mult =  pState->regA[op_idx] & 0x0F;
+            opp->ksl  = (pState->regB[op_idx] >> 6) & 3;
             // TL intentionally omitted
-            opp->ar   = (state->regB[op_idx] >> 0) & 0x1F;
-            opp->dr   = (state->regC[op_idx] >> 4) & 0x0F;
-            opp->sl   = (state->regC[op_idx] >> 0) & 0x0F;
-            opp->rr   = (state->regB[op_idx] >> 0) & 0x0F;
-            opp->ws   = (state->regC[op_idx] >> 0) & 0x07;
+            opp->ar   = (pState->regB[op_idx] >> 0) & 0x1F;
+            opp->dr   = (pState->regC[op_idx] >> 4) & 0x0F;
+            opp->sl   = (pState->regC[op_idx] >> 0) & 0x0F;
+            opp->rr   = (pState->regB[op_idx] >> 0) & 0x0F;
+            opp->ws   = (pState->regC[op_idx] >> 0) & 0x07;
         }
         // Feedback and connection type
-        out->fb[pair]  = (state->regC[c] >> 1) & 0x07;
-        out->cnt[pair] = (state->regC[c] >> 0) & 0x01;
+        pOut->fb[pair]  = (pState->regC[c] >> 1) & 0x07;
+        pOut->cnt[pair] = (pState->regC[c] >> 0) & 0x01;
     }
 }

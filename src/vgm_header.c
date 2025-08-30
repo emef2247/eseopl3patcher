@@ -32,8 +32,8 @@ static uint32_t read_le32(const uint8_t *buf) {
  * @param additional_data_bytes Additional bytes for port 1 (if any)
  */
 void build_vgm_header(
-    uint8_t *header,
-    const uint8_t *orig_vgm_header,
+    uint8_t *pHeader,
+    const uint8_t *pOrigVgmHeader,
     uint32_t total_samples,
     uint32_t eof_offset,
     uint32_t gd3_offset,
@@ -44,8 +44,8 @@ void build_vgm_header(
     // Compute original header size from input data_offset
     uint32_t orig_data_offset = 0;
     uint32_t orig_header_size = VGM_HEADER_SIZE;
-    if (orig_vgm_header) {
-        orig_data_offset = read_le32(orig_vgm_header + 0x34);
+    if (pOrigVgmHeader) {
+        orig_data_offset = read_le32(pOrigVgmHeader + 0x34);
         orig_header_size = 0x34 + orig_data_offset;
         if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
     }
@@ -56,36 +56,36 @@ void build_vgm_header(
         : VGM_HEADER_SIZE;
     uint32_t actual_data_offset = new_header_size - 0x34;
 
-    memset(header, 0, new_header_size);
+    memset(pHeader, 0, new_header_size);
 
     // Copy the original header if available
-    if (orig_vgm_header) {
-        memcpy(header, orig_vgm_header, orig_header_size);
+    if (pOrigVgmHeader) {
+        memcpy(pHeader, pOrigVgmHeader, orig_header_size);
     }
 
     // Overwrite mandatory header fields
-    header[0] = 'V'; header[1] = 'g'; header[2] = 'm'; header[3] = ' ';
-    write_le32(header + 0x04, eof_offset);    // EOF offset
-    write_le32(header + 0x08, version);       // Version
-    write_le32(header + 0x34, actual_data_offset); // Data offset
+    pHeader[0] = 'V'; pHeader[1] = 'g'; pHeader[2] = 'm'; pHeader[3] = ' ';
+    write_le32(pHeader + 0x04, eof_offset);    // EOF offset
+    write_le32(pHeader + 0x08, version);       // Version
+    write_le32(pHeader + 0x34, actual_data_offset); // Data offset
 
     // Adjust GD3 offset (0x14): relative to 0x14. If header size increases, adjust accordingly
     uint32_t actual_gd3_offset = gd3_offset;
     if (new_header_size > VGM_HEADER_SIZE) {
         actual_gd3_offset += (new_header_size - VGM_HEADER_SIZE);
     }
-    write_le32(header + 0x14, actual_gd3_offset);
+    write_le32(pHeader + 0x14, actual_gd3_offset);
 
-    write_le32(header + 0x18, total_samples); // Total samples
+    write_le32(pHeader + 0x18, total_samples); // Total samples
 
     // Read original loop offset, loop samples, and rate
     uint32_t loop_offset_orig = 0xFFFFFFFF;
     uint32_t loop_samples_orig = 0;
     uint32_t rate_orig = 0;
-    if (orig_vgm_header) {
-        loop_offset_orig  = read_le32(orig_vgm_header + 0x1C);
-        loop_samples_orig = read_le32(orig_vgm_header + 0x20);
-        rate_orig         = read_le32(orig_vgm_header + 0x24);
+    if (pOrigVgmHeader) {
+        loop_offset_orig  = read_le32(pOrigVgmHeader + 0x1C);
+        loop_samples_orig = read_le32(pOrigVgmHeader + 0x20);
+        rate_orig         = read_le32(pOrigVgmHeader + 0x24);
     }
     uint32_t new_loop_offset = loop_offset_orig;
 
@@ -97,9 +97,9 @@ void build_vgm_header(
             new_loop_offset += additional_data_bytes;
         }
     }
-    write_le32(header + 0x1C, new_loop_offset);    // Loop offset
-    write_le32(header + 0x20, loop_samples_orig);  // Loop samples
-    write_le32(header + 0x24, rate_orig);          // Rate
+    write_le32(pHeader + 0x1C, new_loop_offset);    // Loop offset
+    write_le32(pHeader + 0x20, loop_samples_orig);  // Loop samples
+    write_le32(pHeader + 0x24, rate_orig);          // Rate
 }
 
 /**
@@ -107,8 +107,8 @@ void build_vgm_header(
  * @param header Pointer to the VGM header
  * @param opl3_clock The clock value for YMF262 (OPL3)
  */
-void set_opl3_clock(uint8_t *header, uint32_t opl3_clock) {
-    write_le32(header + 0x5C, opl3_clock);    // YMF262 (OPL3) clock
+void set_opl3_clock(uint8_t *pHeader, uint32_t opl3_clock) {
+    write_le32(pHeader + 0x5C, opl3_clock);    // YMF262 (OPL3) clock
 }
 
 /**
@@ -116,6 +116,6 @@ void set_opl3_clock(uint8_t *header, uint32_t opl3_clock) {
  * @param header Pointer to the VGM header
  * @param ym3812_clock The clock value for YM3812
  */
-void set_ym3812_clock(uint8_t *header, uint32_t ym3812_clock) {
-    write_le32(header + 0x50, ym3812_clock);  // YM3812 clock
+void set_ym3812_clock(uint8_t *pHeader, uint32_t ym3812_clock) {
+    write_le32(pHeader + 0x50, ym3812_clock);  // YM3812 clock
 }

@@ -41,8 +41,8 @@ typedef struct {
 } OPL3EventList;
 
 // Utility functions
-void opl3_event_list_init(OPL3EventList *list);
-void opl3_event_list_free(OPL3EventList *list);
-void opl3_event_list_add(OPL3EventList *list, const OPL3Event *event);
+void opl3_event_list_init(OPL3EventList *pList);
+void opl3_event_list_free(OPL3EventList *pList);
+void opl3_event_list_add(OPL3EventList *pList, const OPL3Event *pEvent);
 
 #endif // OPL3_EVENT_H

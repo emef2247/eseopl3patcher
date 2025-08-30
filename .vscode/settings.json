@@ -2,6 +2,7 @@
     "files.associations": {
         "math.h": "c",
         "opl3_convert.h": "c",
-        "opl3_voice.h": "c"
+        "opl3_voice.h": "c",
+        "opl3_event.h": "c"
     }
 }

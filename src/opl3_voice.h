@@ -20,16 +20,16 @@ typedef struct {
 
 // Dynamic array for voice database
 typedef struct {
-    OPL3VoiceParam *voices;
+    OPL3VoiceParam *pVoices;
     int count;
     int capacity;
 } OPL3VoiceDB;
 
 // Utility
-void opl3_voice_db_init(OPL3VoiceDB *db);
-void opl3_voice_db_free(OPL3VoiceDB *db);
-int opl3_voice_db_find_or_add(OPL3VoiceDB *db, const OPL3VoiceParam *vp);
+void opl3_voice_db_init(OPL3VoiceDB *pDb);
+void opl3_voice_db_free(OPL3VoiceDB *pDb);
+int opl3_voice_db_find_or_add(OPL3VoiceDB *pDb, const OPL3VoiceParam *pVp);
 int is_4op_channel(const uint8_t reg_104, int ch);
-void extract_voice_param(const OPL3State *state, int ch, uint8_t reg_104, OPL3VoiceParam *out);
+void extract_voice_param(const OPL3State *pState, int ch, uint8_t reg_104, OPL3VoiceParam *pOut);
 
 #endif // OPL3_VOICE_H

@@ -20,20 +20,20 @@ static uint32_t read_le_uint32(const unsigned char *ptr) {
 }
 
 // Check if file ends with ".vgm" or has no extension (for vgz-uncompressed)
-static bool has_vgm_extension_or_none(const char *filename) {
-    size_t len = strlen(filename);
-    if (len > 4 && strcasecmp(filename + len - 4, ".vgm") == 0) return true;
-    const char *basename = strrchr(filename, '/');
-    basename = basename ? basename + 1 : filename;
+static bool has_vgm_extension_or_none(const char *pFilename) {
+    size_t len = strlen(pFilename);
+    if (len > 4 && strcasecmp(pFilename + len - 4, ".vgm") == 0) return true;
+    const char *basename = strrchr(pFilename, '/');
+    basename = basename ? basename + 1 : pFilename;
     if (strchr(basename, '.') == NULL) return true;
     return false;
 }
 
 // Generate default output filename based on input name
-static void make_default_output_name(const char *input, char *output, size_t outlen) {
-    size_t len = strlen(input);
-    if (len > 4 && strcmp(&input[len-4], ".vgm") == 0) len -= 4;
-    snprintf(output, outlen, "%.*sOPL3.vgm", (int)len, input);
+static void make_default_output_name(const char *pInput, char *pOutput, size_t outlen) {
+    size_t len = strlen(pInput);
+    if (len > 4 && strcmp(&pInput[len-4], ".vgm") == 0) len -= 4;
+    snprintf(pOutput, outlen, "%.*sOPL3.vgm", (int)len, pInput);
 }
 
 int main(int argc, char *argv[]) {
@@ -43,14 +43,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     // Parse required arguments
-    const char *input_vgm = argv[1];
+    const char *pInputVgm = argv[1];
     double detune = atof(argv[2]);
 
     // Wait is optional, default is DEFAULT_WAIT
     int opl3_keyon_wait = DEFAULT_WAIT;
 
-    const char *creator = "eseopl3patcher";
-    const char *output_path = NULL;
+    const char *pCreator = "eseopl3patcher";
+    const char *pOutputPath = NULL;
 
     // --- New argument defaults ---
     int ch_panning = DEFAULT_CH_PANNING;   // Default: Channel panning mode: ON
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     for (int i = 3; i < argc; ++i) {
         // Handle -o option
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
-            output_path = argv[i + 1];
+            pOutputPath = argv[i + 1];
             i++; // Skip output filename
             continue;
         }
@@ -86,72 +86,72 @@ int main(int argc, char *argv[]) {
         // If this argument starts with '-', skip (unknown option)
         if (argv[i][0] == '-') continue;
         // If this argument is a number and wait is not yet set, use as wait
-        char *endptr;
-        int val = (int)strtol(argv[i], &endptr, 10);
-        if (*endptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
+        char *pEndptr;
+        int val = (int)strtol(argv[i], &pEndptr, 10);
+        if (*pEndptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
             opl3_keyon_wait = val;
             continue;
         }
         // If creator not set (other than default), use this argument
-        if (creator == NULL || strcmp(creator, "eseopl3patcher") == 0) {
-            creator = argv[i];
+        if (pCreator == NULL || strcmp(pCreator, "eseopl3patcher") == 0) {
+            pCreator = argv[i];
             continue;
         }
         // Otherwise, ignore
     }
 
-    // If output_path not set, generate default
-    if (!output_path) {
+    // If pOutputPath not set, generate default
+    if (!pOutputPath) {
         static char default_out[256];
-        make_default_output_name(input_vgm, default_out, sizeof(default_out));
-        output_path = default_out;
+        make_default_output_name(pInputVgm, default_out, sizeof(default_out));
+        pOutputPath = default_out;
     }
 
     // Check file extension
-    if (!has_vgm_extension_or_none(input_vgm)) {
+    if (!has_vgm_extension_or_none(pInputVgm)) {
         fprintf(stderr, "Input file must have .vgm extension or no extension (for vgz-uncompressed files)\n");
         return 1;
     }
 
     // Open and read input VGM file
-    FILE *fp = fopen(input_vgm, "rb");
+    FILE *fp = fopen(pInputVgm, "rb");
     if (!fp) {
-        fprintf(stderr, "Cannot open input file: %s\n", input_vgm);
+        fprintf(stderr, "Cannot open input file: %s\n", pInputVgm);
         return 1;
     }
     fseek(fp, 0, SEEK_END);
     long filesize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    unsigned char *vgm_data = (unsigned char*)malloc(filesize);
-    if (fread(vgm_data, 1, filesize, fp) != (size_t)filesize) {
+    unsigned char *pVgmData = (unsigned char*)malloc(filesize);
+    if (fread(pVgmData, 1, filesize, fp) != (size_t)filesize) {
         fprintf(stderr, "Failed to read entire file!\n");
-        free(vgm_data);
+        free(pVgmData);
         fclose(fp);
         return 1;
     }
     fclose(fp);
 
     // Verify VGM file signature
-    if (memcmp(vgm_data, "Vgm ", 4) != 0) {
+    if (memcmp(pVgmData, "Vgm ", 4) != 0) {
         fprintf(stderr, "Not a valid VGM file.\n");
-        free(vgm_data);
+        free(pVgmData);
         return 1;
     }
 
     // Parse VGM header fields
-    uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(vgm_data + 0x34) : 0;
+    uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(pVgmData + 0x34) : 0;
     uint32_t orig_header_size = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
-    if (orig_header_size < 0x40) orig_header_size = 0x100; // fallback for broken files
+    if (orig_header_size < 0x40) orig_header_size = 0x100; // fallbac   k for broken files
     long data_start = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
     if (data_start >= filesize) {
         fprintf(stderr, "Invalid VGM data offset.\n");
-        free(vgm_data);
+        free(pVgmData);
         return 1;
     }
 
     // Get original loop offset and calculate loop address
-    uint32_t orig_loop_offset = read_le_uint32(vgm_data + 0x1C);
+    uint32_t orig_loop_offset = read_le_uint32(pVgmData  + 0x1C);
     uint32_t orig_loop_address = 0;
     if (orig_loop_offset != 0xFFFFFFFF) {
         orig_loop_address = orig_loop_offset + 0x04;
@@ -179,12 +179,12 @@ int main(int argc, char *argv[]) {
             loop_start_in_music_data = music_data.size;
         }
 
-        unsigned char cmd = vgm_data[read_done_byte];
+        unsigned char cmd = pVgmData[read_done_byte];
 
         // YM3812 register write (0x5A)
         if (cmd == 0x5A) {
-            uint8_t reg = vgm_data[read_done_byte + 1];
-            uint8_t val = vgm_data[read_done_byte + 2];
+            uint8_t reg = pVgmData[read_done_byte + 1];
+            uint8_t val = pVgmData[read_done_byte + 2];
             read_done_byte += 3;
 
             if (is_replicate_reg_ymf262) {
@@ -212,8 +212,8 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "Truncated 0x61 at end of file\n");
                 break;
             }
-            uint8_t lo = vgm_data[read_done_byte + 1];
-            uint8_t hi = vgm_data[read_done_byte + 2];
+            uint8_t lo = pVgmData[read_done_byte + 1];
+            uint8_t hi = pVgmData[read_done_byte + 2];
             uint16_t samples = lo | (hi << 8);
             vgm_wait_samples(&music_data, &vstat, samples);
             read_done_byte += 3;
@@ -248,13 +248,13 @@ int main(int argc, char *argv[]) {
     // GD3 tag handling: read, modify, rebuild
     char *gd3_fields[GD3_FIELDS] = {NULL};
     uint32_t orig_gd3_ver = 0, orig_gd3_len = 0;
-    if (extract_gd3_fields(vgm_data, filesize, gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
+    if (extract_gd3_fields(pVgmData, filesize, gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
         fprintf(stderr, "Original GD3 not found, will use empty fields.\n");
         for (int i = 0; i < GD3_FIELDS; ++i) gd3_fields[i] = strdup("");
         orig_gd3_ver = 0x00000100;
     }
     char creator_append[128];
-    snprintf(creator_append, sizeof(creator_append), ",%s", creator);
+    snprintf(creator_append, sizeof(creator_append), ",%s", pCreator);
 
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
     // Build new VGM header
     build_vgm_header(
         header_buf,
-        vgm_data,
+        pVgmData,
         vstat.new_total_samples,
         vgm_eof_offset_field,
         gd3_offset_field_value,
@@ -312,24 +312,24 @@ int main(int argc, char *argv[]) {
     set_ym3812_clock(header_buf, 0);
 
     // Write output VGM file: header, music data, GD3 chunk
-    FILE *wf = fopen(output_path, "wb");
+    FILE *wf = fopen(pOutputPath, "wb");
     if (!wf) {
-        fprintf(stderr, "Failed to open output file for writing: %s\n", output_path);
+        fprintf(stderr, "Failed to open output file for writing: %s\n", pOutputPath);
         buffer_free(&music_data);
         buffer_free(&gd3);
-        free(vgm_data);
+        free(pVgmData);
         free(header_buf);
         return 1;
     }
     fwrite(header_buf, 1, header_size, wf);
-    fwrite(music_data.data, 1, music_data.size, wf);
-    fwrite(gd3.data, 1, gd3.size, wf);
+    fwrite(music_data.pData, 1, music_data.size, wf);
+    fwrite(gd3.pData, 1, gd3.size, wf);
     fclose(wf);
 
-    printf("Converted VGM written to: %s\n", output_path);
+    printf("Converted VGM written to: %s\n", pOutputPath);
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
-    printf("Creator: %s\n", creator);
+    printf("Creator: %s\n", pCreator);
     printf("Channel Panning Mode: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
@@ -337,7 +337,7 @@ int main(int argc, char *argv[]) {
     // Free resources
     buffer_free(&music_data);
     buffer_free(&gd3);
-    free(vgm_data);
+    free(pVgmData);
     free(header_buf);
 
     return 0;
