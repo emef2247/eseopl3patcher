@@ -12,7 +12,10 @@
 #define DEFAULT_WAIT 0
 #define DEFAULT_CH_PANNING 0
 #define DEFAULT_VOLUME_RATIO0 1.0
-#define DEFAULT_VOLUME_RATIO1 0.6
+#define DEFAULT_VOLUME_RATIO1 0.8
+
+// Global verbose flag (used for debug print control)
+int verbose = 0;
 
 // Read little-endian 32-bit integer from buffer
 static uint32_t read_le_uint32(const unsigned char *p_ptr) {
@@ -37,9 +40,9 @@ static void make_default_output_name(const char *p_input, char *p_output, size_t
 }
 
 int main(int argc, char *argv[]) {
-    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f]
+    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose]
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose]\n", argv[0]);
         return 1;
     }
     // Parse required arguments
@@ -55,7 +58,7 @@ int main(int argc, char *argv[]) {
     // New argument defaults
     int ch_panning = DEFAULT_CH_PANNING;      // Default: Channel panning mode: ON
     double v_ratio0 = DEFAULT_VOLUME_RATIO0;  // Default: 100% volume
-    double v_ratio1 = DEFAULT_VOLUME_RATIO1;  // Default: 60% volume
+    double v_ratio1 = DEFAULT_VOLUME_RATIO1;  // Default: 80% volume
 
     // Parse optional arguments
     for (int i = 3; i < argc; ++i) {
@@ -81,6 +84,11 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[i], "-vr1") == 0 && i + 1 < argc) {
             v_ratio1 = atof(argv[i + 1]);
             i++;
+            continue;
+        }
+        // Handle -verbose option
+        if (strcmp(argv[i], "-verbose") == 0) {
+            verbose = 1;
             continue;
         }
         // If this argument starts with '-', skip (unknown option)
@@ -353,11 +361,13 @@ int main(int argc, char *argv[]) {
     printf("Channel Panning Mode: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
+    if (verbose) {
+        printf("Verbose mode enabled: detailed debug messages will be shown during processing.\n");
+    }
 
     // Free resources
     vgm_buffer_free(&vgmctx.buffer);
     vgm_buffer_free(&outbuf);
-    // gd3.data is freed by vgm_buffer_free(&gd3) above as it's now in vgmctx.gd3.data
     free(p_vgm_data);
     free(p_header_buf);
 

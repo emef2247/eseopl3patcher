@@ -13,7 +13,7 @@ eseopl3patcherは、YM3812 (OPL2) 用に作成されたVGMファイルをOPL3 (Y
 - チャンネルパンモード（`-ch_panning`）でチャンネルごとのL/R振り分けが可能
 - ポートごとに独立した音量比率（`-vr0`, `-vr1`）を指定可能
 - 変換情報や操作者情報を自動的にGD3タグへ追記
-  
+
 ## 入力パラメータ
 
 - VGMファイル（YM3812/OPL2形式）
@@ -29,6 +29,8 @@ eseopl3patcherは、YM3812 (OPL2) 用に作成されたVGMファイルをOPL3 (Y
     - ポート0の音量比率を指定（1.0 = 100%、0.6 = 60%など）
 - ポート1の音量比率（`-vr1 <float>`）。省略可（デフォルト: `0.6`）
     - ポート1の音量比率を指定（1.0 = 100%、0.6 = 60%など）
+- 詳細なデバッグ出力を有効にする`-verbose`オプション。省略可（デフォルト: 無効）
+    - 変換処理中に詳細なデバッグメッセージ（OPL3ボイスパラメータなど）を表示します。
 
 ### デチューン値（±指定）について
 
@@ -41,18 +43,19 @@ eseopl3patcherは、YM3812 (OPL2) 用に作成されたVGMファイルをOPL3 (Y
 
 > **デチューン値の符号によって、変換後のピッチが上がるか下がるかが決まります。用途に応じて指定してください。**
 
-### チャンネルパンモード・音量バランスについて
+### チャンネルパンモード・音量バランス・詳細表示について
 
 - `-ch_panning 0`（デフォルト）：ポート0はL、ポート1はR出力。デチューン音（ポート1）がRだけから出るため、効果を明確に確認できます。
 - `-ch_panning 1`：偶数・奇数チャンネルを交互にL/Rに振り分けてステレオ効果を得られます。
 - `-vr0` および `-vr1` でポートごとの音量バランスも自由に調整できます。
     - 例：デチューン音（ポート1）を目立たせたくない場合は `-vr1 0.6` などを指定。
     - コーラス効果を明確にしたい場合は `-ch_panning 0` にして `-vr1` の値を調整してください。
+- `-verbose : 変換時にOPL3ボイスやオペレーターパラメータなど詳細なデバッグ情報を表示します。
 
 ## 使い方
 
 ```sh
-eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>]
+eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose]
 ```
 
 - `<input.vgm>` : 変換対象のVGMファイル（YM3812/OPL2形式）
@@ -63,9 +66,9 @@ eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_
 - `[-ch_panning 0|1]` : チャンネルパンモード　0:OFF 1:ON（省略可、デフォルト: 0）
 - `[-vr0 <float>]` : ポート0音量比率 1.0以下の小数（1.0で100%)（省略可、デフォルト: 1.0）
 - `[-vr1 <float>]` : ポート1音量比率 1.0以下の小数（1.0で100%)（省略可、デフォルト: 0.6）
+- `[-verbose]` : 詳細なデバッグ出力を有効化（省略可）
 
-**引数の順序は柔軟です。**  
-`[keyon_wait]`、`[creator]`、`-o output.vgm`、`-ch_panning`、`-vr0`、`-vr1` は `<input.vgm>` と `<detune>` の後ならどの順でも指定可能です。
+`[keyon_wait]`、`[creator]`、`-o output.vgm`、`-ch_panning`、`-vr0`、`-vr1`、`-verbose` は `<input.vgm>` と `<detune>` の後ならどの順でも指定可能です。
 
 **使用例:**
 ```sh
@@ -78,6 +81,8 @@ eseopl3patcher song.vgm 1.5 0 YourName -o output.vgm
 eseopl3patcher song.vgm -1 -o output.vgm YourName
 eseopl3patcher song.vgm 1.5 -ch_panning 1 -vr0 1.0 -vr1 0.5
 eseopl3patcher song.vgm 2.5 -vr1 0.8
+eseopl3patcher song.vgm 2.5 -verbose
+eseopl3patcher song.vgm 2.5 -ch_panning 1 -verbose -vr1 0.7
 ```
 
 英語版READMEは[こちら](https://github.com/emef2247/eseopl3patcher/blob/main/README.md#usage) をご覧ください。

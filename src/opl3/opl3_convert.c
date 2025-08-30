@@ -4,9 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
-#include "vgm_helpers.h"
+#include "../vgm/vgm_helpers.h"
 #include "opl3_voice.h"
 #include "opl3_debug_util.h"
+
+extern int verbose;
 
 // Write register value and update state flags
 void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value) {
@@ -108,7 +110,7 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
                 int prev_voice_count = ctx->p_state->voice_db.count;
                 int voice_id = opl3_voice_db_find_or_add(&ctx->p_state->voice_db, &vparam);
                 if (voice_id >= 0 && ctx->p_state->voice_db.count > prev_voice_count) {
-                    print_opl3_voice_param(ctx->p_state, &vparam);
+                    if (verbose) print_opl3_voice_param(ctx->p_state, &vparam);
                 } else if (voice_id < 0) {
                     fprintf(stderr, "Error: Failed to find or add voice parameters for channel %d\n", ctx->ch);
                 }

@@ -12,6 +12,7 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 - Applies detuning to the OPL3 extra channels (channels 9–17)
 - Channel panning options for flexible channel panning (see `-ch_panning`)
 - Independent volume ratio control for Port 0 and Port 1 (see `-vr0` and `-vr1`)
+- Verbose mode for detailed debug output (see `-verbose`)
 - Automatically appends conversion info and operator information to the GD3 tag
 - Simple and flexible command-line usage (argument order is flexible)
 
@@ -30,6 +31,8 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
     - Sets the volume ratio for Port 0 (1.0 = 100%, 0.6 = 60%, etc.)
 - Port 1 volume ratio (`-vr1 <float>`). Optional. (Default: `0.6`)
     - Sets the volume ratio for Port 1 (1.0 = 100%, 0.6 = 60%, etc.)
+- Verbose mode (`-verbose`). Optional. (Default: off)
+    - Enables detailed debug and operator parameter messages during conversion.
 
 ### About Detune Value (+/- specification)
 
@@ -42,7 +45,7 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 
 > **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
 
-### About Channel panning and Volume Ratio
+### About Channel panning, Volume Ratio, and Verbose Mode
 
 - `-ch_panning 0` (default): Port 0 outputs to Left, Port 1 outputs to Right. Useful for clearly checking the detuned sound (Port 1) isolated in the Right channel.
 - `-ch_panning 1`: Channels are alternately panned L/R for a full stereo effect.
@@ -53,7 +56,7 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 ## Usage
 
 ```sh
-eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>]
+eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose]
 ```
 
 - `<input.vgm>` : VGM file to convert (YM3812/OPL2 format)
@@ -64,9 +67,9 @@ eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_
 - `[-ch_panning 0|1]` : Channel panning mode 0:OFF 1:ON (optional, default: 0)
 - `[-vr0 <float>]` : Port 0 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 1.0)
 - `[-vr1 <float>]` : Port 1 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 0.6)
+- `[-verbose]` : Enable verbose debug output (optional)
 
-**Argument order is flexible.**  
-You can specify `[keyon_wait]`, `[creator]`, `-o output.vgm`, `-ch_panning`, `-vr0`, and `-vr1` in any order after `<input.vgm>` and `<detune>`.
+You can specify `[keyon_wait]`, `[creator]`, `-o output.vgm`, `-ch_panning`, `-vr0`, `-vr1`, and `-verbose` in any order after `<input.vgm>` and `<detune>`.
 
 **Examples:**
 ```sh
@@ -79,6 +82,8 @@ eseopl3patcher song.vgm 1.5 0 YourName -o output.vgm
 eseopl3patcher song.vgm -1 -o output.vgm YourName
 eseopl3patcher song.vgm 1.5 -ch_panning 1 -vr0 1.0 -vr1 0.5
 eseopl3patcher song.vgm 2.5 -vr1 0.8
+eseopl3patcher song.vgm 2.5 -verbose
+eseopl3patcher song.vgm 2.5 -ch_panning 1 -verbose -vr1 0.7
 ```
 
 For Japanese README, see [here](https://github.com/emef2247/eseopl3patcher/blob/main/README.ja.md#使い方)

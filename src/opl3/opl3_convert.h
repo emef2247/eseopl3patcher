@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "vgm_helpers.h"
+#include "../vgm/vgm_helpers.h"
 #include "opl3_voice.h"
 #include "opl3_event.h"
 
