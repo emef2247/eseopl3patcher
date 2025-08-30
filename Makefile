@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-O2 -Wall -Iinclude
-SRCS=$(wildcard src/*.c)
+CFLAGS=-O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm
+SRCS=$(wildcard src/opl3/*.c) $(wildcard src/vgm/*.c) src/main.c
 OBJS=$(SRCS:.c=.o)
 TARGET=eseopl3patcher
 
@@ -20,8 +20,7 @@ win: $(SRCS)
 
 # Clean build artifacts
 clean:
-	rm -f $(TARGET) $(TARGET_WIN) src/*.o
-
+	rm -f $(TARGET) $(TARGET_WIN) src/opl3/*.o src/vgm/*.o src/*.o
 
 release: eseopl3patcher eseopl3patcher.exe
 	@mkdir -p release_temp
