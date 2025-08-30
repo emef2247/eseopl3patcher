@@ -3,10 +3,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
-#include "vgm_helpers.h"
-#include "vgm_header.h"
-#include "opl3_convert.h"
-#include "gd3_util.h"
+#include "vgm/vgm_helpers.h"
+#include "vgm/vgm_header.h"
+#include "vgm/gd3_util.h"
+#include "opl3/opl3_convert.h"
 
 #define DEFAULT_DETUNE 1.0
 #define DEFAULT_WAIT 0
