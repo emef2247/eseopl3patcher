@@ -7,9 +7,6 @@
 // Print the voice parameters with voice ID, total count, FM chip type (as string), and patch number.
 void print_opl3_voice_param(const OPL3State *p_state, const OPL3VoiceParam *vp);
 
-// Print the registers, voice ID, FM chip type (as string), and patch number for each channel in OPL3State.
-void print_opl3_state_and_voice(const OPL3State *p_state);
-
 // Returns the current number of voices registered in the database.
 static inline int opl3_voice_db_count(const OPL3VoiceDB *p_db) {
     return p_db->count;

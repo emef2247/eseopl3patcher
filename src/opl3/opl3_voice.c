@@ -1,209 +1,137 @@
-#include "opl3_convert.h"
 #include "opl3_voice.h"
+#include "opl3_convert.h"
 #include <string.h>
 #include <stdlib.h>
 
-// --- YMF262 (OPL3) Channel/Slot/Register mapping tables ---
-// Reference: YMF262 datasheet
-
-// Each channel has 2 operators. The following table maps logical channel and operator to the slot number.
-// The indexes are [channel][operator] (operator: 0=slot1, 1=slot2).
-// This covers both Port 0 (A1=L, ch 0..8) and Port 1 (A1=H, ch 9..17).
-
-static const int opl3_slot_reg_offset[18][2] = {
-    // ch: 0..8 (Port 0, A1=L)
-    { 0, 3 },   // ch 0
-    { 1, 4 },   // ch 1
-    { 2, 5 },   // ch 2
-    { 6, 9 },   // ch 3
-    { 7,10 },   // ch 4
-    { 8,11 },   // ch 5
-    {12,15 },   // ch 6 (RYT)
-    {13,16 },   // ch 7 (RYT)
-    {14,17 },   // ch 8 (RYT)
-    // ch: 9..17 (Port 1, A1=H)
-    {18,21 },   // ch 9
-    {19,22 },   // ch10
-    {20,23 },   // ch11
-    {24,27 },   // ch12
-    {25,28 },   // ch13
-    {26,29 },   // ch14
-    {30,33 },   // ch15 (RYT)
-    {31,34 },   // ch16 (RYT)
-    {32,35 }    // ch17 (RYT)
-};
-
-#define REG20 0x20
-#define REG40 0x40
-#define REG60 0x60
-#define REG80 0x80
-#define REGE0 0xE0
-#define REGC0 0xC0
-
-// Read little-endian 32-bit integer from buffer
-static uint32_t read_le_uint32(const unsigned char *p_ptr) {
-    return (uint32_t)p_ptr[0] | ((uint32_t)p_ptr[1] << 8) | ((uint32_t)p_ptr[2] << 16) | ((uint32_t)p_ptr[3] << 24);
-}
-
-// Initialize the voice database
+/**
+ * Initialize the OPL3VoiceDB dynamic array.
+ */
 void opl3_voice_db_init(OPL3VoiceDB *p_db) {
     p_db->count = 0;
     p_db->capacity = 16;
-    p_db->p_voices = (OPL3VoiceParam*)calloc(p_db->capacity, sizeof(OPL3VoiceParam));
+    p_db->p_voices = (OPL3VoiceParam *)calloc(p_db->capacity, sizeof(OPL3VoiceParam));
 }
 
-// Free the voice database
+/**
+ * Free memory used by the OPL3VoiceDB.
+ */
 void opl3_voice_db_free(OPL3VoiceDB *p_db) {
     if (p_db->p_voices) free(p_db->p_voices);
     p_db->p_voices = NULL;
-    p_db->count = p_db->capacity = 0;
+    p_db->count = 0;
+    p_db->capacity = 0;
 }
 
-// Compare two OPL3VoiceParam structures, including all meaningful fields.
-// Also compare source_fmchip and patch_no for strict uniqueness.
+/**
+ * Compare two OPL3VoiceParam structures.
+ * Returns 0 if equal, nonzero otherwise (compares all meaningful fields).
+ */
 int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b) {
+    // Compare operator parameters, mode, feedback, connection, source FM chip, and patch number
     if (a->is_4op != b->is_4op) return 1;
+    if (memcmp(a->op, b->op, sizeof(a->op))) return 1;
+    if (memcmp(a->fb, b->fb, sizeof(a->fb))) return 1;
+    if (memcmp(a->cnt, b->cnt, sizeof(a->cnt))) return 1;
     if (a->source_fmchip != b->source_fmchip) return 1;
     if (a->patch_no != b->patch_no) return 1;
-    int n_ops = (a->is_4op) ? 4 : 2;
-    for (int i = 0; i < n_ops; ++i) {
-        if (memcmp(&a->op[i], &b->op[i], sizeof(OPL3OperatorParam)) != 0)
-            return 1;
-    }
-    int n_fb = (a->is_4op) ? 2 : 1;
-    for (int i = 0; i < n_fb; ++i) {
-        if (a->fb[i] != b->fb[i] || a->cnt[i] != b->cnt[i]) return 1;
-    }
     return 0;
 }
 
-// Find or add a new voice to the database. source_fmchip and patch_no are also keys.
-// Returns its Voice ID (0-based).
+/**
+ * Find a matching voice in the DB or add a new one. Returns its 0-based voice ID.
+ */
 int opl3_voice_db_find_or_add(OPL3VoiceDB *p_db, const OPL3VoiceParam *p_vp) {
-    // Search for an existing matching voice
     for (int i = 0; i < p_db->count; ++i) {
         if (opl3_voice_param_cmp(&p_db->p_voices[i], p_vp) == 0) {
             return i;
         }
     }
-    // Not found, add the new voice to the database
+    // Add new voice if not found
     if (p_db->count >= p_db->capacity) {
-        int new_capacity = (p_db->capacity > 0) ? (p_db->capacity * 2) : 16;
-        OPL3VoiceParam* new_voices = (OPL3VoiceParam*)realloc(p_db->p_voices, new_capacity * sizeof(OPL3VoiceParam));
-        if (!new_voices) {
-            // Allocation failed
-            return -1;
-        }
-        p_db->p_voices = new_voices;
-        p_db->capacity = new_capacity;
+        p_db->capacity *= 2;
+        p_db->p_voices = (OPL3VoiceParam *)realloc(p_db->p_voices, p_db->capacity * sizeof(OPL3VoiceParam));
     }
     p_db->p_voices[p_db->count] = *p_vp;
     return p_db->count++;
 }
 
-// Returns 1 (true) if the channel is in 4op mode, 0 (false) otherwise.
+/**
+ * Check if a given channel is in 4op mode (returns 2 for 4op, 1 for 2op).
+ * Uses OPL3State pointer and channel index.
+ */
 int is_4op_channel(const OPL3State *p_state, int ch) {
     uint8_t reg_104 = p_state->reg[0x104];
-    // Only channels 0-5 and 9-14 can be part of a 4op pair
-    if ((ch >= 0 && ch <= 2) || (ch >= 3 && ch <= 5)) {
-        int pair = ch % 3;
-        return (reg_104 & (1 << pair)) ? 1 : 0;
-    } else if ((ch >= 9 && ch <= 11) || (ch >= 12 && ch <= 14)) {
-        int pair = (ch - 9) % 3;
-        return (reg_104 & (1 << pair)) ? 1 : 0;
-    }
-    // All other channels are always 2op
-    return 0;
+    // OPL3 4op pairs: 0+3 (bit0), 1+4 (bit1), 2+5 (bit2)
+    if (ch == 0 || ch == 3) return (reg_104 & 0x01) ? 2 : 1;
+    if (ch == 1 || ch == 4) return (reg_104 & 0x02) ? 2 : 1;
+    if (ch == 2 || ch == 5) return (reg_104 & 0x04) ? 2 : 1;
+    // OPL3 4op is only for ch0-5
+    return 1;
 }
 
-// Get the OPL3 channel mode (2op or 4op)
+/**
+ * Get the OPL3 channel mode (OPL3_MODE_2OP or OPL3_MODE_4OP).
+ */
 int get_opl3_channel_mode(const OPL3State *p_state, int ch) {
-    uint8_t reg_104 = p_state->reg[0x104];
-    if ((ch >= 0 && ch <= 2) || (ch >= 3 && ch <= 5)) {
-        int pair = ch % 3;
-        return (reg_104 & (1 << pair)) ? OPL3_MODE_4OP : OPL3_MODE_2OP;
-    } else if ((ch >= 9 && ch <= 11) || (ch >= 12 && ch <= 14)) {
-        int pair = (ch - 9) % 3;
-        return (reg_104 & (1 << pair)) ? OPL3_MODE_4OP : OPL3_MODE_2OP;
-    }
-    return OPL3_MODE_2OP;
+    return is_4op_channel(p_state, ch) == 2 ? OPL3_MODE_4OP : OPL3_MODE_2OP;
 }
 
-// Extract voice parameters for the specified channel.
-// This function does NOT fill source_fmchip or patch_no; set them at registration/conversion time if needed.
+/**
+ * Extract voice parameters for the given logical channel (0..17).
+ * Fills out an OPL3VoiceParam structure.
+ */
 void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out) {
     memset(p_out, 0, sizeof(OPL3VoiceParam));
-
-    int four_op = is_4op_channel(p_state, ch);
-
-    p_out->is_4op = four_op ? 1 : 0;
-
-    // For 4op, only extract from the lower-numbered channel in the pair
-    int is_port1 = (ch >= 9);
-    int ch_base = is_port1 ? 9 : 0;
-    int ch_local = ch - ch_base;
-
+    int mode = is_4op_channel(p_state, ch);
+    p_out->is_4op = mode;
+    int ch_main = ch;
     int ch_pair = -1;
-    if (four_op) {
-        if (ch_local < 3) ch_pair = ch_base + ch_local + 3;
-        else if (ch_local >= 3 && ch_local <= 5) ch_pair = ch_base + ch_local - 3;
-        // Only extract for the lower-numbered channel in each pair
-        if (ch_local >= 3 && ch_local <= 5) {
-            memset(p_out, 0, sizeof(OPL3VoiceParam));
-            return;
-        }
+    if (mode == 2) {
+        // Determine 4op channel pair
+        if (ch < 3) ch_pair = ch + 3;
+        else if (ch >= 3 && ch <= 5) ch_pair = ch - 3;
     }
-
-    int n_pairs = four_op ? 2 : 1;
-    int chs[2] = { ch, (four_op ? ch_pair : -1) };
-    for (int pair = 0; pair < n_pairs; ++pair) {
+    int chs[2] = {ch_main, (mode == 2 ? ch_pair : -1)};
+    for (int pair = 0; pair < (mode == 2 ? 2 : 1); ++pair) {
         int c = chs[pair];
-        if (c < 0 || c >= 18) continue;
+        if (c < 0) continue;
+        // Each 2op pair has 2 operators: slot = c + op*3
         for (int op = 0; op < 2; ++op) {
-            int slot = opl3_slot_reg_offset[c][op];
-            OPL3OperatorParam *p_opp = &p_out->op[pair * 2 + op];
-            uint8_t reg20 = p_state->reg[REG20 + slot];
-            uint8_t reg40 = p_state->reg[REG40 + slot];
-            uint8_t reg60 = p_state->reg[REG60 + slot];
-            uint8_t reg80 = p_state->reg[REG80 + slot];
-            uint8_t regE0 = p_state->reg[REGE0 + slot];
-
-            p_opp->am   = (reg20 >> 7) & 1;
-            p_opp->vib  = (reg20 >> 6) & 1;
-            p_opp->egt  = (reg20 >> 5) & 1;
-            p_opp->ksr  = (reg20 >> 4) & 1;
-            p_opp->mult =  reg20 & 0x0F;
-            p_opp->ksl  = (reg40 >> 6) & 3;
-            // TL intentionally omitted
-            p_opp->ar   = (reg60 >> 4) & 0x0F;
-            p_opp->dr   = (reg60 >> 0) & 0x0F;
-            p_opp->sl   = (reg80 >> 4) & 0x0F;
-            p_opp->rr   = (reg80 >> 0) & 0x0F;
-            p_opp->ws   = regE0 & 0x07;
+            int op_idx = c + op * 3;
+            OPL3OperatorParam *opp = &p_out->op[pair * 2 + op];
+            // The following assumes state contains OPL3 register mirror per spec
+            opp->am   = (p_state->reg[0x20 + op_idx] >> 7) & 1;
+            opp->vib  = (p_state->reg[0x20 + op_idx] >> 6) & 1;
+            opp->egt  = (p_state->reg[0x20 + op_idx] >> 5) & 1;
+            opp->ksr  = (p_state->reg[0x20 + op_idx] >> 4) & 1;
+            opp->mult =  p_state->reg[0x20 + op_idx] & 0x0F;
+            opp->ksl  = (p_state->reg[0x40 + op_idx] >> 6) & 3;
+            opp->ar   = (p_state->reg[0x60 + op_idx]) & 0x1F;
+            opp->dr   = (p_state->reg[0x80 + op_idx] >> 4) & 0x0F;
+            opp->sl   = (p_state->reg[0x80 + op_idx]) & 0x0F;
+            opp->rr   = (p_state->reg[0xA0 + op_idx]) & 0x0F;
+            opp->ws   = (p_state->reg[0xE0 + op_idx]) & 0x07;
         }
-        // Feedback and connection type are per channel
-        uint8_t regC0 = p_state->reg[REGC0 + c];
-        p_out->fb[pair]  = (regC0 >> 1) & 0x07;
-        p_out->cnt[pair] = (regC0 >> 0) & 0x01;
+        // Feedback and connection type
+        p_out->fb[pair]  = (p_state->reg[0xC0 + c] >> 1) & 0x07;
+        p_out->cnt[pair] = (p_state->reg[0xC0 + c]) & 0x01;
     }
-    // Zero unused operators if not 4op
-    if (!four_op) {
-        memset(&p_out->op[2], 0, sizeof(OPL3OperatorParam) * 2);
-        p_out->fb[1] = 0;
-        p_out->cnt[1] = 0;
-    }
-    // Note: source_fmchip and patch_no should be set by the registration/conversion function,
-    // depending on the FM chip and patch being converted.
+    // Set chip type and patch number if tracked elsewhere (leave as default otherwise)
+    // p_out->source_fmchip and p_out->patch_no can be set by the caller if desired
 }
 
-// Returns the FM chip name string for the given FMChipType enum value
+/**
+ * Returns the FM chip name string for the given FMChipType enum value.
+ */
 const char* fmchip_type_name(FMChipType type) {
+    // Print FM chip type as string (if available)
     switch (type) {
+        case FMCHIP_YM2413:   return "YM2413";
         case FMCHIP_YM2612:   return "YM2612";
         case FMCHIP_YM2151:   return "YM2151";
         case FMCHIP_YM2203:   return "YM2203";
         case FMCHIP_YM2608:   return "YM2608";
-        case FMCHIP_YM2610:   return "YM2610/B";
+        case FMCHIP_YM2610:   return "YM2610";
         case FMCHIP_YM3812:   return "YM3812";
         case FMCHIP_YM3526:   return "YM3526";
         case FMCHIP_Y8950:    return "Y8950";
@@ -211,26 +139,43 @@ const char* fmchip_type_name(FMChipType type) {
         case FMCHIP_YMF278B:  return "YMF278B";
         case FMCHIP_YMF271:   return "YMF271";
         case FMCHIP_YMZ280B:  return "YMZ280B";
-        case FMCHIP_YM2413:   return "YM2413";
-        default:              return "Unknown";
+        case FMCHIP_2xYM2413:  return "2xYM2413";
+        case FMCHIP_2xYM2612:  return "2xYM2612";
+        case FMCHIP_2xYM2151:  return "2xYM2151";
+        case FMCHIP_2xYM2203:  return "2xYM2203";
+        case FMCHIP_2xYM2608:  return "2xYM2608";
+        case FMCHIP_2xYM2610:  return "2xYM2610";
+        case FMCHIP_2xYM3812:  return "2xYM3812";
+        case FMCHIP_2xYM3526:  return "2xYM3526";
+        case FMCHIP_2xY8950:   return "2xY8950";
+        case FMCHIP_2xYMF262:  return "2xYMF262";
+        case FMCHIP_2xYMF278B: return "2xYMF278B";
+        case FMCHIP_2xYMF271:  return "2xYMF271";
+        case FMCHIP_2xYMZ280B: return "2xYMZ280B";
+        // Add more as needed
+        default: return "UNKNOWN";
     }
 }
 
-// Detect which FM chip is present in the VGM header and used in the input file
+/**
+ * Detect which FM chip is present in the VGM header and used in the input file.
+ * Returns FMChipType value.
+ */
 FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize) {
-    // Check chip clocks in header (standard VGM header offsets)
-    if (read_le_uint32(p_vgm_data + 0x50) != 0) return FMCHIP_YM2413;   // YM2413
-    if (read_le_uint32(p_vgm_data + 0x2C) != 0) return FMCHIP_YM2612;   // YM2612
-    if (read_le_uint32(p_vgm_data + 0x30) != 0) return FMCHIP_YM2151;   // YM2151
-    if (read_le_uint32(p_vgm_data + 0x38) != 0) return FMCHIP_YM2203;   // YM2203
-    if (read_le_uint32(p_vgm_data + 0x40) != 0) return FMCHIP_YM2608;   // YM2608
-    if (read_le_uint32(p_vgm_data + 0x44) != 0) return FMCHIP_YM2610;   // YM2610/B
-    if (read_le_uint32(p_vgm_data + 0x58) != 0) return FMCHIP_YM3812;   // YM3812
-    if (read_le_uint32(p_vgm_data + 0x5C) != 0) return FMCHIP_YM3526;   // YM3526
-    if (read_le_uint32(p_vgm_data + 0x60) != 0) return FMCHIP_Y8950;    // Y8950
-    if (read_le_uint32(p_vgm_data + 0x68) != 0) return FMCHIP_YMF262;   // YMF262
-    if (read_le_uint32(p_vgm_data + 0x70) != 0) return FMCHIP_YMF278B;  // YMF278B
-    if (read_le_uint32(p_vgm_data + 0x74) != 0) return FMCHIP_YMF271;   // YMF271
-    if (read_le_uint32(p_vgm_data + 0x7C) != 0) return FMCHIP_YMZ280B;  // YMZ280B
+    if (filesize < 0x70) return FMCHIP_NONE;
+    // Check clock values for known chips in VGM header (see vgm_header.h offsets)
+    if (*(uint32_t*)(p_vgm_data + 0x40)) return FMCHIP_YM2413;
+    if (*(uint32_t*)(p_vgm_data + 0x2C)) return FMCHIP_YM2612;
+    if (*(uint32_t*)(p_vgm_data + 0x30)) return FMCHIP_YM2151;
+    if (*(uint32_t*)(p_vgm_data + 0x44)) return FMCHIP_YM2203;
+    if (*(uint32_t*)(p_vgm_data + 0x48)) return FMCHIP_YM2608;
+    if (*(uint32_t*)(p_vgm_data + 0x4C)) return FMCHIP_YM2610;
+    if (*(uint32_t*)(p_vgm_data + 0x50)) return FMCHIP_YM3812;
+    if (*(uint32_t*)(p_vgm_data + 0x54)) return FMCHIP_YM3526;
+    if (*(uint32_t*)(p_vgm_data + 0x58)) return FMCHIP_Y8950;
+    if (*(uint32_t*)(p_vgm_data + 0x5C)) return FMCHIP_YMF262;
+    if (*(uint32_t*)(p_vgm_data + 0x60)) return FMCHIP_YMF278B;
+    if (*(uint32_t*)(p_vgm_data + 0x64)) return FMCHIP_YMF271;
+    if (*(uint32_t*)(p_vgm_data + 0x68)) return FMCHIP_YMZ280B;
     return FMCHIP_NONE;
 }
