@@ -8,6 +8,116 @@
 #include "opl3_voice.h"
 #include "opl3_debug_util.h"
 
+<<<<<<< Updated upstream
+=======
+extern int verbose;
+
+// OPLL (YM2413) preset to OPL3 parameter conversion table
+// Each entry maps a OPLL instrument (0-14) to OPL3 operator parameters
+typedef struct {
+    // Operator 1 parameters
+    uint8_t mult1, ar1, dr1, sl1, rr1, am1, vib1, ksr1;
+    // Operator 2 parameters
+    uint8_t mult2, ar2, dr2, sl2, rr2, am2, vib2, ksr2;
+    uint8_t tl;      // Total Level for Operator 2 (OPLL TL affects only OP2)
+    uint8_t fb;      // Feedback (FB)
+    uint8_t alg;     // Algorithm (ALG)
+    uint8_t wf;      // Waveform
+} OPLL2OPL3Patch;
+
+// Conversion table for OPLL preset instruments (No.0〜14), No.15 is user patch (handled separately)
+static const OPLL2OPL3Patch opll_to_opl3_table[15] = {
+    // Violin (No.0)
+    {1,12,6,9,6,0,0,0, 1,12,6,9,6,0,0,0, 0, 1,0, 0},
+    // Guitar (No.1)
+    {2,15,4,8,5,0,0,0, 1,12,6,9,6,0,0,0, 3, 2,0, 0},
+    // Piano (No.2)
+    {1,14,8,7,4,0,0,0, 2,12,7,8,5,0,0,0, 2, 1,0, 0},
+    // Flute (No.3)
+    {1,13,7,8,6,0,1,0, 1,12,6,9,6,0,0,0, 0, 0,0, 0},
+    // Clarinet (No.4)
+    {1,12,6,9,5,0,0,0, 1,11,6,8,5,0,0,0, 1, 0,0, 0},
+    // Trumpet (No.5)
+    {2,15,5,7,4,1,0,0, 1,13,6,8,5,0,0,0, 0, 1,0, 0},
+    // Oboe (No.6)
+    {1,14,7,9,6,0,0,0, 1,12,6,8,5,0,0,0, 0, 0,0, 0},
+    // Organ (No.7)
+    {1,12,8,15,15,0,0,0, 1,12,8,15,15,0,0,0, 0, 0,0, 0},
+    // Bell (No.8)
+    {1,15,4,0,1,0,0,0, 1,15,4,0,1,0,0,0, 0, 0,0, 0},
+    // Marimba (No.9)
+    {2,15,6,5,3,0,0,0, 1,12,7,6,3,0,0,0, 2, 1,0, 0},
+    // Bass (No.10)
+    {1,13,8,6,4,0,0,0, 1,12,7,5,3,0,0,0, 0, 2,0, 0},
+    // SynthLead (No.11)
+    {2,15,5,7,4,1,0,0, 1,14,6,8,5,1,0,0, 1, 2,0, 0},
+    // SynthPad (No.12)
+    {1,12,8,9,6,0,1,0, 1,12,8,9,6,0,0,0, 0, 1,0, 0},
+    // Sitar (No.13)
+    {3,15,5,7,3,0,0,0, 1,12,6,8,5,0,0,0, 3, 1,0, 0},
+    // Vibraphone (No.14)
+    {2,14,6,7,4,0,1,0, 1,12,6,8,5,0,0,0, 1, 0,0, 0},
+    // User patch (No.15) is not included; handled by user patch data
+};
+
+// Convert OPLL preset instrument to OPL3 voice parameters and register as a voice
+// Arguments:
+//   state: pointer to OPL3State structure (voice_db will be updated)
+//   inst: OPLL instrument number (0-14 for presets)
+// Returns:
+//   Registered voice ID (>=0 if success, <0 if error)
+int register_opll_patch_as_opl3_voice(OPL3State *state, int inst) {
+    if (inst < 0 || inst >= 15) {
+        // Invalid instrument number
+        return -1;
+    }
+
+    // Fetch patch parameters from the conversion table
+    const OPLL2OPL3Patch *patch = &opll_to_opl3_table[inst];
+
+    // Prepare OPL3VoiceParam structure and fill with converted parameters
+    OPL3VoiceParam vparam;
+    memset(&vparam, 0, sizeof(vparam));
+
+    vparam.is_4op = 0; // OPLL patches are always 2op
+    vparam.source_fmchip = state->source_fmchip; // Set the source FM chip type from state (should be FMCHIP_YM2413)
+    vparam.patch_no = inst; // Set the patch number
+
+    // Operator 1
+    vparam.op[0].mult = patch->mult1;
+    vparam.op[0].ar   = patch->ar1;
+    vparam.op[0].dr   = patch->dr1;
+    vparam.op[0].sl   = patch->sl1;
+    vparam.op[0].rr   = patch->rr1;
+    vparam.op[0].am   = patch->am1;
+    vparam.op[0].vib  = patch->vib1;
+    vparam.op[0].ksr  = patch->ksr1;
+
+    // Operator 2
+    vparam.op[1].mult = patch->mult2;
+    vparam.op[1].ar   = patch->ar2;
+    vparam.op[1].dr   = patch->dr2;
+    vparam.op[1].sl   = patch->sl2;
+    vparam.op[1].rr   = patch->rr2;
+    vparam.op[1].am   = patch->am2;
+    vparam.op[1].vib  = patch->vib2;
+    vparam.op[1].ksr  = patch->ksr2;
+    // OPLL TL applies only to OP2
+
+    // Feedback and connection type (algorithm)
+    vparam.fb[0]  = patch->fb;
+    vparam.cnt[0] = patch->alg;
+
+    // Waveform; set for both operators if needed
+    vparam.op[0].ws = patch->wf;
+    vparam.op[1].ws = patch->wf;
+
+    // Register this voice into the voice database and return voice ID
+    int voice_id = opl3_voice_db_find_or_add(&state->voice_db, &vparam);
+    return voice_id;
+}
+
+>>>>>>> Stashed changes
 // Write register value and update state flags
 void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value) {
     uint16_t addr = reg + (port ? 0x100 : 0x000);
@@ -40,7 +150,7 @@ uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
     return (orig_val & 0xC0) | (new_tl & 0x3F);
 }
 
-// Detune helper (see previous code)
+// Detune helper for FM channels (used for frequency detune effects)
 void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB) {
     if (ch >= 6 && p_state->rhythm_mode) {
         *p_outA = regA;
@@ -66,7 +176,7 @@ opl3_regtype_t opl3_judge_regtype(uint8_t reg) {
     return OPL3_REGTYPE_OTHER;
 }
 
-// Apply register value to OPL3/OPL2 ports (multi-port/stereo logic logic)
+// Apply register value to OPL3/OPL2 ports (multi-port/stereo logic)
 // All per-channel register operations are routed here
 int apply_to_ports(const opl3_convert_ctx_t *ctx) {
     int port1_bytes = 0;
@@ -83,7 +193,6 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
             // 0xB0 + ch (Frequency MSB, KEYON/BLOCK)
             int addr_regA = 0xA0 + ctx->ch;
             int addr_regB = 0xB0 + ctx->ch;
-            // Write B register sequence to port 0
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regB, ctx->val);
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regA, ctx->p_state->reg[addr_regA]);
             opl3_write_reg(ctx->p_state, ctx->p_music_data, 0, addr_regB, ctx->val);
@@ -105,6 +214,9 @@ int apply_to_ports(const opl3_convert_ctx_t *ctx) {
                 // Extract and register voice parameters
                 OPL3VoiceParam vparam;
                 extract_voice_param(ctx->p_state, ctx->ch, &vparam);
+                // Set source_fmchip and patch_no from state defaults (for YM3812/OPL3 use FMCHIP_YM3812 etc.)
+                vparam.source_fmchip = ctx->p_state->source_fmchip;
+                vparam.patch_no = -1; // Unknown patch_no for non-preset chips unless tracked separately
                 int prev_voice_count = ctx->p_state->voice_db.count;
                 int voice_id = opl3_voice_db_find_or_add(&ctx->p_state->voice_db, &vparam);
                 if (voice_id >= 0 && ctx->p_state->voice_db.count > prev_voice_count) {
@@ -198,10 +310,12 @@ int duplicate_write_opl3(
 }
 
 // OPL3 initialization sequence
-void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state) {
+// Now takes FMChipType to set default source_fmchip in OPL3State
+void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip) {
     memset(p_state->reg, 0, OPL3_REGISTER_SIZE);
     p_state->rhythm_mode = false;
     p_state->opl3_mode_initialized = false;
+    p_state->source_fmchip = source_fmchip; // Set default FM chip type for this conversion session
     opl3_voice_db_init(&p_state->voice_db);
     // OPL3 global registers
     opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01); // OPL3 enable

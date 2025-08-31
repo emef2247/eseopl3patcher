@@ -2,6 +2,7 @@
 #define OPL3_EVENT_H
 
 #include <stdint.h>
+#include "vgm_helpers.h" // For FMChipType (for future expansion, e.g. per-event chip info)
 
 // OPL3 event type enumeration
 typedef enum {
@@ -30,7 +31,9 @@ typedef struct {
     int16_t control_value;   // Control value (signed), for control events
     uint32_t wait_value;     // Number of samples/ticks to wait (for WAIT type)
     uint32_t meta_value;     // System/meta (e.g., tempo, time signature)
-    // You can add more fields as needed for advanced export (e.g. detune, pan, etc.)
+    FMChipType source_fmchip; // Source FM chip type for this event (e.g. YM2413/YM3812); set if needed
+    int patch_no;             // Patch/instrument number from source chip, if relevant
+    // Add more fields if needed for advanced export (e.g. detune, pan, etc.)
 } OPL3Event;
 
 // Dynamic event list for easy appending (expandable array)

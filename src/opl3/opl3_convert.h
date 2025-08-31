@@ -19,6 +19,7 @@ typedef struct OPL3State {
     OPL3EventList event_list;        // Event database (KeyOn/KeyOff etc.)
     OPL3KeyOnStatus keyon_status[OPL3_NUM_CHANNELS]; // Per-channel KeyOn state
     uint32_t timestamp;              // Current timestamp in samples or ticks
+    FMChipType source_fmchip;        // Default FM chip type for the conversion session
     // Add more fields as needed (e.g., other aggregate state)
 } OPL3State;
 
@@ -46,6 +47,7 @@ typedef struct {
     int ch_panning;            // Channel panning mode
     double v_ratio0;           // Volume ratio for port 0
     double v_ratio1;           // Volume ratio for port 1
+    // Optionally: add fields for source_fmchip/patch_no if context needed
 } opl3_convert_ctx_t;
 
 // Write a value to the OPL3 register mirror and update internal state flags.
@@ -74,6 +76,15 @@ int duplicate_write_opl3(
 );
 
 // OPL3 initialization sequence for both ports
-void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state);
+// Now takes FMChipType to set default source_fmchip in OPL3State
+void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip);
+
+// Convert OPLL preset instrument to OPL3 voice parameters and register as a voice
+// Arguments:
+//   state: pointer to OPL3State structure (voice_db will be updated)
+//   inst: OPLL instrument number (0-14 for presets)
+// Returns:
+//   Registered voice ID (>=0 if success, <0 if error)
+int register_opll_patch_as_opl3_voice(OPL3State *state, int inst);
 
 #endif // OPL3_CONVERT_H

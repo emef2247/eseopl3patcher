@@ -4,7 +4,7 @@
 #include "opl3_debug_util.h"
 #include <stdio.h>
 
-// Print the voice parameters with automatic voice ID and total count lookup via OPL3State
+// Print the voice parameters with automatic voice ID, total count, FM chip type (as string), and patch number.
 void print_opl3_voice_param(const OPL3State *p_state, const OPL3VoiceParam *vp) {
     if (!vp || !p_state) {
         printf("  (null voice param or state)\n");
@@ -20,7 +20,15 @@ void print_opl3_voice_param(const OPL3State *p_state, const OPL3VoiceParam *vp) 
             break;
         }
     }
-    printf("Voice %d/%d: is4op=%d | ", voice_id, total_count, vp->is_4op);
+    // Print FM chip type as string
+    printf("Voice %d/%d: is4op=%d | FMChip=%s (enum=%d) PatchNo=%d | ",
+        voice_id,
+        total_count,
+        vp->is_4op,
+        fmchip_type_name(vp->source_fmchip),
+        vp->source_fmchip,
+        vp->patch_no
+    );
     int n_ops = (vp->is_4op == 2) ? 4 : 2;
     for (int op = 0; op < n_ops; ++op) {
         const OPL3OperatorParam *opp = &vp->op[op];
@@ -38,7 +46,7 @@ void print_opl3_voice_param(const OPL3State *p_state, const OPL3VoiceParam *vp) 
     printf("\n");
 }
 
-// Print the registers and Voice ID for each channel in OPL3State, using the database in p_state
+// Print the registers and Voice ID for each channel in OPL3State, including FM chip type as string and patch number.
 void print_opl3_state_and_voice(const OPL3State *p_state) {
     printf("=== OPL3 State and Voice Dump ===\n");
     for (int ch = 0; ch < OPL3_NUM_CHANNELS; ++ch) {
@@ -68,6 +76,13 @@ void print_opl3_state_and_voice(const OPL3State *p_state) {
             }
         }
         printf("VoiceID=%d ", voice_id);
+
+        // Print FM chip type as string and patch number
+        printf("FMChip=%s (enum=%d) PatchNo=%d ",
+            fmchip_type_name(vparam.source_fmchip),
+            vparam.source_fmchip,
+            vparam.patch_no
+        );
 
         // Print main parameters (2op/4op, operator parameters)
         printf("is4op=%d | ", vparam.is_4op);

@@ -6,6 +6,7 @@
 #include "vgm/vgm_helpers.h"
 #include "vgm/vgm_header.h"
 #include "vgm/gd3_util.h"
+#include "opl3/opl3_voice.h"
 #include "opl3/opl3_convert.h"
 
 #define DEFAULT_DETUNE 1.0
@@ -34,6 +35,16 @@ static void make_default_output_name(const char *p_input, char *p_output, size_t
     size_t len = strlen(p_input);
     if (len > 4 && strcmp(&p_input[len-4], ".vgm") == 0) len -= 4;
     snprintf(p_output, outlen, "%.*sOPL3.vgm", (int)len, p_input);
+}
+
+// Remove \r and \n from file name
+void sanitize_filename(char *filename) {
+    char *src = filename, *dst = filename;
+    while (*src) {
+        if (*src != '\r' && *src != '\n') *dst++ = *src;
+        src++;
+    }
+    *dst = '\0';
 }
 
 int main(int argc, char *argv[]) {
@@ -169,7 +180,6 @@ int main(int argc, char *argv[]) {
     OPL3State state = {0};
     state.rhythm_mode = false;
     state.opl3_mode_initialized = false;
-
     bool is_replicate_reg_ymf262 = true;
     long read_done_byte = data_start;
     uint32_t additional_bytes = 0;
@@ -186,8 +196,8 @@ int main(int argc, char *argv[]) {
 
         unsigned char cmd = p_vgm_data[read_done_byte];
 
-        // YM3812 register write (0x5A)
-        if (cmd == 0x5A) {
+        // YM2413 register write (0x51)
+        if (cmd == 0x51) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
@@ -195,7 +205,70 @@ int main(int argc, char *argv[]) {
             if (is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
                     // Initialize OPL3 registers (buffer will grow here)
-                    opl3_init(&vgmctx.buffer, ch_panning, &state);
+                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
+
+                    #define NUM_OPLL_PRESET 15
+                    // For YM2413, initialize the voice DB with all preset patches
+                    for (int i = 0; i < NUM_OPLL_PRESET; ++i) {
+                        register_opll_patch_as_opl3_voice(&state, i);
+                    }
+                    state.opl3_mode_initialized = true;
+                }
+                // duplicate_write_opl3 returns additional bytes written for Port 1
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, NULL, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+            } else {
+                forward_write(&vgmctx.buffer, 0, reg, val);
+            }
+            continue;
+        }
+        // YM3812 register write (0x5A)
+        else if (cmd == 0x5A) {
+            uint8_t reg = p_vgm_data[read_done_byte + 1];
+            uint8_t val = p_vgm_data[read_done_byte + 2];
+            read_done_byte += 3;
+
+            if (is_replicate_reg_ymf262) {
+                if (!state.opl3_mode_initialized) {
+                    // Initialize OPL3 registers (buffer will grow here)
+                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
+                    state.opl3_mode_initialized = true;
+                }
+                // duplicate_write_opl3 returns additional bytes written for Port 1
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, NULL, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+            } else {
+                forward_write(&vgmctx.buffer, 0, reg, val);
+            }
+            continue;
+        }
+        // YM3526 register write (0x5B)
+        else if (cmd == 0x5B) {
+            uint8_t reg = p_vgm_data[read_done_byte + 1];
+            uint8_t val = p_vgm_data[read_done_byte + 2];
+            read_done_byte += 3;
+
+            if (is_replicate_reg_ymf262) {
+                if (!state.opl3_mode_initialized) {
+                    // Initialize OPL3 registers (buffer will grow here)
+                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
+                    state.opl3_mode_initialized = true;
+                }
+                // duplicate_write_opl3 returns additional bytes written for Port 1
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, NULL, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+            } else {
+                forward_write(&vgmctx.buffer, 0, reg, val);
+            }
+            continue;
+        }
+        // Y8950 register write (0x5C)
+        else if (cmd == 0x5C) {
+            uint8_t reg = p_vgm_data[read_done_byte + 1];
+            uint8_t val = p_vgm_data[read_done_byte + 2];
+            read_done_byte += 3;
+
+            if (is_replicate_reg_ymf262) {
+                if (!state.opl3_mode_initialized) {
+                    // Initialize OPL3 registers (buffer will grow here)
+                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
                     state.opl3_mode_initialized = true;
                 }
                 // duplicate_write_opl3 returns additional bytes written for Port 1
@@ -263,8 +336,8 @@ int main(int argc, char *argv[]) {
 
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
-        ", Converted from YM3812 to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
-        detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
+        ", Converted from %s to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
+        fmchip_type_name(state.source_fmchip), detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
     VGMBuffer gd3;
     vgm_buffer_init(&gd3);
@@ -312,9 +385,25 @@ int main(int argc, char *argv[]) {
         p_header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
     }
 
-    // Set OPL3 clock and zero YM3812 clock
-    set_opl3_clock(p_header_buf, OPL3_CLOCK);
-    set_ym3812_clock(p_header_buf, 0);
+    // Set OPL3 clock
+    set_ymf262_clock(p_header_buf, OPL3_CLOCK);
+
+    // Set only the clock for the converted chip (state.source_fmchip) to 0, not all others
+    switch (state.source_fmchip) {
+        case FMCHIP_YM2413: set_ym2413_clock(p_header_buf, 0); break;
+        case FMCHIP_YM3812: set_ym3812_clock(p_header_buf, 0); break;
+        case FMCHIP_YM2151: set_ym2151_clock(p_header_buf, 0); break;
+        case FMCHIP_YM2612: set_ym2612_clock(p_header_buf, 0); break;
+        case FMCHIP_YM2203: set_ym2203_clock(p_header_buf, 0); break;
+        case FMCHIP_YM2608: set_ym2608_clock(p_header_buf, 0); break;
+        case FMCHIP_YM2610: set_ym2610_clock(p_header_buf, 0); break;
+        case FMCHIP_YM3526: set_ym3526_clock(p_header_buf, 0); break;
+        case FMCHIP_Y8950:  set_y8950_clock(p_header_buf, 0);  break;
+        case FMCHIP_YMF278B:set_ymf278b_clock(p_header_buf, 0);break;
+        case FMCHIP_YMF271: set_ymf271_clock(p_header_buf, 0); break;
+        case FMCHIP_YMZ280B:set_ymz280b_clock(p_header_buf, 0);break;
+        default: break; // No change for unknown/none/OPL3
+    }
 
     // Copy header and GD3 info into VGMContext for export
     memcpy(vgmctx.header.raw, p_header_buf, (header_size > sizeof(vgmctx.header.raw) ? sizeof(vgmctx.header.raw) : header_size));
@@ -347,12 +436,20 @@ int main(int argc, char *argv[]) {
     fclose(p_wf);
 
     printf("Converted VGM written to: %s\n", p_output_path);
+    printf("Source FM Chip for conversion: %s\n", fmchip_type_name(state.source_fmchip));
     printf("Detune value: %g%%\n", detune);
     printf("Wait value: %d\n", opl3_keyon_wait);
     printf("Creator: %s\n", p_creator);
     printf("Channel Panning Mode: %d\n", ch_panning);
     printf("Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("Port1 Volume: %.2f%%\n", v_ratio1 * 100);
+<<<<<<< Updated upstream
+=======
+    if (verbose) {
+        printf("Verbose mode enabled: detailed debug messages will be shown during processing.\n");
+    }
+    printf("\n");
+>>>>>>> Stashed changes
 
     // Free resources
     vgm_buffer_free(&vgmctx.buffer);

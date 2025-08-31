@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 // --- YMF262 (OPL3) Channel/Slot/Register mapping tables ---
-// Reference: YMF262 datasheet (see attached image1)
+// Reference: YMF262 datasheet
 
 // Each channel has 2 operators. The following table maps logical channel and operator to the slot number.
 // The indexes are [channel][operator] (operator: 0=slot1, 1=slot2).
@@ -33,13 +33,17 @@ static const int opl3_slot_reg_offset[18][2] = {
     {32,35 }    // ch17 (RYT)
 };
 
-// Register base addresses for each operator parameter set (TL excluded)
 #define REG20 0x20
 #define REG40 0x40
 #define REG60 0x60
 #define REG80 0x80
 #define REGE0 0xE0
 #define REGC0 0xC0
+
+// Read little-endian 32-bit integer from buffer
+static uint32_t read_le_uint32(const unsigned char *p_ptr) {
+    return (uint32_t)p_ptr[0] | ((uint32_t)p_ptr[1] << 8) | ((uint32_t)p_ptr[2] << 16) | ((uint32_t)p_ptr[3] << 24);
+}
 
 // Initialize the voice database
 void opl3_voice_db_init(OPL3VoiceDB *p_db) {
@@ -55,9 +59,12 @@ void opl3_voice_db_free(OPL3VoiceDB *p_db) {
     p_db->count = p_db->capacity = 0;
 }
 
-// Compare two OPL3VoiceParam (compare only meaningful fields)
+// Compare two OPL3VoiceParam structures, including all meaningful fields.
+// Also compare source_fmchip and patch_no for strict uniqueness.
 int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b) {
     if (a->is_4op != b->is_4op) return 1;
+    if (a->source_fmchip != b->source_fmchip) return 1;
+    if (a->patch_no != b->patch_no) return 1;
     int n_ops = (a->is_4op) ? 4 : 2;
     for (int i = 0; i < n_ops; ++i) {
         if (memcmp(&a->op[i], &b->op[i], sizeof(OPL3OperatorParam)) != 0)
@@ -70,7 +77,8 @@ int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b) {
     return 0;
 }
 
-// Find or add a new voice, return its Voice ID (0-based)
+// Find or add a new voice to the database. source_fmchip and patch_no are also keys.
+// Returns its Voice ID (0-based).
 int opl3_voice_db_find_or_add(OPL3VoiceDB *p_db, const OPL3VoiceParam *p_vp) {
     // Search for an existing matching voice
     for (int i = 0; i < p_db->count; ++i) {
@@ -78,7 +86,7 @@ int opl3_voice_db_find_or_add(OPL3VoiceDB *p_db, const OPL3VoiceParam *p_vp) {
             return i;
         }
     }
-    // If not found, add the new voice to the database
+    // Not found, add the new voice to the database
     if (p_db->count >= p_db->capacity) {
         int new_capacity = (p_db->capacity > 0) ? (p_db->capacity * 2) : 16;
         OPL3VoiceParam* new_voices = (OPL3VoiceParam*)realloc(p_db->p_voices, new_capacity * sizeof(OPL3VoiceParam));
@@ -121,9 +129,8 @@ int get_opl3_channel_mode(const OPL3State *p_state, int ch) {
     return OPL3_MODE_2OP;
 }
 
-
 // Extract voice parameters for the specified channel.
-// If the channel is in 4op mode, extract both channels of the pair from the lower-numbered channel only.
+// This function does NOT fill source_fmchip or patch_no; set them at registration/conversion time if needed.
 void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out) {
     memset(p_out, 0, sizeof(OPL3VoiceParam));
 
@@ -138,11 +145,10 @@ void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out
 
     int ch_pair = -1;
     if (four_op) {
-        if (ch_local < 3) ch_pair = ch_base + ch_local + 3; // e.g. 0+3, 1+4, 2+5 or 9+12, 10+13, 11+14
+        if (ch_local < 3) ch_pair = ch_base + ch_local + 3;
         else if (ch_local >= 3 && ch_local <= 5) ch_pair = ch_base + ch_local - 3;
         // Only extract for the lower-numbered channel in each pair
         if (ch_local >= 3 && ch_local <= 5) {
-            // Clear all fields for this channel to avoid duplicate or partial registration
             memset(p_out, 0, sizeof(OPL3VoiceParam));
             return;
         }
@@ -186,4 +192,45 @@ void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out
         p_out->fb[1] = 0;
         p_out->cnt[1] = 0;
     }
+    // Note: source_fmchip and patch_no should be set by the registration/conversion function,
+    // depending on the FM chip and patch being converted.
+}
+
+// Returns the FM chip name string for the given FMChipType enum value
+const char* fmchip_type_name(FMChipType type) {
+    switch (type) {
+        case FMCHIP_YM2612:   return "YM2612";
+        case FMCHIP_YM2151:   return "YM2151";
+        case FMCHIP_YM2203:   return "YM2203";
+        case FMCHIP_YM2608:   return "YM2608";
+        case FMCHIP_YM2610:   return "YM2610/B";
+        case FMCHIP_YM3812:   return "YM3812";
+        case FMCHIP_YM3526:   return "YM3526";
+        case FMCHIP_Y8950:    return "Y8950";
+        case FMCHIP_YMF262:   return "YMF262";
+        case FMCHIP_YMF278B:  return "YMF278B";
+        case FMCHIP_YMF271:   return "YMF271";
+        case FMCHIP_YMZ280B:  return "YMZ280B";
+        case FMCHIP_YM2413:   return "YM2413";
+        default:              return "Unknown";
+    }
+}
+
+// Detect which FM chip is present in the VGM header and used in the input file
+FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize) {
+    // Check chip clocks in header (standard VGM header offsets)
+    if (read_le_uint32(p_vgm_data + 0x50) != 0) return FMCHIP_YM2413;   // YM2413
+    if (read_le_uint32(p_vgm_data + 0x2C) != 0) return FMCHIP_YM2612;   // YM2612
+    if (read_le_uint32(p_vgm_data + 0x30) != 0) return FMCHIP_YM2151;   // YM2151
+    if (read_le_uint32(p_vgm_data + 0x38) != 0) return FMCHIP_YM2203;   // YM2203
+    if (read_le_uint32(p_vgm_data + 0x40) != 0) return FMCHIP_YM2608;   // YM2608
+    if (read_le_uint32(p_vgm_data + 0x44) != 0) return FMCHIP_YM2610;   // YM2610/B
+    if (read_le_uint32(p_vgm_data + 0x58) != 0) return FMCHIP_YM3812;   // YM3812
+    if (read_le_uint32(p_vgm_data + 0x5C) != 0) return FMCHIP_YM3526;   // YM3526
+    if (read_le_uint32(p_vgm_data + 0x60) != 0) return FMCHIP_Y8950;    // Y8950
+    if (read_le_uint32(p_vgm_data + 0x68) != 0) return FMCHIP_YMF262;   // YMF262
+    if (read_le_uint32(p_vgm_data + 0x70) != 0) return FMCHIP_YMF278B;  // YMF278B
+    if (read_le_uint32(p_vgm_data + 0x74) != 0) return FMCHIP_YMF271;   // YMF271
+    if (read_le_uint32(p_vgm_data + 0x7C) != 0) return FMCHIP_YMZ280B;  // YMZ280B
+    return FMCHIP_NONE;
 }

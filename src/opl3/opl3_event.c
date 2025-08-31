@@ -24,5 +24,6 @@ void opl3_event_list_add(OPL3EventList *p_list, const OPL3Event *p_event) {
         p_list->capacity *= 2;
         p_list->p_events = (OPL3Event*)realloc(p_list->p_events, p_list->capacity * sizeof(OPL3Event));
     }
+    // Copy event (including source_fmchip and patch_no if present)
     p_list->p_events[p_list->count++] = *p_event;
 }

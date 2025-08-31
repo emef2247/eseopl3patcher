@@ -2,7 +2,7 @@
 #define OPL3_VOICE_H
 
 #include <stdint.h>
-
+#include "vgm_helpers.h" // for FMChipType
 
 #define OPL3_MODE_2OP 0
 #define OPL3_MODE_4OP 1
@@ -22,6 +22,8 @@ typedef struct {
     OPL3OperatorParam op[4];   // [0..1]: 2op, [0..3]: 4op
     uint8_t fb[2];             // Feedback for each 2op pair
     uint8_t cnt[2];            // Connection type for each 2op pair
+    FMChipType source_fmchip;  // Source FM chip type for this voice (e.g. YM2413/YM3812)
+    int patch_no;              // Patch/instrument number from the source FM chip (if applicable)
 } OPL3VoiceParam;
 
 // Dynamic array for voice database
@@ -31,14 +33,12 @@ typedef struct {
     int capacity;
 } OPL3VoiceDB;
 
-
 // Voice DB utility functions
 void opl3_voice_db_init(OPL3VoiceDB *p_db);
 void opl3_voice_db_free(OPL3VoiceDB *p_db);
 int opl3_voice_db_find_or_add(OPL3VoiceDB *p_db, const OPL3VoiceParam *p_vp);
 
 // Compare two OPL3VoiceParam (compare only meaningful fields)
-// Extern so it can be used from other modules (e.g. debug print)
 int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b);
 
 // Check if given channel is in 4op mode (returns 1 for 4op, 0 for 2op; now uses OPL3State pointer)
@@ -49,4 +49,9 @@ int get_opl3_channel_mode(const OPL3State *p_state, int ch);
 // Extract voice parameters for the given logical channel (0..17).
 void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out);
 
+// Returns the FM chip name string for the given FMChipType enum value
+const char* fmchip_type_name(FMChipType type);
+
+// Detect which FM chip is present in the VGM header and used in the input file
+FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize);
 #endif // OPL3_VOICE_H

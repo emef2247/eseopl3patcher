@@ -9,6 +9,38 @@
 extern "C" {
 #endif
 
+// Enumeration for FM sound chip types supported in VGM
+typedef enum {
+    FMCHIP_NONE = 0,    // Undefined / not set
+    FMCHIP_YM2413,
+    FMCHIP_YM2612,
+    FMCHIP_YM2151,
+    FMCHIP_YM2203,
+    FMCHIP_YM2608,
+    FMCHIP_YM2610,      // YM2610 and YM2610B (treat as same)
+    FMCHIP_YM3812,
+    FMCHIP_YM3526,
+    FMCHIP_Y8950,
+    FMCHIP_YMF262,
+    FMCHIP_YMF278B,
+    FMCHIP_YMF271,
+    FMCHIP_YMZ280B,
+    FMCHIP_2xYM2413,
+    FMCHIP_2xYM2612,
+    FMCHIP_2xYM2151,
+    FMCHIP_2xYM2203,
+    FMCHIP_2xYM2608,
+    FMCHIP_2xYM2610,      // YM2610 and YM2610B (treat as same)
+    FMCHIP_2xYM3812,
+    FMCHIP_2xYM3526,
+    FMCHIP_2xY8950,
+    FMCHIP_2xYMF262,
+    FMCHIP_2xYMF278B,
+    FMCHIP_2xYMF271,
+    FMCHIP_2xYMZ280B,
+    FMCHIP_MAX
+} FMChipType;
+
 // Dynamic buffer for VGM data stream
 typedef struct {
     uint8_t *data;     // Pointer to the buffer data
@@ -55,7 +87,8 @@ typedef struct {
     VGMStatus status;          // Status (total samples etc.)
     VGMHeaderInfo header;      // VGM header (raw + parsed info)
     VGMGD3Tag    gd3;          // GD3 tag (raw/parsed)
-    // Add more fields as needed (loop meta, export options, etc.)
+    // The source FM chip type for conversion (i.e., the type of FM chip in the input VGM)
+    FMChipType source_fmchip;
 } VGMContext;
 
 // Buffer utility functions

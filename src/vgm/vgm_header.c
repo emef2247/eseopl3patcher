@@ -52,27 +52,180 @@ void build_vgm_header(
     }
 }
 
-// Set the YMF262 (OPL3) clock value in the VGM header and zero the YM3812 clock
-void set_opl3_clock(uint8_t *p_header, uint32_t opl3_clock) {
-    // OPL3 clock is at 0x50, YM3812 at 0x44
-    p_header[0x50] = (opl3_clock) & 0xFF;
-    p_header[0x51] = (opl3_clock >> 8) & 0xFF;
-    p_header[0x52] = (opl3_clock >> 16) & 0xFF;
-    p_header[0x53] = (opl3_clock >> 24) & 0xFF;
-    // Zero YM3812 clock
-    p_header[0x44] = 0; p_header[0x45] = 0; p_header[0x46] = 0; p_header[0x47] = 0;
+/**
+ * Sets the YM2413 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2413
+ */
+void set_ym2413_clock(uint8_t *p_header, uint32_t value) {
+    // YM2413 clock is at 0x44, OPL3 at 0x50
+    p_header[0x10] = (value) & 0xFF;
+    p_header[0x11] = (value >> 8) & 0xFF;
+    p_header[0x12] = (value >> 16) & 0xFF;
+    p_header[0x13] = (value >> 24) & 0xFF;
 }
 
-// Set the YM3812 clock value in the VGM header and zero the OPL3 clock
-void set_ym3812_clock(uint8_t *p_header, uint32_t ym3812_clock) {
-    // YM3812 clock is at 0x44, OPL3 at 0x50
-    p_header[0x44] = (ym3812_clock) & 0xFF;
-    p_header[0x45] = (ym3812_clock >> 8) & 0xFF;
-    p_header[0x46] = (ym3812_clock >> 16) & 0xFF;
-    p_header[0x47] = (ym3812_clock >> 24) & 0xFF;
-    // Zero OPL3 clock
-    p_header[0x50] = 0; p_header[0x51] = 0; p_header[0x52] = 0; p_header[0x53] = 0;
+/**
+ * Sets the YM2612 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2612
+ */
+void set_ym2612_clock(uint8_t *p_header, uint32_t value){
+    // YM2612 clock is at 0x2C
+    p_header[0x2C] = (value) & 0xFF;
+    p_header[0x2D] = (value >> 8) & 0xFF;
+    p_header[0x2E] = (value >> 16) & 0xFF;
+    p_header[0x2F] = (value >> 24) & 0xFF;
 }
+
+/**
+ * Sets the YM2151 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2151
+ */
+void set_ym2151_clock(uint8_t *p_header, uint32_t value) {
+    // YM2151 clock is at 0x30
+    p_header[0x30] = (value) & 0xFF;
+    p_header[0x31] = (value >> 8) & 0xFF;
+    p_header[0x32] = (value >> 16) & 0xFF;
+    p_header[0x33] = (value >> 24) & 0xFF;
+}
+
+/**
+ * Sets the YM2203 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2203
+ */
+void set_ym2203_clock(uint8_t *p_header, uint32_t value){
+    // YM2203 clock is at 0x44
+    p_header[0x44] = (value) & 0xFF;
+    p_header[0x45] = (value >> 8) & 0xFF;
+    p_header[0x46] = (value >> 16) & 0xFF;
+    p_header[0x47] = (value >> 24) & 0xFF;
+}
+
+
+/**
+ * Sets the YM2608 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2608
+ */
+void set_ym2608_clock(uint8_t *p_header, uint32_t value){
+    // YM2608 clock is at 0x48
+    p_header[0x48] = (value) & 0xFF;
+    p_header[0x49] = (value >> 8) & 0xFF;
+    p_header[0x4A] = (value >> 16) & 0xFF;
+    p_header[0x4B] = (value >> 24) & 0xFF;
+}
+
+/**
+ * Sets the YM2610 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2610
+ */
+void set_ym2610_clock(uint8_t *p_header, uint32_t value) {
+    // YM2610 clock is at 0x4C
+    p_header[0x4C] = (value) & 0xFF;
+    p_header[0x4D] = (value >> 8) & 0xFF;
+    p_header[0x4E] = (value >> 16) & 0xFF;
+    p_header[0x4F] = (value >> 24) & 0xFF;
+}
+
+/**
+ * Sets the YM3812 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM3812
+ */
+void set_ym3812_clock(uint8_t *p_header, uint32_t value) {
+    // YM3812 clock is at 0x50
+    p_header[0x50] = (value) & 0xFF;
+    p_header[0x51] = (value >> 8) & 0xFF;
+    p_header[0x52] = (value >> 16) & 0xFF;
+    p_header[0x53] = (value >> 24) & 0xFF;
+}
+
+/**
+ * Sets the YM3526 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM3526
+ */
+void set_ym3526_clock(uint8_t *p_header, uint32_t value) {
+    // YM3526 clock is at 0x54
+    p_header[0x54] = (value) & 0xFF;
+    p_header[0x55] = (value >> 8) & 0xFF;
+    p_header[0x56] = (value >> 16) & 0xFF;
+    p_header[0x57] = (value >> 24) & 0xFF;
+}
+
+/**
+ * Sets the Y8950 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for Y8950
+ */
+void set_y8950_clock(uint8_t *p_header, uint32_t value) {
+    // Y8950 clock is at 0x58
+    p_header[0x58] = (value) & 0xFF;
+    p_header[0x59] = (value >> 8) & 0xFF;
+    p_header[0x5A] = (value >> 16) & 0xFF;
+    p_header[0x5B] = (value >> 24) & 0xFF;
+}
+
+
+/**
+ * Sets the YMF262 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF262
+ */
+void set_ymf262_clock(uint8_t *p_header, uint32_t value) {
+    // YMF262 clock is at 0x60
+    p_header[0x60] = (value) & 0xFF;
+    p_header[0x61] = (value >> 8) & 0xFF;
+    p_header[0x62] = (value >> 16) & 0xFF;
+    p_header[0x63] = (value >> 24) & 0xFF;
+}
+
+
+/**
+ * Sets the YMF278B clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF278B
+ */
+void set_ymf278b_clock(uint8_t *p_header, uint32_t value) {
+    // YMF278B clock is at 0x60
+    p_header[0x60] = (value) & 0xFF;
+    p_header[0x61] = (value >> 8) & 0xFF;
+    p_header[0x62] = (value >> 16) & 0xFF;
+    p_header[0x63] = (value >> 24) & 0xFF;
+}
+
+
+/**
+ * Sets the YMF271 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF271
+ */
+void set_ymf271_clock(uint8_t *p_header, uint32_t value) {
+    // YMF271 clock is at 0x64
+    p_header[0x64] = (value) & 0xFF;
+    p_header[0x65] = (value >> 8) & 0xFF;
+    p_header[0x66] = (value >> 16) & 0xFF;
+    p_header[0x67] = (value >> 24) & 0xFF;
+}
+
+
+/**
+ * Sets the YMZ280B clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMZ280B
+ */
+void set_ymz280b_clock(uint8_t *p_header, uint32_t value) {
+    // YMZ280B clock is at 0x68
+    p_header[0x68] = (value) & 0xFF;
+    p_header[0x69] = (value >> 8) & 0xFF;
+    p_header[0x6A] = (value >> 16) & 0xFF;
+    p_header[0x6B] = (value >> 24) & 0xFF;
+}
+
 
 /**
  * Write the VGM header and GD3 block from VGMContext to the output VGMBuffer.
