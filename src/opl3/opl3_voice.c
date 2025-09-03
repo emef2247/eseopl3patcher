@@ -108,48 +108,99 @@ int get_opl3_channel_mode(const OPL3State *p_state, int ch) {
 }
 
 /**
- * Extract voice parameters for the given logical channel (0..17).
- * Fills out an OPL3VoiceParam structure, including TL value.
- * @param p_state Pointer to OPL3State.
- * @param ch Channel index.
- * @param p_out Pointer to OPL3VoiceParam to fill.
+ * Extracts all operator and channel parameters for a single OPL3 channel
+ * from the register mirror and fills OPL3VoiceParam.
+ * This version does not require ch or reg_type, but scans register mirror.
+ *
+ * @param p_state Pointer to OPL3State containing register mirror
+ * @param p_out Pointer to output OPL3VoiceParam structure
  */
-void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out) {
-    memset(p_out, 0, sizeof(OPL3VoiceParam));    
-    int mode = is_4op_channel(p_state, ch);
-    p_out->is_4op = mode;
-    int ch_main = ch;
-    int ch_pair = -1;
-    if (mode == 1) {
-        // Determine 4op channel pair
-        if (ch < 3) ch_pair = ch + 3;
-        else if (ch >= 3 && ch <= 5) ch_pair = ch - 3;
-    }
-    int chs[2] = {ch_main, (mode == 1 ? ch_pair : -1)};
-    for (int pair = 0; pair < (mode == 1 ? 2 : 1); ++pair) {
-        int c = chs[pair];
-        if (c < 0) continue;
-        // Each 2op pair has 2 operators: slot = c + op*3
-        for (int op = 0; op < 2; ++op) {
-            int op_idx = c + op * 3;
-            OPL3OperatorParam *opp = &p_out->op[pair * 2 + op];
-            // Fill operator parameters from register mirror
-            opp->am   = (p_state->reg[0x20 + op_idx] >> 7) & 1;
-            opp->vib  = (p_state->reg[0x20 + op_idx] >> 6) & 1;
-            opp->egt  = (p_state->reg[0x20 + op_idx] >> 5) & 1;
-            opp->ksr  = (p_state->reg[0x20 + op_idx] >> 4) & 1;
-            opp->mult =  p_state->reg[0x20 + op_idx] & 0x0F;
-            opp->ksl  = (p_state->reg[0x40 + op_idx] >> 6) & 3;
-            opp->tl   = p_state->reg[0x40 + op_idx] & 0x3F;
-            opp->ar   = (p_state->reg[0x60 + op_idx]) & 0x1F;
-            opp->dr   = (p_state->reg[0x80 + op_idx] >> 4) & 0x0F;
-            opp->sl   = (p_state->reg[0x80 + op_idx]) & 0x0F;
-            opp->rr   = (p_state->reg[0xA0 + op_idx]) & 0x0F;
-            opp->ws   = (p_state->reg[0xE0 + op_idx]) & 0x07;
+void extract_voice_param(const OPL3State *p_state, OPL3VoiceParam *p_out) {
+    memset(p_out, 0, sizeof(OPL3VoiceParam));
+
+    // Try to detect the most recent "KeyOn" event to identify the current channel.
+    int latest_keyon_ch = -1;
+    for (int ch = 0; ch < OPL3_NUM_CHANNELS; ++ch) {
+        uint8_t reg_val = p_state->reg[0xB0 + ch];
+        uint8_t keyon = reg_val & 0x20;
+        if (keyon) {
+            // Use timestamp or some heuristic to pick the most recent KeyOn.
+            // Here, we simply pick the first found "active" channel.
+            latest_keyon_ch = ch;
+            // If you have timestamps per channel, use them for accuracy.
+            break;
         }
-        // Feedback and connection type
-        p_out->fb[pair]  = (p_state->reg[0xC0 + c] >> 1) & 0x07;
-        p_out->cnt[pair] = (p_state->reg[0xC0 + c]) & 0x01;
     }
-    // The unique voice_no will be set by the voice_db on insertion.
+
+    // If no KeyOn found, fallback to channel 0.
+    int ch = (latest_keyon_ch >= 0) ? latest_keyon_ch : 0;
+
+    // Operator slot mapping for OPL3 (for 2-operator mode)
+    // Each channel has 2 operators: slot1 (modulator) and slot2 (carrier)
+    static const int slot_table[9][2] = {
+        {0, 3}, {1, 4}, {2, 5}, {6, 9}, {7, 10}, {8, 11}, {12, 15}, {13, 16}, {14, 17}
+    };
+
+    int slot_mod = slot_table[ch % 9][0];
+    int slot_car = slot_table[ch % 9][1];
+    int reg_base_mod = 0x40 + slot_mod;
+    int reg_base_car = 0x40 + slot_car;
+
+    // Extract operator parameters for modulator
+    OPL3OperatorParam *mod = &p_out->op[0];
+    uint8_t val;
+    val = p_state->reg[reg_base_mod];
+    mod->tl = val & 0x3F;
+    mod->ksl = (val >> 6) & 0x03;
+
+    val = p_state->reg[0x20 + slot_mod];
+    mod->mult = val & 0x0F;
+    mod->ksr = (val >> 4) & 0x01;
+    mod->egt = (val >> 5) & 0x01;
+    mod->vib = (val >> 6) & 0x01;
+    mod->am  = (val >> 7) & 0x01;
+
+    val = p_state->reg[0x60 + slot_mod];
+    mod->ar = (val >> 4) & 0x0F;
+    mod->dr = val & 0x0F;
+
+    val = p_state->reg[0x80 + slot_mod];
+    mod->sl = (val >> 4) & 0x0F;
+    mod->rr = val & 0x0F;
+
+    val = p_state->reg[0xE0 + slot_mod];
+    mod->ws = val & 0x07;
+
+    // Extract operator parameters for carrier
+    OPL3OperatorParam *car = &p_out->op[1];
+    val = p_state->reg[reg_base_car];
+    car->tl = val & 0x3F;
+    car->ksl = (val >> 6) & 0x03;
+
+    val = p_state->reg[0x20 + slot_car];
+    car->mult = val & 0x0F;
+    car->ksr = (val >> 4) & 0x01;
+    car->egt = (val >> 5) & 0x01;
+    car->vib = (val >> 6) & 0x01;
+    car->am  = (val >> 7) & 0x01;
+
+    val = p_state->reg[0x60 + slot_car];
+    car->ar = (val >> 4) & 0x0F;
+    car->dr = val & 0x0F;
+
+    val = p_state->reg[0x80 + slot_car];
+    car->sl = (val >> 4) & 0x0F;
+    car->rr = val & 0x0F;
+
+    val = p_state->reg[0xE0 + slot_car];
+    car->ws = val & 0x07;
+
+    // Channel-level parameters (Feedback and Algorithm)
+    val = p_state->reg[0xC0 + ch];
+    p_out->fb[0]  = (val >> 1) & 0x07;
+    p_out->cnt[0] = val & 0x01;
+
+    // Fill rest of OPL3VoiceParam as needed (e.g., voice number, FM chip type)
+    p_out->voice_no = ch;
+    p_out->is_4op = 0; // Not handled here (2-op only)
 }

@@ -99,11 +99,12 @@ int is_4op_channel(const OPL3State *p_state, int ch);
 int get_opl3_channel_mode(const OPL3State *p_state, int ch);
 
 /**
- * Extract voice parameters for the given logical channel (0..17).
- * @param p_state Pointer to OPL3State.
- * @param ch Channel index.
- * @param p_out Pointer to OPL3VoiceParam to fill.
+ * Extracts all operator and channel parameters for a single OPL3 channel
+ * from the register mirror and fills OPL3VoiceParam.
+ * Scans the register state to determine channel and operator parameters.
+ *
+ * @param p_state Pointer to OPL3State containing register mirror
+ * @param p_out Pointer to output OPL3VoiceParam structure
  */
-void extract_voice_param(const OPL3State *p_state, int ch, OPL3VoiceParam *p_out);
-
+void extract_voice_param(const OPL3State *p_state, OPL3VoiceParam *p_out);
 #endif // OPL3_VOICE_H

@@ -188,15 +188,13 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (is_replicate_reg_ymf262) {
+            if (!is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
                     state.opl3_mode_initialized = true;
                 }
                 additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-            } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
-            }
+            } 
             continue;
         }
         // YM3812 register write (0x5A)
@@ -222,32 +220,19 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (is_replicate_reg_ymf262) {
+            if (!is_replicate_reg_ymf262) {
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
                     state.opl3_mode_initialized = true;
                 }
                 additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-            } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
-            }
+            } 
             continue;
         }
         // Y8950 register write (0x5C)
         else if (cmd == 0x5C) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
-            read_done_byte += 3;
-
-            if (is_replicate_reg_ymf262) {
-                if (!state.opl3_mode_initialized) {
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
-                    state.opl3_mode_initialized = true;
-                }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-            } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
-            }
             continue;
         }
         // Short wait command (0x70-0x7F)

@@ -30,11 +30,18 @@ typedef struct OPL3State {
  * OPL3 register type for conversion logic (meaningful, not just A/B/C/T)
  */
 typedef enum {
+    OPL3_REGTYPE_LSI_TEST,   /**< 0x01 : LST TEST  (Only port 0) */
+    OPL3_REGTYPE_TIMER1,     /**< 0x02 : TIMER1 (Only port 0) */
+    OPL3_REGTYPE_TIMER2,     /**< 0x03 : TIMER2 (Only port 0) */
+    OPL3_REGTYPE_RST_MT_ST,  /**< 0x04 : RST/MT1/MT2/ST2/ST1 (Only port 0) */
+    OPL3_REGTYPE_MODE,       /**< 0x05 : NEW (Only port 1) */
+    OPL3_REGTYPE_NTS,        /**< 0x08 : NTS (Only port 0) */
     OPL3_REGTYPE_FREQ_LSB,   /**< 0xA0-0xA8 : Frequency LSB (FNUM low) */
     OPL3_REGTYPE_FREQ_MSB,   /**< 0xB0-0xB8 : Frequency MSB (FNUM high, KEYON, BLOCK) */
     OPL3_REGTYPE_CH_CTRL,    /**< 0xC0-0xC8 : Channel control (Feedback, Algorithm, Panning) */
     OPL3_REGTYPE_OP_TL,      /**< 0x40-0x55 : Operator TL (Total Level) */
     OPL3_REGTYPE_RHYTHM_BD,  /**< 0xBD      : Rhythm mode/BD */
+    OPL3_REGTYPE_WB,         /**< 0xE0-$F5  : Wave Select */
     OPL3_REGTYPE_OTHER       /**< All other registers */
 } opl3_regtype_t;
 
@@ -45,8 +52,6 @@ typedef struct {
     VGMBuffer *p_music_data;   // Pointer to VGM dynamic buffer
     VGMStatus *p_vstat;        // Pointer to VGM status (sample count)
     OPL3State *p_state;        // Pointer to OPL3 state
-    int ch;                    // Channel index
-    opl3_regtype_t reg_type;   // Register type (for conversion logic)
     uint8_t reg;               // Actual register offset (e.g. 0xA0.., 0xB0.., etc)
     uint8_t val;               // Register value
     double detune;             // Detune value (for chorus/detune effect)
@@ -110,16 +115,6 @@ int duplicate_write_opl3_ym2413(
  * @return OPL3 register type (enum value).
  */
 opl3_regtype_t opl3_judge_regtype(uint8_t reg);
-
-/**
- * Apply register value to OPL3/OPL2 ports (used for multi-port/stereo applications).
- * Uses context struct for all relevant info.
- * Returns: number of bytes written to port 1.
- *
- * @param ctx Pointer to conversion context.
- * @return Number of bytes written to port 1.
- */
-int opl3_apply_to_ports(const opl3_convert_ctx_t *ctx);
 
 /**
  * Rhythm mode register handler.
