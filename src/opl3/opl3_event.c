@@ -5,6 +5,7 @@
 
 /**
  * Initialize an OPL3EventList structure.
+ * @param p_list Pointer to OPL3EventList to initialize.
  */
 void opl3_event_list_init(OPL3EventList *p_list) {
     p_list->count = 0;
@@ -14,6 +15,7 @@ void opl3_event_list_init(OPL3EventList *p_list) {
 
 /**
  * Free all memory used by an OPL3EventList.
+ * @param p_list Pointer to OPL3EventList to free.
  */
 void opl3_event_list_free(OPL3EventList *p_list) {
     if (p_list->p_events) free(p_list->p_events);
@@ -24,6 +26,8 @@ void opl3_event_list_free(OPL3EventList *p_list) {
 
 /**
  * Add a new event to the OPL3EventList, expanding capacity if needed.
+ * @param p_list Pointer to OPL3EventList to add to.
+ * @param p_event Pointer to OPL3Event to add.
  */
 void opl3_event_list_add(OPL3EventList *p_list, const OPL3Event *p_event) {
     if (p_list->count >= p_list->capacity) {

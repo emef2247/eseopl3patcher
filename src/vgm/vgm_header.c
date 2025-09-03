@@ -196,3 +196,61 @@ void vgm_export_header_and_gd3(const VGMContext *ctx, VGMBuffer *out_buf) {
         vgm_buffer_append(out_buf, ctx->gd3.data, ctx->gd3.size);
     }
 }
+
+/**
+ * Returns the FM chip name string for the given FMChipType enum value.
+ */
+const char* fmchip_type_name(FMChipType type) {
+    switch (type) {
+        case FMCHIP_YM2413:   return "YM2413";
+        case FMCHIP_YM2612:   return "YM2612";
+        case FMCHIP_YM2151:   return "YM2151";
+        case FMCHIP_YM2203:   return "YM2203";
+        case FMCHIP_YM2608:   return "YM2608";
+        case FMCHIP_YM2610:   return "YM2610";
+        case FMCHIP_YM3812:   return "YM3812";
+        case FMCHIP_YM3526:   return "YM3526";
+        case FMCHIP_Y8950:    return "Y8950";
+        case FMCHIP_YMF262:   return "YMF262";
+        case FMCHIP_YMF278B:  return "YMF278B";
+        case FMCHIP_YMF271:   return "YMF271";
+        case FMCHIP_YMZ280B:  return "YMZ280B";
+        case FMCHIP_2xYM2413:  return "2xYM2413";
+        case FMCHIP_2xYM2612:  return "2xYM2612";
+        case FMCHIP_2xYM2151:  return "2xYM2151";
+        case FMCHIP_2xYM2203:  return "2xYM2203";
+        case FMCHIP_2xYM2608:  return "2xYM2608";
+        case FMCHIP_2xYM2610:  return "2xYM2610";
+        case FMCHIP_2xYM3812:  return "2xYM3812";
+        case FMCHIP_2xYM3526:  return "2xYM3526";
+        case FMCHIP_2xY8950:   return "2xY8950";
+        case FMCHIP_2xYMF262:  return "2xYMF262";
+        case FMCHIP_2xYMF278B: return "2xYMF278B";
+        case FMCHIP_2xYMF271:  return "2xYMF271";
+        case FMCHIP_2xYMZ280B: return "2xYMZ280B";
+        default: return "UNKNOWN";
+    }
+}
+
+/**
+ * Detect which FM chip is present in the VGM header and used in the input file.
+ * Returns FMChipType value.
+ */
+FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize) {
+    if (filesize < 0x70) return FMCHIP_NONE;
+    // Check clock values for known chips in VGM header (see vgm_header.h offsets)
+    if (*(uint32_t*)(p_vgm_data + 0x40)) return FMCHIP_YM2413;
+    if (*(uint32_t*)(p_vgm_data + 0x2C)) return FMCHIP_YM2612;
+    if (*(uint32_t*)(p_vgm_data + 0x30)) return FMCHIP_YM2151;
+    if (*(uint32_t*)(p_vgm_data + 0x44)) return FMCHIP_YM2203;
+    if (*(uint32_t*)(p_vgm_data + 0x48)) return FMCHIP_YM2608;
+    if (*(uint32_t*)(p_vgm_data + 0x4C)) return FMCHIP_YM2610;
+    if (*(uint32_t*)(p_vgm_data + 0x50)) return FMCHIP_YM3812;
+    if (*(uint32_t*)(p_vgm_data + 0x54)) return FMCHIP_YM3526;
+    if (*(uint32_t*)(p_vgm_data + 0x58)) return FMCHIP_Y8950;
+    if (*(uint32_t*)(p_vgm_data + 0x5C)) return FMCHIP_YMF262;
+    if (*(uint32_t*)(p_vgm_data + 0x60)) return FMCHIP_YMF278B;
+    if (*(uint32_t*)(p_vgm_data + 0x64)) return FMCHIP_YMF271;
+    if (*(uint32_t*)(p_vgm_data + 0x68)) return FMCHIP_YMZ280B;
+    return FMCHIP_NONE;
+}
