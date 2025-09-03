@@ -32,18 +32,95 @@ void build_vgm_header(
 );
 
 /**
- * Sets the YMF262 (OPL3) clock value in the VGM header and zeros the YM3812 clock.
+ * Sets the YM2413 clock value in the VGM header
  * @param p_header Pointer to the VGM header
- * @param opl3_clock The clock value for YMF262 (OPL3)
+ * @param value The clock value for YM2413
  */
-void set_opl3_clock(uint8_t *p_header, uint32_t opl3_clock);
+void set_ym2413_clock(uint8_t *p_header, uint32_t value);
 
 /**
- * Sets the YM3812 clock value in the VGM header and zeros the OPL3 clock.
+ * Sets the YM3812 clock value in the VGM header
  * @param p_header Pointer to the VGM header
- * @param ym3812_clock The clock value for YM3812
+ * @param value The clock value for YM3812
  */
-void set_ym3812_clock(uint8_t *p_header, uint32_t ym3812_clock);
+void set_ym3812_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM2151 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2151
+ */
+void set_ym2151_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM2612 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2612
+ */
+void set_ym2612_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM2203 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2203
+ */
+void set_ym2203_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM2608 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2608
+ */
+void set_ym2608_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM2610 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM2610
+ */
+void set_ym2610_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YM3526 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YM3526
+ */
+void set_ym3526_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the Y8950 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for Y8950
+ */
+void set_y8950_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YMF262 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF262
+ */
+void set_ymf262_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YMF278B clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF278B
+ */
+void set_ymf278b_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YMF271 clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMF271
+ */
+void set_ymf271_clock(uint8_t *p_header, uint32_t value);
+
+/**
+ * Sets the YMZ280B clock value in the VGM header
+ * @param p_header Pointer to the VGM header
+ * @param value The clock value for YMZ280B
+ */
+void set_ymz280b_clock(uint8_t *p_header, uint32_t value);
 
 /**
  * Copies header and GD3 information from VGMContext to the VGM file buffer.
@@ -52,5 +129,20 @@ void set_ym3812_clock(uint8_t *p_header, uint32_t ym3812_clock);
  * @param out_buf Output buffer to which the header and GD3 block are written
  */
 void vgm_export_header_and_gd3(const VGMContext *ctx, VGMBuffer *out_buf);
+
+/**
+ * Returns the FM chip name string for the given FMChipType enum value.
+ * @param type FMChipType enum value.
+ * @return Constant string with FM chip name.
+ */
+const char* fmchip_type_name(FMChipType type);
+
+/**
+ * Detect which FM chip is present in the VGM header and used in the input file.
+ * @param p_vgm_data Pointer to VGM data buffer.
+ * @param filesize Size of the VGM data buffer.
+ * @return FMChipType value indicating detected chip, or FMCHIP_NONE if unknown.
+ */
+FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize);
 
 #endif // VGM_HEADER_H
