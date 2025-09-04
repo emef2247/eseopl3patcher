@@ -112,6 +112,28 @@ typedef struct {
     FMChipType source_fmchip;  /**< The source FM chip type for conversion */
 } VGMContext;
 
+/**
+ * FM chip clocks and flags structure for VGM header analysis.
+ * This allows checking which chips are present and flagging them.
+ */
+typedef struct {
+    uint32_t ym3812_clock;
+    uint32_t ym3526_clock;
+    uint32_t y8950_clock;
+
+    bool has_ym3812;
+    bool has_ym3526;
+    bool has_y8950;
+
+    // Mark which chips are selected for conversion
+    bool convert_ym3812;
+    bool convert_ym3526;
+    bool convert_y8950;
+
+    bool opl_group_autodetect; // true if "auto" mode, false if explicit
+    int  opl_group_first_cmd;  // 0x5A=3812, 0x5B=3526, 0x5C=Y8950
+} VGMChipClockFlags;
+
 // --- Function documentation comments ---
 
 /**
@@ -228,6 +250,22 @@ void vgm_wait_60hz_ctx(VGMContext *ctx);
  * @param ctx Pointer to VGMContext.
  */
 void vgm_wait_50hz_ctx(VGMContext *ctx);
+
+/**
+ * Parse the VGM header for FM chip clock values and flags.
+ * Returns true if parsing was successful.
+ * @param vgm_data  Pointer to the start of the VGM file
+ * @param filesize  Size of the VGM file
+ * @param out_flags Pointer to a VGMChipClockFlags struct to fill
+ */
+bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockFlags *out_flags);
+
+/**
+ * Returns the name of the FM chip selected for conversion in chip_flags.
+ * Only one chip should be selected for conversion; if multiple are selected, returns the first found.
+ * If none is selected, returns "UNKNOWN".
+ */
+const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags);
 
 #ifdef __cplusplus
 }

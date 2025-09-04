@@ -75,6 +75,7 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
     *p_outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
 
+
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
  * @param p_music_data Pointer to VGMBuffer for music data.
@@ -97,7 +98,7 @@ int duplicate_write_opl3(
     double detune, int opl3_keyon_wait, int ch_panning,
     double v_ratio0, double v_ratio1
 ) {
-    int port1_bytes = 0;
+    int addtional_bytes = 0;
 
     if (reg == 0x01 || reg == 0x02 || reg == 0x03 || reg == 0x04) {
         // Write only to port 0
@@ -110,7 +111,7 @@ int duplicate_write_opl3(
         uint8_t val0 = apply_tl_with_ratio(val, v_ratio0);
         uint8_t val1 = apply_tl_with_ratio(val, v_ratio1);
         opl3_write_reg(p_state, p_music_data, 0, reg, val0);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val1); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
     } else if (reg >= 0xA0 && reg <= 0xA8) {
         // Only write port0 for A0..A8
         int ch = reg - 0xA0;
@@ -123,21 +124,39 @@ int duplicate_write_opl3(
             p_state->reg[reg] = val;
         }
     } else if (reg >= 0xB0 && reg <= 0xB8) {
+        // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
+        // Get the previous and new KEYON bit values
+        uint8_t prev_val = p_state->reg_stamp[reg];
+        uint8_t keyon_prev = prev_val & 0x20;
+        uint8_t keyon_new  = val & 0x20;
+        // KeyOn occurs: extract and register voice parameters for this channel
+        if (!keyon_prev && keyon_new) {
+            OPL3VoiceParam vp;
+            // Always zero-initialize the whole structure before extracting parameters
+            memset(&vp, 0, sizeof(OPL3VoiceParam));
+            // Extract voice parameters from the OPL3 state
+            extract_voice_param(p_state, &vp);
+            // Set additional fields as needed before DB registration
+            vp.source_fmchip = p_state->source_fmchip;
+            // Register or find voice in the database
+            opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
+        }
+        
         // Write B0 (KeyOn/Block/FnumMSB) and handle detune
         // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
         int ch = reg - 0xB0;
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        opl3_write_reg(p_state, 
-            p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
+        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-
+        // Extra 1 bytes
+        addtional_bytes += 1;
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
 
         uint8_t detunedA, detunedB;
         detune_if_fm(p_state, ch, p_state->reg[0xA0 + ch], val, detune, &detunedA, &detunedB);
-        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); port1_bytes += 3;
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
         }
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
@@ -163,38 +182,18 @@ int duplicate_write_opl3(
                 port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
         }
         opl3_write_reg(p_state, p_music_data, 0, 0xC0 + ch, (0xF & val) | port0_panning);
-        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, (0xF & val) | port1_panning); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, (0xF & val) | port1_panning); addtional_bytes += 3;
     } else if (reg == 0xBD) {
         opl3_write_reg(p_state, p_music_data, 0, reg, val);
     } else if (reg >= 0xE0 && reg <= 0xF5) {
         opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
     } else {
         // Write to both ports
         opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); port1_bytes += 3;
+        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
     }
-
-    // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
-    if (reg >= 0xB0 && reg <= 0xB8) {
-        // Get the previous and new KEYON bit values
-        uint8_t prev_val = p_state->reg_stamp[reg];
-        uint8_t keyon_prev = prev_val & 0x20;
-        uint8_t keyon_new  = val & 0x20;
-        // KeyOn occurs: extract and register voice parameters for this channel
-        if (!keyon_prev && keyon_new) {
-            OPL3VoiceParam vp;
-            // Always zero-initialize the whole structure before extracting parameters
-            memset(&vp, 0, sizeof(OPL3VoiceParam));
-            // Extract voice parameters from the OPL3 state
-            extract_voice_param(p_state, &vp);
-            // Set additional fields as needed before DB registration
-            vp.source_fmchip = p_state->source_fmchip;
-            // Register or find voice in the database
-            opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
-        }
-    }
-    return port1_bytes;
+    return addtional_bytes;
 }
 
 /**
