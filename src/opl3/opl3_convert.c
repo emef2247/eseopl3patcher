@@ -148,8 +148,8 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
         opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        // Extra 1 bytes
-        addtional_bytes += 1;
+        // Extra 3 bytes
+        addtional_bytes += 3;
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
 
         uint8_t detunedA, detunedB;
