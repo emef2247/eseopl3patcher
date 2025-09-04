@@ -8,6 +8,8 @@
 #include "opl3/opl3_convert.h"
 #include "opl3/opl3_debug_util.h"
 #include "vgm/gd3_util.h"
+#include "opl3/opl3_debug_util.h"
+#include "vgm/gd3_util.h"
 
 #define DEFAULT_DETUNE 1.0
 #define DEFAULT_WAIT 0
@@ -17,6 +19,30 @@
 
 // Global verbose flag (used for debug print control)
 int verbose = 0;
+
+// Helper: parse command line to set chip conversion flags
+static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlags *chip_flags) {
+    // Default: auto-detect OPL group (YM3812/YM3526/Y8950)
+    chip_flags->opl_group_autodetect = true;
+    chip_flags->convert_ym3812 = false;
+    chip_flags->convert_ym3526 = false;
+    chip_flags->convert_y8950 = false;
+
+    for (int i = 3; i < argc; ++i) {
+        if (strcmp(argv[i], "--convert-ym3812") == 0) {
+            chip_flags->convert_ym3812 = true;
+            chip_flags->opl_group_autodetect = false;
+        }
+        if (strcmp(argv[i], "--convert-ym3526") == 0) {
+            chip_flags->convert_ym3526 = true;
+            chip_flags->opl_group_autodetect = false;
+        }
+        if (strcmp(argv[i], "--convert-y8950") == 0) {
+            chip_flags->convert_y8950 = true;
+            chip_flags->opl_group_autodetect = false;
+        }
+    }
+}
 
 // Read little-endian 32-bit integer from buffer
 static uint32_t read_le_uint32(const unsigned char *p_ptr) {
@@ -41,9 +67,11 @@ static void make_default_output_name(const char *p_input, char *p_output, size_t
 }
 
 int main(int argc, char *argv[]) {
-    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose]
+    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] [--convert-ymXXXX ...]
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] [--convert-ymXXXX ...]\n", argv[0]);
+        fprintf(stderr, "  --convert-ymXXXX : Explicitly select chips for conversion (YM3812, YM3526, Y8950)\n");
+        fprintf(stderr, "  (Default: OPL group auto, only first OPL chip in VGM is converted unless explicit)\n");
         return 1;
     }
     // Parse required arguments
@@ -60,11 +88,15 @@ int main(int argc, char *argv[]) {
     int ch_panning = DEFAULT_CH_PANNING;
     double v_ratio0 = DEFAULT_VOLUME_RATIO0;
     double v_ratio1 = DEFAULT_VOLUME_RATIO1;
+    int ch_panning = DEFAULT_CH_PANNING;
+    double v_ratio0 = DEFAULT_VOLUME_RATIO0;
+    double v_ratio1 = DEFAULT_VOLUME_RATIO1;
 
     // Parse optional arguments
     for (int i = 3; i < argc; ++i) {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             p_output_path = argv[i + 1];
+            i++;
             i++;
             continue;
         }
@@ -87,6 +119,10 @@ int main(int argc, char *argv[]) {
             verbose = 1;
             continue;
         }
+        if (strcmp(argv[i], "-verbose") == 0) {
+            verbose = 1;
+            continue;
+        }
         if (argv[i][0] == '-') continue;
         char *endptr;
         int val = (int)strtol(argv[i], &endptr, 10);
@@ -99,6 +135,10 @@ int main(int argc, char *argv[]) {
             continue;
         }
     }
+
+    // --- Parse FM chip conversion flags from command line ---
+    VGMChipClockFlags chip_flags = {0};
+    parse_chip_conversion_flags(argc, argv, &chip_flags);
 
     if (!p_output_path) {
         static char default_out[256];
@@ -141,6 +181,7 @@ int main(int argc, char *argv[]) {
     uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(p_vgm_data + 0x34) : 0;
     uint32_t orig_header_size = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
     if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
+    if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
     long data_start = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
     if (data_start >= filesize) {
         fprintf(stderr, "Invalid VGM data offset.\n");
@@ -156,6 +197,7 @@ int main(int argc, char *argv[]) {
     }
 
     // --- Setup VGMContext for conversion ---
+    // --- Setup VGMContext for conversion ---
     VGMContext vgmctx;
     vgm_buffer_init(&vgmctx.buffer);
     vgm_timestamp_init(&vgmctx.timestamp, 44100.0);
@@ -164,15 +206,31 @@ int main(int argc, char *argv[]) {
     vgmctx.gd3.data = NULL;
     vgmctx.gd3.size = 0;
 
-    OPL3State state = {0};
+    // --- Parse VGM header for FM chip clocks and usage flags ---
+    if (!vgm_parse_chip_clocks(p_vgm_data, filesize, &chip_flags)) {
+        fprintf(stderr, "Failed to parse VGM header for chip clocks.\n");
+        free(p_vgm_data);
+        return 1;
+    }
+
+    // Debug print: show detected chips and clocks
+    if (verbose) {
+        printf("[VGM] FM chip usage in header:\n");
+        printf(" YM3812:   %s (clock=%u)\n",  chip_flags.has_ym3812   ? "YES" : "NO", chip_flags.ym3812_clock);
+        printf(" YM3526:   %s (clock=%u)\n",  chip_flags.has_ym3526   ? "YES" : "NO", chip_flags.ym3526_clock);
+        printf(" Y8950:    %s (clock=%u)\n",  chip_flags.has_y8950    ? "YES" : "NO", chip_flags.y8950_clock);
+
+    }
+
+    OPL3State state = {0};  
     state.rhythm_mode = false;
     state.opl3_mode_initialized = false;
 
-    bool is_replicate_reg_ymf262 = true;
     long read_done_byte = data_start;
     uint32_t additional_bytes = 0;
     long loop_start_in_buffer = -1;
 
+    // --- Main VGM data conversion loop ---
     // --- Main VGM data conversion loop ---
     while (read_done_byte < filesize) {
         // Detect loop start: when reaching the original loop address, record buffer.size
@@ -182,19 +240,30 @@ int main(int argc, char *argv[]) {
 
         unsigned char cmd = p_vgm_data[read_done_byte];
 
+        // --- OPL group auto-detect: select first encountered chip for conversion ---
+        if (chip_flags.opl_group_autodetect) {
+            if (cmd == 0x5A && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+                chip_flags.convert_ym3812 = true;
+                chip_flags.opl_group_autodetect = false;
+                chip_flags.opl_group_first_cmd = 0x5A;
+            } else if (cmd == 0x5B && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+                chip_flags.convert_ym3526 = true;
+                chip_flags.opl_group_autodetect = false;
+                chip_flags.opl_group_first_cmd = 0x5B;
+            } else if (cmd == 0x5C && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+                chip_flags.convert_y8950 = true;
+                chip_flags.opl_group_autodetect = false;
+                chip_flags.opl_group_first_cmd = 0x5C;
+            }
+        }
+
         // YM2413 register write (0x51)
         if (cmd == 0x51) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (!is_replicate_reg_ymf262) {
-                if (!state.opl3_mode_initialized) {
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
-                    state.opl3_mode_initialized = true;
-                }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-            } 
+            forward_write(&vgmctx.buffer, 0, reg, val);
             continue;
         }
         // YM3812 register write (0x5A)
@@ -203,7 +272,7 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (is_replicate_reg_ymf262) {
+            if (chip_flags.convert_ym3812) {
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
                     state.opl3_mode_initialized = true;
@@ -220,23 +289,74 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (!is_replicate_reg_ymf262) {
+            if (chip_flags.convert_ym3526) {
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
                     state.opl3_mode_initialized = true;
                 }
                 additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-            } 
+            } else {
+                forward_write(&vgmctx.buffer, 0, reg, val);
+            }
             continue;
         }
         // Y8950 register write (0x5C)
         else if (cmd == 0x5C) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
+            read_done_byte += 3;
+
+            if (chip_flags.convert_y8950) {
+                if (!state.opl3_mode_initialized) {
+                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
+                    state.opl3_mode_initialized = true;
+                }
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+            } else {
+                forward_write(&vgmctx.buffer, 0, reg, val);
+            }
             continue;
         }
+        // YM2612 register write (0x52)
+        else if (cmd == 0x52) {
+            // TODO: implement conversion if chip_flags.convert_ym2612
+            // For now, just copy
+            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            read_done_byte += 3;
+            continue;
+        }
+        // YM2151 register write (0x54)
+        else if (cmd == 0x54) {
+            // TODO: implement conversion if chip_flags.convert_ym2151
+            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            read_done_byte += 3;
+            continue;
+        }
+        // YM2203 register write (0x55)
+        else if (cmd == 0x55) {
+            // TODO: implement conversion if chip_flags.convert_ym2203
+            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            read_done_byte += 3;
+            continue;
+        }
+        // YM2608 register write (0x56)
+        else if (cmd == 0x56) {
+            // TODO: implement conversion if chip_flags.convert_ym2608
+            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            read_done_byte += 3;
+            continue;
+        }
+        // YM2610 register write (0x57)
+        else if (cmd == 0x57) {
+            // TODO: implement conversion if chip_flags.convert_ym2610
+            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            read_done_byte += 3;
+            continue;
+        }
+
         // Short wait command (0x70-0x7F)
         else if (cmd >= 0x70 && cmd <= 0x7F) {
+            vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
             vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
             read_done_byte++;
             continue;
@@ -251,17 +371,20 @@ int main(int argc, char *argv[]) {
             uint8_t hi = p_vgm_data[read_done_byte + 2];
             uint16_t samples = lo | (hi << 8);
             vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, samples);
+            vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, samples);
             read_done_byte += 3;
             continue;
         }
         // Wait 60Hz (0x62)
         else if (cmd == 0x62) {
             vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status);
+            vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status);
             read_done_byte++;
             continue;
         }
         // Wait 50Hz (0x63)
         else if (cmd == 0x63) {
+            vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
             vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
             read_done_byte++;
             continue;
@@ -281,6 +404,7 @@ int main(int argc, char *argv[]) {
     }
 
     // GD3 tag handling
+    // GD3 tag handling
     char *p_gd3_fields[GD3_FIELDS] = {NULL};
     uint32_t orig_gd3_ver = 0, orig_gd3_len = 0;
     if (extract_gd3_fields(p_vgm_data, filesize, p_gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
@@ -292,8 +416,9 @@ int main(int argc, char *argv[]) {
     snprintf(creator_append, sizeof(creator_append), ",%s", p_creator);
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
-        ", Converted from YM3812 to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
-        detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
+    ", Converted from %s to OPL3. Port 0 (ch0-8): original, Port 1 (ch9-17): detuned for chorus. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
+    get_converted_opl_chip_name(&chip_flags),
+    detune, opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
     VGMBuffer gd3;
     vgm_buffer_init(&gd3);
@@ -301,10 +426,14 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < GD3_FIELDS; ++i) free(p_gd3_fields[i]);
 
     uint32_t music_data_size = (uint32_t)vgmctx.buffer.size;
+    uint32_t music_data_size = (uint32_t)vgmctx.buffer.size;
     uint32_t gd3_size = (uint32_t)gd3.size;
     uint32_t header_size = (orig_header_size > VGM_HEADER_SIZE) ? orig_header_size : VGM_HEADER_SIZE;
     uint32_t new_eof_offset = music_data_size + header_size + gd3_size - 1;
+    uint32_t header_size = (orig_header_size > VGM_HEADER_SIZE) ? orig_header_size : VGM_HEADER_SIZE;
+    uint32_t new_eof_offset = music_data_size + header_size + gd3_size - 1;
     uint32_t vgm_eof_offset_field = new_eof_offset - 0x04;
+    uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
     uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
     uint32_t data_offset = header_size - 0x34;
     uint32_t new_loop_offset = 0xFFFFFFFF;
@@ -326,6 +455,7 @@ int main(int argc, char *argv[]) {
     );
 
     // Set loop offset in header if applicable
+    // Set loop offset in header if applicable
     if (new_loop_offset != 0xFFFFFFFF) {
         p_header_buf[0x1C] = (uint8_t)(new_loop_offset & 0xFF);
         p_header_buf[0x1D] = (uint8_t)((new_loop_offset >> 8) & 0xFF);
@@ -333,9 +463,24 @@ int main(int argc, char *argv[]) {
         p_header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
     }
 
+    // --- After conversion, set chip clocks to 0 for chips that were used but converted ---
+    // Example: For OPL3 conversion, set converted chip clock (e.g. YM3812) to 0
+    // You may want to generalize this logic if supporting other conversions
+
     // Set OPL3 clock and clear YM3812 clock in header
     set_ymf262_clock(p_header_buf, OPL3_CLOCK);
-    set_ym3812_clock(p_header_buf, 0);
+    if (chip_flags.has_ym3812) {
+        set_ym3812_clock(p_header_buf, 0);
+    }
+    if (chip_flags.has_ym3526) {
+        set_ym3526_clock(p_header_buf, 0);
+    }
+    if (chip_flags.has_y8950) {
+        set_y8950_clock(p_header_buf, 0);
+    }
+
+    // Set OPL3 clock and clear YM3812 clock in header
+    set_ymf262_clock(p_header_buf, OPL3_CLOCK);
 
     // Write output file
     FILE *p_wf = fopen(p_output_path, "wb");
@@ -350,8 +495,18 @@ int main(int argc, char *argv[]) {
     fwrite(p_header_buf, 1, header_size, p_wf);
     fwrite(vgmctx.buffer.data, 1, vgmctx.buffer.size, p_wf);
     fwrite(gd3.data, 1, gd3.size, p_wf);
+    fwrite(p_header_buf, 1, header_size, p_wf);
+    fwrite(vgmctx.buffer.data, 1, vgmctx.buffer.size, p_wf);
+    fwrite(gd3.data, 1, gd3.size, p_wf);
     fclose(p_wf);
 
+    printf("[OPL3] Converted VGM written to: %s\n", p_output_path);
+    printf("[OPL3] <detune f> Detune value: %g%%\n", detune);
+    printf("[OPL3] Wait value: %d\n", opl3_keyon_wait);
+    printf("[OPL3] Creator: %s\n", p_creator);
+    printf("[OPL3] Channel Panning Mode: %d\n", ch_panning);
+    printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
+    printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
     printf("[OPL3] Converted VGM written to: %s\n", p_output_path);
     printf("[OPL3] <detune f> Detune value: %g%%\n", detune);
     printf("[OPL3] Wait value: %d\n", opl3_keyon_wait);
@@ -368,7 +523,16 @@ int main(int argc, char *argv[]) {
         //}
     }
     printf("\n");
+    if (verbose) {
+        printf("[OPL3] Total number of detected voices: %d\n", state.voice_db.count);
+
+        //for (int i = 0; i < state.voice_db.count; ++i) {
+        //    print_opl3_voice_param(&state.voice_db.p_voices[i]);
+        //}
+    }
+    printf("\n");
     vgm_buffer_free(&vgmctx.buffer);
+    vgm_buffer_free(&gd3);
     vgm_buffer_free(&gd3);
     free(p_vgm_data);
     free(p_header_buf);

@@ -1,74 +1,93 @@
 # eseopl3patcher
 
-YM3812 (OPL2) VGMファイルをYMF262 (OPL3) VGMファイルに変換するツール
+YM3812, YM3526, Y8950 の VGM ファイルを YMF262 (OPL3) VGM ファイルに変換するツール
 
 ## 概要
 
-eseopl3patcherは、YM3812 (OPL2) 用に作成されたVGMファイルをOPL3 (YMF262) 形式に変換するコマンドラインツールです。OPL3の拡張チャンネルを活用し、デチューンした音声を追加することでコーラス効果を付与します。さらに、柔軟なステレオ出力や音量バランスの調整が可能です。
+eseopl3patcher は、OPL2/OPL ファミリー（YM3812, YM3526, Y8950）用の VGM ファイルを OPL3 (YMF262) フォーマットに変換するコマンドラインツールです。OPL3 の拡張チャンネルを利用してデチューン（Chorus効果）を追加し、柔軟なステレオ・ボリューム設定が可能です。
 
-## 特徴
+## サポートされている入力チップ
 
-- YM3812 (OPL2) コマンドをOPL3 (YMF262) コマンドへ変換
-- OPL3の拡張チャンネル（ch9～17）にデチューンを適用
-- チャンネルパンモード（`-ch_panning`）でチャンネルごとのL/R振り分けが可能
-- ポートごとに独立した音量比率（`-vr0`, `-vr1`）を指定可能
-- 変換情報や操作者情報を自動的にGD3タグへ追記
+- **YM3812 (OPL2)**
+- **YM3526 (OPL)**
+- **Y8950 (OPL, ADPCM部は未変換)**
+
+これらのチップ用VGMファイルが変換対象として利用できます。
+
+## 主な機能
+
+- YM3812, YM3526, Y8950 コマンドを OPL3 (YMF262) コマンドに変換
+- OPL3 の拡張チャンネル (ch9–17) にデチューンを適用してコーラス効果を追加
+- チャンネルごとのパンニング設定（`-ch_panning`オプション参照）
+- ポートごとの独立したボリューム比設定（`-vr0`, `-vr1`）
+- 詳細デバッグ出力（`-verbose`）
+- GD3タグに自動的に変換情報やオペレータ情報を追加
+- コマンドラインから柔軟に各種オプションを指定可能
+- **複数OPLチップが混在している場合は自動判定で一つだけ変換します。明示的選択も可**
 
 ## 入力パラメータ
 
-- VGMファイル（YM3812/OPL2形式）
-- デチューン値（パーセント、例: `2.5` は+2.5%、`-1` は-1%デチューン）
-    - デチューン値はパーセントで指定してください。例: `2.5` = 2.5%、`-1` = -1%。
-- KeyOnウェイト（整数、例: `1`）。省略可（デフォルト: `0`）
-- 作成者名（ここで指定した文字列がGD3 Creator欄に追加されます）。省略可（デフォルト: `eseopl3patcher`）
-- 出力ファイル名（`-o output.vgm`）。省略可（デフォルト: `<input>OPL3.vgm`）
-- チャンネルパンモード（`-ch_panning 0|1`）。省略可（デフォルト: `0`）
-    - `0`：ポート0（ch0–ch8）はL、ポート1（ch9–ch17）はR出力
-    - `1`：偶数チャンネル・奇数チャンネルを交互にL/Rに振り分けて出力（ステレオ感UP）
-- ポート0の音量比率（`-vr0 <float>`）。省略可（デフォルト: `1.0`）
-    - ポート0の音量比率を指定（1.0 = 100%、0.6 = 60%など）
-- ポート1の音量比率（`-vr1 <float>`）。省略可（デフォルト: `0.6`）
-    - ポート1の音量比率を指定（1.0 = 100%、0.6 = 60%など）
-- 詳細なデバッグ出力を有効にする`-verbose`オプション。省略可（デフォルト: 無効）
-    - 変換処理中に詳細なデバッグメッセージ（OPL3ボイスパラメータなど）を表示します。
+- VGMファイル (YM3812/OPL2/YM3526/Y8950 フォーマット)
+- デチューン値（パーセント指定, 例: `2.5` → +2.5%、`-1` → -1%）
+    - デチューン値はパーセントで指定します。例: `2.5`=+2.5%、`-1`=-1%
+- KeyOnウェイト（整数, 例: `1`）※省略可（初期値: `0`）
+- クリエイター名（GD3タグに追記, 初期値: `eseopl3patcher`）
+- 出力ファイル名 (`-o output.vgm`) ※省略可（初期値: `<input>OPL3.vgm`）
+- チャンネルパンニングモード (`-ch_panning 0|1`) ※省略可（初期値: `0`）
+    - `0`: Port 0 (ch0–ch8) を左、Port 1 (ch9–ch17) を右に出力
+    - `1`: 偶数/奇数チャンネルをL/R交互にパンニング
+- Port 0 ボリューム比 (`-vr0 <float>`) ※省略可（初期値: `1.0`）
+- Port 1 ボリューム比 (`-vr1 <float>`) ※省略可（初期値: `0.6`）
+- 詳細デバッグ (`-verbose`) ※省略可（初期値: OFF）
 
-### デチューン値（±指定）について
+### OPLチップの明示的選択
 
-- デチューン値は正負どちらでも指定可能です。
-    - 正の値（例: `2.5`）はデチューン音のピッチを上げます。
-    - 負の値（例: `-2.5`）はデチューン音のピッチを下げます。
+複数OPLチップが混在している場合、デフォルトでは最初に現れたチップのみ変換されます。  
+複数チップを同時に変換したい場合は、下記オプションを明示的に指定してください。
+
+- `--convert-ym3812` : YM3812 を変換
+- `--convert-ym3526` : YM3526 を変換
+- `--convert-y8950`  : Y8950 を変換
+
+複数指定も可能です。
+
+### デチューン値（+/-の指定について）
+
+- デチューン値は正・負どちらでも指定可能です。
+    - 正の値（例: `2.5`）はピッチが上がります
+    - 負の値（例: `-2.5`）はピッチが下がります
 - 例:
-    - `2.5` … FNumberに+2.5%加算（高くなる）
-    - `-2.5` … FNumberから-2.5%減算（低くなる）
+    - `2.5` … FNumber に +2.5% 加算（高音化）
+    - `-2.5` … FNumber から -2.5% 減算（低音化）
 
-> **デチューン値の符号によって、変換後のピッチが上がるか下がるかが決まります。用途に応じて指定してください。**
+> **デチューン値の符号で変換後のピッチ方向が決まります。用途に合わせて指定してください。**
 
-### チャンネルパンモード・音量バランス・詳細表示について
+### チャンネルパンニング・ボリューム比・デバッグについて
 
-- `-ch_panning 0`（デフォルト）：ポート0はL、ポート1はR出力。デチューン音（ポート1）がRだけから出るため、効果を明確に確認できます。
-- `-ch_panning 1`：偶数・奇数チャンネルを交互にL/Rに振り分けてステレオ効果を得られます。
-- `-vr0` および `-vr1` でポートごとの音量バランスも自由に調整できます。
-    - 例：デチューン音（ポート1）を目立たせたくない場合は `-vr1 0.6` などを指定。
-    - コーラス効果を明確にしたい場合は `-ch_panning 0` にして `-vr1` の値を調整してください。
-- `-verbose : 変換時にOPL3ボイスやオペレーターパラメータなど詳細なデバッグ情報を表示します。
+- `-ch_panning 0`（初期値）: Port 0→左, Port 1→右。デチューン音を右チャンネルで分離して聴きやすいです
+- `-ch_panning 1`: 偶数/奇数チャンネルを交互にL/Rパンニングでステレオ効果
+- `-vr0`, `-vr1`でPortごとのバランス調整が可能です
+    - 例: デチューン音を小さくする場合 `-vr1 0.6`
+    - コーラス効果を強調したい場合は `-ch_panning 0`推奨
 
 ## 使い方
 
 ```sh
-eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose]
+eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose] [--convert-ym3812] [--convert-ym3526] [--convert-y8950]
 ```
 
-- `<input.vgm>` : 変換対象のVGMファイル（YM3812/OPL2形式）
-- `<detune>` : デチューン値（パーセント、例: `2.5`は+2.5%、`-1`は-1%）
-- `[keyon_wait]` : KeyOnウェイト（整数、省略可、デフォルト: 0）
-- `[creator]` : 作成者名（省略可、デフォルト: "eseopl3patcher"）
-- `[-o output.vgm]` : 出力ファイル名（省略可、省略時は自動生成）
-- `[-ch_panning 0|1]` : チャンネルパンモード　0:OFF 1:ON（省略可、デフォルト: 0）
-- `[-vr0 <float>]` : ポート0音量比率 1.0以下の小数（1.0で100%)（省略可、デフォルト: 1.0）
-- `[-vr1 <float>]` : ポート1音量比率 1.0以下の小数（1.0で100%)（省略可、デフォルト: 0.6）
-- `[-verbose]` : 詳細なデバッグ出力を有効化（省略可）
+- `<input.vgm>` : VGMファイル（YM3812/OPL2/YM3526/Y8950対応）
+- `<detune>` : デチューン値（パーセント, 例 `2.5`, `-1`）
+- `[keyon_wait]` : KeyOnウェイト（整数, 省略可, 初期値: 0）
+- `[creator]` : GD3タグのクリエイター（省略可, 初期値: "eseopl3patcher"）
+- `[-o output.vgm]` : 出力ファイル名（省略可, 自動生成）
+- `[-ch_panning 0|1]` : パンニングモード（省略可, 初期値: 0）
+- `[-vr0 <float>]` : Port 0ボリューム比（省略可, 初期値: 1.0）
+- `[-vr1 <float>]` : Port 1ボリューム比（省略可, 初期値: 0.6）
+- `[-verbose]` : 詳細デバッグ出力（省略可）
+- `[--convert-ym3812] [--convert-ym3526] [--convert-y8950]` : 変換するOPLチップを明示的に選択（複数可）
 
-`[keyon_wait]`、`[creator]`、`-o output.vgm`、`-ch_panning`、`-vr0`、`-vr1`、`-verbose` は `<input.vgm>` と `<detune>` の後ならどの順でも指定可能です。
+パラメータは `<input.vgm>`, `<detune>` の後なら順番自由です。
 
 **使用例:**
 ```sh
@@ -83,15 +102,15 @@ eseopl3patcher song.vgm 1.5 -ch_panning 1 -vr0 1.0 -vr1 0.5
 eseopl3patcher song.vgm 2.5 -vr1 0.8
 eseopl3patcher song.vgm 2.5 -verbose
 eseopl3patcher song.vgm 2.5 -ch_panning 1 -verbose -vr1 0.7
+eseopl3patcher song.vgm 2.5 --convert-ym3526
+eseopl3patcher song.vgm 2.5 --convert-y8950 --convert-ym3526
 ```
-
-英語版READMEは[こちら](https://github.com/emef2247/eseopl3patcher/blob/main/README.md#usage) をご覧ください。
 
 ## ダウンロード
 
-[![Download for Linux and Windows](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
+[![Linux/Windows版ダウンロード](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
 
-**Linux** および **Windows** 用のビルド済みバイナリは [最新リリースページ](https://github.com/emef2247/eseopl3patcher/releases/latest) からダウンロードできます。
+Linux/Windows用のバイナリは [最新リリースページ](https://github.com/emef2247/eseopl3patcher/releases/latest) からダウンロードできます。
 
 ## ビルド
 
@@ -103,7 +122,7 @@ gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 
 ## 作者
 
-[@emef2247](https://github.com/emef2247) 
+[@emef2247](https://github.com/emef2247) 作
 
 ## ライセンス
 

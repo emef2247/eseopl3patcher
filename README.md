@@ -1,24 +1,34 @@
 # eseopl3patcher
 
-A tool to convert a YM3812 (OPL2) VGM file to a YMF262 (OPL3) VGM file
+A tool to convert OPL2/OPL chips (YM3812, YM3526, Y8950) VGM files to YMF262 (OPL3) VGM files
 
 ## Overview
 
-eseopl3patcher is a command-line tool that converts VGM files made for the YM3812 (OPL2) sound chip to OPL3 (YMF262) format. It utilizes the OPL3’s extra channels, adding detuned voices for a chorus effect, and provides flexible stereo and volume options.
+eseopl3patcher is a command-line tool that converts VGM files made for the OPL2/OPL family sound chips (YM3812, YM3526, Y8950) to OPL3 (YMF262) format. It utilizes the OPL3’s extra channels, adding detuned voices for a chorus effect, and provides flexible stereo and volume options.
+
+## Supported Input Chips
+
+- **YM3812 (OPL2)**
+- **YM3526 (OPL)**
+- **Y8950 (OPL, ADPCM support not converted)**
+
+You can now use VGM files targeting any of these chips as input for conversion.
 
 ## Features
 
-- Converts YM3812 (OPL2) commands to OPL3 (YMF262) commands
+- Converts YM3812 (OPL2), YM3526 (OPL), and Y8950 commands to OPL3 (YMF262) commands
 - Applies detuning to the OPL3 extra channels (channels 9–17)
 - Channel panning options for flexible channel panning (see `-ch_panning`)
 - Independent volume ratio control for Port 0 and Port 1 (see `-vr0` and `-vr1`)
 - Verbose mode for detailed debug output (see `-verbose`)
+- Verbose mode for detailed debug output (see `-verbose`)
 - Automatically appends conversion info and operator information to the GD3 tag
 - Simple and flexible command-line usage (argument order is flexible)
+- **Auto-detects which OPL chip to convert if multiple are present, or allows explicit selection via command line**
 
 ## Input Parameters
 
-- VGM file (YM3812/OPL2 format)
+- VGM file (YM3812/OPL2/YM3526/Y8950 format)
 - Detune value (percentage, e.g. `2.5` means +2.5% detune, `-1` means -1% detune)
     - Specify the detune value as a percentage. For example: `2.5` = 2.5%, `-1` = -1%.
 - KeyOn wait (integer, e.g. `1`). Optional. (Default: `0`)
@@ -34,6 +44,15 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 - Verbose mode (`-verbose`). Optional. (Default: off)
     - Enables detailed debug and operator parameter messages during conversion.
 
+### Explicit OPL Chip Selection
+
+By default, if multiple OPL-family chips are present, the tool automatically detects and converts the first chip encountered in the VGM data (YM3812, YM3526, or Y8950).  
+If you want to explicitly select which chip(s) to convert, add one or more of the following options:
+
+- `--convert-ym3812` : Convert YM3812 commands
+- `--convert-ym3526` : Convert YM3526 commands
+- `--convert-y8950`  : Convert Y8950 commands
+
 ### About Detune Value (+/- specification)
 
 - You can specify positive or negative values for the detune value.
@@ -46,6 +65,7 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 > **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
 
 ### About Channel panning, Volume Ratio, and Verbose Mode
+### About Channel panning, Volume Ratio, and Verbose Mode
 
 - `-ch_panning 0` (default): Port 0 outputs to Left, Port 1 outputs to Right. Useful for clearly checking the detuned sound (Port 1) isolated in the Right channel.
 - `-ch_panning 1`: Channels are alternately panned L/R for a full stereo effect.
@@ -56,10 +76,10 @@ eseopl3patcher is a command-line tool that converts VGM files made for the YM381
 ## Usage
 
 ```sh
-eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose]
+eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose] [--convert-ym3812] [--convert-ym3526] [--convert-y8950]
 ```
 
-- `<input.vgm>` : VGM file to convert (YM3812/OPL2 format)
+- `<input.vgm>` : VGM file to convert (YM3812/OPL2/YM3526/Y8950 format)
 - `<detune>` : Detune value (percentage, e.g. `2.5` for +2.5%, `-1` for -1%)
 - `[keyon_wait]` : KeyOn wait (integer, optional, default: 0)
 - `[creator]` : Creator string (optional, default: "eseopl3patcher")
@@ -68,8 +88,9 @@ eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_
 - `[-vr0 <float>]` : Port 0 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 1.0)
 - `[-vr1 <float>]` : Port 1 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 0.6)
 - `[-verbose]` : Enable verbose debug output (optional)
+- `[--convert-ym3812]`, `[--convert-ym3526]`, `[--convert-y8950]` : Explicitly select which OPL chip(s) to convert (optional)
 
-You can specify `[keyon_wait]`, `[creator]`, `-o output.vgm`, `-ch_panning`, `-vr0`, `-vr1`, and `-verbose` in any order after `<input.vgm>` and `<detune>`.
+You can specify `[keyon_wait]`, `[creator]`, `-o output.vgm`, `-ch_panning`, `-vr0`, `-vr1`, `-verbose`, and `--convert-ymXXXX` in any order after `<input.vgm>` and `<detune>`.
 
 **Examples:**
 ```sh
@@ -84,6 +105,8 @@ eseopl3patcher song.vgm 1.5 -ch_panning 1 -vr0 1.0 -vr1 0.5
 eseopl3patcher song.vgm 2.5 -vr1 0.8
 eseopl3patcher song.vgm 2.5 -verbose
 eseopl3patcher song.vgm 2.5 -ch_panning 1 -verbose -vr1 0.7
+eseopl3patcher song.vgm 2.5 --convert-ym3526
+eseopl3patcher song.vgm 2.5 --convert-y8950 --convert-ym3526
 ```
 
 For Japanese README, see [here](https://github.com/emef2247/eseopl3patcher/blob/main/README.ja.md#使い方)
