@@ -35,3 +35,17 @@ void print_opl3_voice_param(const OPL3VoiceParam *vp) {
     }
     printf("\n");
 }
+
+
+void debug_dump_opl3_voiceparam(int ch, const OPL3VoiceParam* vp, uint8_t fnum_lsb, uint8_t fnum_msb, uint8_t block, uint8_t keyon)
+{
+    printf("[DEBUG] KeyOn準備: ch=%d\n", ch);
+    printf("  FNUM: %03X (LSB=0x%02X, MSB=0x%02X), Block=%u, KeyOn=%u\n", ((fnum_msb&0x03)<<8)|fnum_lsb, fnum_lsb, fnum_msb, block, keyon);
+    printf("  Modulator: TL=%d AR=%d DR=%d SL=%d RR=%d MULT=%d KSL=%d AM=%d VIB=%d EGT=%d KSR=%d WS=%d\n",
+        vp->op[0].tl, vp->op[0].ar, vp->op[0].dr, vp->op[0].sl, vp->op[0].rr,
+        vp->op[0].mult, vp->op[0].ksl, vp->op[0].am, vp->op[0].vib, vp->op[0].egt, vp->op[0].ksr, vp->op[0].ws);
+    printf("  Carrier:   TL=%d AR=%d DR=%d SL=%d RR=%d MULT=%d KSL=%d AM=%d VIB=%d EGT=%d KSR=%d WS=%d\n",
+        vp->op[1].tl, vp->op[1].ar, vp->op[1].dr, vp->op[1].sl, vp->op[1].rr,
+        vp->op[1].mult, vp->op[1].ksl, vp->op[1].am, vp->op[1].vib, vp->op[1].egt, vp->op[1].ksr, vp->op[1].ws);
+    printf("  ALG=%u FB=%u CNT=%u\n", vp->cnt[0], vp->fb[0], vp->cnt[0]);
+}

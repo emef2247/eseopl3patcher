@@ -175,11 +175,13 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
         return false;
 
     // VGM spec offsets
+    out_flags->ym2413_clock  = read_le_uint32(vgm_data + 0x10);
     out_flags->ym3812_clock  = read_le_uint32(vgm_data + 0x50);
     out_flags->ym3526_clock  = read_le_uint32(vgm_data + 0x54);
     out_flags->y8950_clock   = read_le_uint32(vgm_data + 0x58);
 
     // Set bool flags if clock is nonzero
+    out_flags->has_ym2413   = (out_flags->ym2413_clock  != 0);
     out_flags->has_ym3812   = (out_flags->ym3812_clock  != 0);
     out_flags->has_ym3526   = (out_flags->ym3526_clock  != 0);
     out_flags->has_y8950    = (out_flags->y8950_clock   != 0);
@@ -193,8 +195,9 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
  * If none is selected, returns "UNKNOWN".
  */
 const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags) {
-    if (chip_flags->convert_ym3812)  return "YM3812";
-    if (chip_flags->convert_ym3526)  return "YM3526";
-    if (chip_flags->convert_y8950)   return "Y8950";
+    if (chip_flags->has_ym2413)  return "YM2413";
+    if (chip_flags->has_ym3812)  return "YM3812";
+    if (chip_flags->has_ym3526)  return "YM3526";
+    if (chip_flags->has_y8950)   return "Y8950";
     return "UNKNOWN";
 }
