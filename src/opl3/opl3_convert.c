@@ -36,11 +36,28 @@ double calc_fmchip_frequency(FMChipType chip, double clock, int block, int fnum)
 }
 
 /**
+ * Calculate frequency (Hz) from OPLL (YM2413) FNUM and block.
+ * @param fnum 9-bit FNUM (0-511)
+ * @param block 3-bit block (0-7)
+ * @param clock OPLL source clock (Hz)
+ * @return Frequency in Hz
+ */
+double opll_fnum_block_to_freq(int fnum, int block, double clock) {
+    // f = FNUM * (clock / 72) * 2^(block - 19)
+    double base = clock / 72.0;
+    double freq = fnum * base * pow(2.0, block - 19);
+    return freq;
+}
+
+/**
  * Calculate OPL3 FNUM and block for a target frequency.
  * Output values are clipped to valid OPL3 ranges.
- * DEBUG: Dumps all candidate block/fnum/freq/error for traceability.
+ * @param freq Frequency in Hz
+ * @param clock OPL3 clock in Hz
+ * @param[out] block Pointer to integer for resulting block
+ * @param[out] fnum Pointer to integer for resulting FNUM
  */
-void calc_opl3_fnum_block(double freq, double clock, int* block, int* fnum) {
+void opl3_calc_fnum_block_from_freq(double freq, double clock, int* block, int* fnum) {
     if (freq <= 0.0 || clock <= 0.0) {
         *block = 0; *fnum = 0;
         return;
@@ -55,8 +72,6 @@ void calc_opl3_fnum_block(double freq, double clock, int* block, int* fnum) {
         if (cand_fnum < 0 || cand_fnum > 1023) continue;
         double calc_freq = (clock / 288.0) * pow(2.0, b - 1) * ((double)cand_fnum / 1024.0);
         double err = fabs(calc_freq - freq);
-        // Debug: trace all candidates (uncomment for verbose)
-        // printf("[DEBUG] block=%d, FNUM=0x%03X, calc_freq=%.4f, err=%.4f\n", b, cand_fnum, calc_freq, err);
         if (err < min_err) {
             min_err = err;
             best_block = b;
@@ -70,7 +85,7 @@ void calc_opl3_fnum_block(double freq, double clock, int* block, int* fnum) {
 /**
  * Main OPL3/OPL2 register write handler with frequency conversion.
  * If the source FM chip or clock does not match OPL3 target, frequency will be recalculated.
- * Now logs and traces frequency conversion for $A0/$B0.
+ * This function now always does FM frequency conversion for $A0/$B0 if FM chip or clock differs.
  */
 int duplicate_write_opl3(
     VGMBuffer *p_music_data,
@@ -107,8 +122,15 @@ int duplicate_write_opl3(
         int out_fnum = original_fnum;
 
         if (need_conversion) {
-            double freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
-            calc_opl3_fnum_block(freq, tgt_clock, &out_block, &out_fnum);
+            double freq;
+            if (src_chip == FMCHIP_YM2413) {
+                // Source is OPLL: use OPLL formula for frequency
+                freq = opll_fnum_block_to_freq(original_fnum, block, src_clock);
+            } else {
+                // Use generic formula for other FM chips
+                freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
+            }
+            opl3_calc_fnum_block_from_freq(freq, tgt_clock, &out_block, &out_fnum);
             // Debug: show input/output freq and FNUM/BLOCK
             printf("[CONV][A0] CH=%d srcchip=%d srcclk=%.0fHz tgtclk=%.0fHz block=%d fnum=0x%03X freq=%.4fHz -> OPL3 block=%d fnum=0x%03X\n",
                 ch, src_chip, src_clock, tgt_clock, block, original_fnum, freq, out_block, out_fnum);
@@ -143,8 +165,15 @@ int duplicate_write_opl3(
         int out_fnum = original_fnum;
 
         if (need_conversion) {
-            double freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
-            calc_opl3_fnum_block(freq, tgt_clock, &out_block, &out_fnum);
+            double freq;
+            if (src_chip == FMCHIP_YM2413) {
+                // Source is OPLL: use OPLL formula for frequency
+                freq = opll_fnum_block_to_freq(original_fnum, block, src_clock);
+            } else {
+                // Use generic formula for other FM chips
+                freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
+            }
+            opl3_calc_fnum_block_from_freq(freq, tgt_clock, &out_block, &out_fnum);
             printf("[CONV][B0] CH=%d srcchip=%d srcclk=%.0fHz tgtclk=%.0fHz block=%d fnum=0x%03X freq=%.4fHz -> OPL3 block=%d fnum=0x%03X keyon=%d\n",
                 ch, src_chip, src_clock, tgt_clock, block, original_fnum, freq, out_block, out_fnum, keyon);
         }
@@ -205,7 +234,6 @@ int duplicate_write_opl3(
     }
     return addtional_bytes;
 }
-
 
 void convert_opll_patch_to_opl3_param(int voice_index, OPL3OperatorParam *mod, OPL3OperatorParam *car) {
     if (voice_index < 0 || voice_index > 15 || !mod || !car) {
@@ -520,54 +548,53 @@ int duplicate_write_opl3_ym2413(
 
     if (reg <= 0x07 || reg == 0x0E) return 0;
 
-    // $10-$18: FNUM LSB -> OPL3 $A0+n
+    // $10-$18: FNUM LSB (buffer only)
     if (reg >= 0x10 && reg <= 0x18) {
         int ch = reg - 0x10;
-        return duplicate_write_opl3(
-            p_music_data, p_vstat, p_state,
-            0xA0 + ch, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1
-        );
+        ym2413_regs[reg] = val; // just buffer, do NOT emit yet
+        return 0;
     }
 
     // $20-$28: KeyOn/FNUM MSB/Block
     if (reg >= 0x20 && reg <= 0x28) {
         int ch = reg - 0x20;
+        ym2413_regs[reg] = val;
+
         uint8_t inst = (ym2413_regs[0x30 + ch] >> 4) & 0x0F;
         uint8_t vol  = ym2413_regs[0x30 + ch] & 0x0F;
-        uint8_t keyon = (val & 0x10) ? 1 : 0;
-        uint8_t block = val & 0x07;
-        uint8_t fnum_lsb = ym2413_regs[0x10 + ch];
-        uint8_t fnum_msb = (val & 0x0F);
-        int ym2413_fnum = ((fnum_msb << 8) | fnum_lsb);
 
-        // --- TL/VOL補正値をキャリアに加算（OPLLと同じ仕様） ---
+        uint8_t fnum_lsb = ym2413_regs[0x10 + ch];
+        uint16_t fnum = ((val & 0x01) << 8) | fnum_lsb;          // FNUM正しい9bit
+        uint8_t block = (val >> 1) & 0x07;                       // blockはbit1-3
+        uint8_t keyon = (val & 0x10) ? 1 : 0;                    // KeyOnはbit4
+
+        // TL/VOL correction
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_voiceparam(inst, ym2413_regs, &vp);
         uint8_t vol_tl = (uint8_t)((vol / 15.0) * 63.0 + 0.5);
-        vp.op[1].tl = (vp.op[1].tl > vol_tl) ? vp.op[1].tl : vol_tl;
         int tl_mod = vp.op[0].tl;
         int tl_car = vp.op[1].tl + vol_tl;
         if (tl_car > 63) tl_car = 63;
         vp.op[0].tl = (uint8_t)tl_mod;
-        vp.op[1].tl = 0;
+        vp.op[1].tl = 0;// (uint8_t)tl_car;   // 修正: 0ではなく計算値
 
-        // AR/DR下限補正
+        // AR/DR correction
         if (vp.op[0].ar < 2) vp.op[0].ar = 2;
         if (vp.op[1].ar < 2) vp.op[1].ar = 2;
         if (vp.op[0].dr < 2) vp.op[0].dr = 2;
         if (vp.op[1].dr < 2) vp.op[1].dr = 2;
 
-        // --- KeyOffしてから音色設定 ---
+        // --- KeyOff ---
         duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, 0x00, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
         vgm_wait_samples(p_music_data, p_vstat, 1);
 
-        // --- 音色を必ずここで適用 ---
+        // --- Patch apply ---
         opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
 
-        // --- 周波数変換 ---
-        double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, ym2413_fnum);
+        // --- Frequency conversion (正しいFNUM/blockでHz計算) ---
+        double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, fnum);
         int opl3_block, opl3_fnum;
-        calc_opl3_fnum_block(freq, get_fm_target_clock(), &opl3_block, &opl3_fnum);
+        opl3_calc_fnum_block_from_freq(freq, get_fm_target_clock(), &opl3_block, &opl3_fnum);
 
         uint8_t out_lsb = opl3_fnum & 0xFF;
         uint8_t out_msb = ((opl3_fnum >> 8) & 0x03) | ((opl3_block & 0x07) << 2) | (keyon ? 0x20 : 0);
@@ -577,12 +604,16 @@ int duplicate_write_opl3_ym2413(
 
         // --- KeyOn/Off ---
         duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, out_msb, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+
         if (keyon) vgm_wait_samples(p_music_data, p_vstat, OPL3_KEYON_WAIT_AFTER_ON_DEFAULT);
         else      vgm_wait_samples(p_music_data, p_vstat, 1);
 
+        // デバッグ出力
+        printf("[DEBUG][YM2413->OPL3] ch=%d inst=%d vol=%d block=%d fnum=%03X keyon=%d freq=%.2fHz\n",
+            ch, inst, vol, block, fnum, keyon, freq);
+
         return 0;
     }
-
     // $30-$38: instrument/volume (INST/VOL) immediate handling
     if (reg >= 0x30 && reg <= 0x38) {
         int ch = reg - 0x30;
