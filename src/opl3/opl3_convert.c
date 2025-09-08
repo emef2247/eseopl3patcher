@@ -199,6 +199,7 @@ int duplicate_write_opl3(
 /**
  * OPL3 initialization sequence for both ports.
  * Sets FM chip type in OPL3State and initializes register mirror.
+ * Also initializes clock timing fields with default values.
  */
 void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip) {
     if (!p_state) return;
@@ -207,6 +208,9 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     p_state->rhythm_mode = false;
     p_state->opl3_mode_initialized = false;
     p_state->source_fmchip = source_fmchip;
+
+    // Initialize clock timing fields with default values
+    opl3_init_clock_timing(p_state, source_fmchip, 0);
 
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
@@ -250,4 +254,119 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
 
+}
+
+/**
+ * Initialize the clock timing parameters for the unified event manager.
+ * Sets up clock_period and clock_divider based on the source FM chip type.
+ * This function configures timing parameters used for precise pitch and timing calculations.
+ */
+void opl3_init_clock_timing(OPL3State *p_state, FMChipType source_fmchip, uint32_t custom_clock_hz) {
+    if (!p_state) return;
+    
+    uint32_t base_clock_hz;
+    
+    // Set default clock frequencies based on chip type
+    if (custom_clock_hz > 0) {
+        base_clock_hz = custom_clock_hz;
+    } else {
+        switch (source_fmchip) {
+            case FMCHIP_YM3812:
+            case FMCHIP_2xYM3812:
+                base_clock_hz = 3579545; // YM3812 standard clock: ~3.58 MHz
+                break;
+            case FMCHIP_YM3526:
+            case FMCHIP_2xYM3526:
+                base_clock_hz = 3579545; // YM3526 standard clock: ~3.58 MHz
+                break;
+            case FMCHIP_Y8950:
+            case FMCHIP_2xY8950:
+                base_clock_hz = 3579545; // Y8950 standard clock: ~3.58 MHz
+                break;
+            case FMCHIP_YMF262:
+            case FMCHIP_2xYMF262:
+                base_clock_hz = 14318180; // YMF262 (OPL3) standard clock: ~14.32 MHz
+                break;
+            default:
+                base_clock_hz = 3579545; // Default to YM3812 clock
+                break;
+        }
+    }
+    
+    // Calculate clock period in nanoseconds (1 / frequency * 1e9)
+    p_state->clock_period = 1000000000.0 / (double)base_clock_hz;
+    
+    // Set clock divider based on chip type
+    // OPL3 chips typically divide the master clock by 72 for sample timing
+    switch (source_fmchip) {
+        case FMCHIP_YMF262:
+        case FMCHIP_2xYMF262:
+            p_state->clock_divider = 72; // OPL3 uses 72-cycle divider
+            break;
+        default:
+            p_state->clock_divider = 72; // OPL2 and compatible chips also use 72
+            break;
+    }
+}
+
+/**
+ * Calculate precise pitch (F-Number) using clock timing fields.
+ * This function provides accurate pitch calculation based on the configured
+ * clock period and divider settings. The calculation follows the OPL3 specification
+ * for frequency generation.
+ */
+uint16_t opl3_calculate_pitch(const OPL3State *p_state, double note_frequency, uint8_t *block) {
+    if (!p_state || !block) return 0;
+    
+    // Calculate the effective sample rate from clock timing
+    double effective_clock_hz = 1000000000.0 / p_state->clock_period;
+    double sample_rate = effective_clock_hz / (double)p_state->clock_divider;
+    
+    // OPL3 F-Number calculation:
+    // frequency = (F-Number * sample_rate) / (2^20 * 2^(block-1))
+    // Rearranging: F-Number = (frequency * 2^20 * 2^(block-1)) / sample_rate
+    
+    // Start with block 0 and find appropriate block value
+    *block = 0;
+    uint32_t fnum_raw;
+    
+    // Find the appropriate block (octave) value
+    for (uint8_t test_block = 0; test_block < 8; test_block++) {
+        double divisor = sample_rate / (1048576.0 * (1 << test_block)); // 2^20 * 2^block
+        fnum_raw = (uint32_t)(note_frequency / divisor + 0.5); // Round to nearest
+        
+        if (fnum_raw <= 1023) { // F-Number is 10-bit (0-1023)
+            *block = test_block;
+            break;
+        }
+    }
+    
+    // Clamp F-Number to valid range
+    if (fnum_raw > 1023) fnum_raw = 1023;
+    if (fnum_raw < 1) fnum_raw = 1;
+    
+    return (uint16_t)fnum_raw;
+}
+
+/**
+ * Calculate timing delay in samples using clock timing fields.
+ * Converts a delay specified in milliseconds to the appropriate number
+ * of samples based on the current clock settings. This is useful for
+ * precise timing control in event scheduling.
+ */
+uint32_t opl3_calculate_timing(const OPL3State *p_state, double delay_ms, uint32_t sample_rate) {
+    if (!p_state || delay_ms < 0.0) return 0;
+    
+    // If no sample rate provided, calculate from clock settings
+    uint32_t effective_sample_rate = sample_rate;
+    if (effective_sample_rate == 0) {
+        double effective_clock_hz = 1000000000.0 / p_state->clock_period;
+        effective_sample_rate = (uint32_t)(effective_clock_hz / (double)p_state->clock_divider);
+    }
+    
+    // Convert milliseconds to samples: samples = (delay_ms / 1000) * sample_rate
+    double samples_exact = (delay_ms / 1000.0) * (double)effective_sample_rate;
+    
+    // Round to nearest sample
+    return (uint32_t)(samples_exact + 0.5);
 }

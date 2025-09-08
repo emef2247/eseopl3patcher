@@ -12,17 +12,24 @@
 
 /**
  * OPL3State structure holds all OPL3 emulation state, including voice DB and event DB.
+ * This structure serves as the unified event manager for OPL3 operations, handling
+ * timing, pitch calculations, and event coordination.
  */
 typedef struct OPL3State {
-    uint8_t reg[OPL3_REGISTER_SIZE]; // Full OPL3 register mirror (0x000-0x1FF)
-    uint8_t reg_stamp[OPL3_REGISTER_SIZE]; // Full OPL3 register mirror (0x000-0x1FF)
-    bool rhythm_mode;                // Rhythm mode flag, updated on BD writes
-    bool opl3_mode_initialized;      // OPL3 mode flag, updated on 0x105 writes
-    OPL3VoiceDB voice_db;            // Voice database (see opl3_voice.h for definition)
-    OPL3EventList event_list;        // Event database (KeyOn/KeyOff etc.)
-    OPL3KeyOnStatus keyon_status[OPL3_NUM_CHANNELS]; // Per-channel KeyOn state
-    uint32_t timestamp;              // Current timestamp in samples or ticks
-    FMChipType source_fmchip;        // Default FM chip type for the conversion session
+    uint8_t reg[OPL3_REGISTER_SIZE]; /**< Full OPL3 register mirror (0x000-0x1FF) */
+    uint8_t reg_stamp[OPL3_REGISTER_SIZE]; /**< Full OPL3 register mirror timestamp (0x000-0x1FF) */
+    bool rhythm_mode;                /**< Rhythm mode flag, updated on BD writes */
+    bool opl3_mode_initialized;      /**< OPL3 mode flag, updated on 0x105 writes */
+    OPL3VoiceDB voice_db;            /**< Voice database (see opl3_voice.h for definition) */
+    OPL3EventList event_list;        /**< Event database (KeyOn/KeyOff etc.) */
+    OPL3KeyOnStatus keyon_status[OPL3_NUM_CHANNELS]; /**< Per-channel KeyOn state */
+    uint32_t timestamp;              /**< Current timestamp in samples or ticks */
+    FMChipType source_fmchip;        /**< Default FM chip type for the conversion session */
+    
+    /* Clock timing fields for precise pitch and timing calculations */
+    double clock_period;             /**< Clock period in nanoseconds for timing calculations */
+    uint32_t clock_divider;          /**< Clock divider value for sample rate calculations */
+    
     // Add more fields as needed (e.g., other aggregate state)
 } OPL3State;
 
@@ -115,6 +122,7 @@ int duplicate_write_opl3(
 /**
  * OPL3 initialization sequence for both ports.
  * Sets FM chip type in OPL3State and initializes register mirror.
+ * Also initializes clock timing fields with default values.
  *
  * @param p_music_data Pointer to VGMBuffer for music data.
  * @param stereo_mode Stereo mode flag.
@@ -122,6 +130,40 @@ int duplicate_write_opl3(
  * @param source_fmchip FM chip type for conversion session.
  */
 void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip);
+
+/**
+ * Initialize the clock timing parameters for the unified event manager.
+ * Sets up clock_period and clock_divider based on the source FM chip type.
+ *
+ * @param p_state Pointer to OPL3State structure.
+ * @param source_fmchip FM chip type to determine appropriate clock settings.
+ * @param custom_clock_hz Custom clock frequency in Hz (0 for default).
+ */
+void opl3_init_clock_timing(OPL3State *p_state, FMChipType source_fmchip, uint32_t custom_clock_hz);
+
+/**
+ * Calculate precise pitch (F-Number) using clock timing fields.
+ * This function provides accurate pitch calculation based on the configured
+ * clock period and divider settings.
+ *
+ * @param p_state Pointer to OPL3State structure with clock timing info.
+ * @param note_frequency Target frequency in Hz.
+ * @param block Pointer to output block (octave) value.
+ * @return Calculated F-Number value for the given frequency.
+ */
+uint16_t opl3_calculate_pitch(const OPL3State *p_state, double note_frequency, uint8_t *block);
+
+/**
+ * Calculate timing delay in samples using clock timing fields.
+ * Converts a delay specified in milliseconds to the appropriate number
+ * of samples based on the current clock settings.
+ *
+ * @param p_state Pointer to OPL3State structure with clock timing info.
+ * @param delay_ms Delay time in milliseconds.
+ * @param sample_rate Target sample rate in Hz.
+ * @return Number of samples equivalent to the specified delay.
+ */
+uint32_t opl3_calculate_timing(const OPL3State *p_state, double delay_ms, uint32_t sample_rate);
 
 
 #endif // OPL3_CONVERT_H
