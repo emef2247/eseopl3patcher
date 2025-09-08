@@ -78,26 +78,22 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
 
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
- * @param p_music_data Pointer to VGMBuffer for music data.
- * @param p_vstat Pointer to VGMStatus.
- * @param p_state Pointer to OPL3State.
- * @param reg Register address.
- * @param val Value to write.
- * @param detune Detune amount.
- * @param opl3_keyon_wait KeyOn/Off wait (in samples).
- * @param ch_panning Channel panning mode.
- * @param v_ratio0 Volume ratio for port 0.
- * @param v_ratio1 Volume ratio for port 1.
+ * @param args Pointer to CommandArguments structure containing all necessary parameters.
  * @return Bytes written to port 1.
  */
-int duplicate_write_opl3(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstat,
-    OPL3State *p_state,
-    uint8_t reg, uint8_t val,
-    double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
-) {
+int duplicate_write_opl3(const CommandArguments *args) {
+    // Extract parameters from the structure
+    VGMBuffer *p_music_data = args->p_music_data;
+    VGMStatus *p_vstat = args->p_vstat;
+    OPL3State *p_state = args->p_state;
+    uint8_t reg = args->reg;
+    uint8_t val = args->val;
+    double detune = args->detune;
+    int opl3_keyon_wait = args->opl3_keyon_wait;
+    int ch_panning = args->ch_panning;
+    double v_ratio0 = args->v_ratio0;
+    double v_ratio1 = args->v_ratio1;
+    
     int addtional_bytes = 0;
 
     if (reg == 0x01 || reg == 0x02 || reg == 0x03 || reg == 0x04) {

@@ -264,7 +264,19 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                CommandArguments args = {
+                    .p_music_data = &vgmctx.buffer,
+                    .p_vstat = &vgmctx.status,
+                    .p_state = &state,
+                    .reg = reg,
+                    .val = val,
+                    .detune = detune,
+                    .opl3_keyon_wait = opl3_keyon_wait,
+                    .ch_panning = ch_panning,
+                    .v_ratio0 = v_ratio0,
+                    .v_ratio1 = v_ratio1
+                };
+                additional_bytes += duplicate_write_opl3(&args);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -281,7 +293,19 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                CommandArguments args = {
+                    .p_music_data = &vgmctx.buffer,
+                    .p_vstat = &vgmctx.status,
+                    .p_state = &state,
+                    .reg = reg,
+                    .val = val,
+                    .detune = detune,
+                    .opl3_keyon_wait = opl3_keyon_wait,
+                    .ch_panning = ch_panning,
+                    .v_ratio0 = v_ratio0,
+                    .v_ratio1 = v_ratio1
+                };
+                additional_bytes += duplicate_write_opl3(&args);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -298,7 +322,19 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                CommandArguments args = {
+                    .p_music_data = &vgmctx.buffer,
+                    .p_vstat = &vgmctx.status,
+                    .p_state = &state,
+                    .reg = reg,
+                    .val = val,
+                    .detune = detune,
+                    .opl3_keyon_wait = opl3_keyon_wait,
+                    .ch_panning = ch_panning,
+                    .v_ratio0 = v_ratio0,
+                    .v_ratio1 = v_ratio1
+                };
+                additional_bytes += duplicate_write_opl3(&args);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }

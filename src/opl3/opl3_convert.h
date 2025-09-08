@@ -63,6 +63,23 @@ typedef struct {
 } opl3_convert_ctx_t;
 
 /**
+ * Command arguments structure for duplicate_write_opl3 function.
+ * Encapsulates all parameters needed for OPL3 register write operations.
+ */
+typedef struct {
+    VGMBuffer *p_music_data;   // Pointer to VGM dynamic buffer
+    VGMStatus *p_vstat;        // Pointer to VGM status (sample count)
+    OPL3State *p_state;        // Pointer to OPL3 state
+    uint8_t reg;               // Register address
+    uint8_t val;               // Register value
+    double detune;             // Detune value (for chorus/detune effect)
+    int opl3_keyon_wait;       // KeyOn/Off wait (in samples)
+    int ch_panning;            // Channel panning mode
+    double v_ratio0;           // Volume ratio for port 0
+    double v_ratio1;           // Volume ratio for port 1
+} CommandArguments;
+
+/**
  * Write a value to the OPL3 register mirror and update internal state flags.
  * This always writes to the register mirror (reg[]).
  *
@@ -91,26 +108,10 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
  * Returns: bytes written to port 1.
  *
- * @param p_music_data Pointer to VGMBuffer for music data.
- * @param p_vstat Pointer to VGMStatus struct.
- * @param p_state Pointer to OPL3State structure.
- * @param reg Register address.
- * @param val Register value.
- * @param detune Detune value (for chorus/detune effect).
- * @param opl3_keyon_wait KeyOn/Off wait (in samples).
- * @param ch_panning Channel panning mode.
- * @param v_ratio0 Volume ratio for port 0.
- * @param v_ratio1 Volume ratio for port 1.
+ * @param args Pointer to CommandArguments structure containing all necessary parameters.
  * @return Number of bytes written to port 1.
  */
-int duplicate_write_opl3(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstat,
-    OPL3State *p_state,
-    uint8_t reg, uint8_t val,
-    double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
-);
+int duplicate_write_opl3(const CommandArguments *args);
 
 /**
  * OPL3 initialization sequence for both ports.
