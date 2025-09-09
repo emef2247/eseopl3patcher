@@ -83,147 +83,6 @@ void opl3_calc_fnum_block_from_freq(double freq, double clock, int* block, int* 
     *fnum = best_fnum;
 }
 
-/**
- * Main OPL3/OPL2 register write handler with frequency conversion.
- * If the source FM chip or clock does not match OPL3 target, frequency will be recalculated.
- * This function now always does FM frequency conversion for $A0/$B0 if FM chip or clock differs.
- */
-int duplicate_write_opl3(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstat,
-    OPL3State *p_state,
-    uint8_t reg, uint8_t val,
-    double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
-) {
-    int addtional_bytes = 0;
-
-    // Frequency LSB ($A0-A8)
-    if (reg >= 0xA0 && reg <= 0xA8) {
-        int ch = reg - 0xA0;
-        p_state->reg_stamp[reg] = p_state->reg[reg];
-        p_state->reg[reg] = val;
-
-        uint8_t regB = p_state->reg[0xB0 + ch];
-        uint8_t lsb = val;
-        uint8_t msb = regB & 0x03;
-        int block = (regB >> 2) & 0x07;
-        int keyon = (regB >> 5) & 0x01;
-        int original_fnum = ((msb << 8) | lsb);
-
-        FMChipType src_chip = p_state->source_fmchip;
-        double src_clock = get_fm_source_clock();
-        double tgt_clock = get_fm_target_clock();
-        int need_conversion = 0;
-        if (src_chip != FMCHIP_YMF262 || fabs(src_clock - tgt_clock) > 1.0) {
-            need_conversion = 1;
-        }
-
-        int out_block = block;
-        int out_fnum = original_fnum;
-
-        if (need_conversion) {
-            double freq;
-            freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
-            opl3_calc_fnum_block_from_freq(freq, tgt_clock, &out_block, &out_fnum);
-            // Debug: show input/output freq and FNUM/BLOCK
-            printf("[CONV][A0] CH=%d srcchip=%d srcclk=%.0fHz tgtclk=%.0fHz block=%d fnum=0x%03X freq=%.4fHz -> OPL3 block=%d fnum=0x%03X\n",
-                ch, src_chip, src_clock, tgt_clock, block, original_fnum, freq, out_block, out_fnum);
-        }
-
-         //  uint8_t out_lsb = out_fnum & 0xFF;
-        // opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, out_lsb);
-        return addtional_bytes;
-    }
-
-    // Frequency MSB/Block/KeyOn ($B0-B8)
-    if (reg >= 0xB0 && reg <= 0xB8) {
-        int ch = reg - 0xB0;
-        p_state->reg_stamp[reg] = p_state->reg[reg];
-        p_state->reg[reg] = val;
-
-        uint8_t lsb = p_state->reg[0xA0 + ch];
-        uint8_t msb = val & 0x03;
-        int block = (val >> 2) & 0x07;
-        int keyon = (val >> 5) & 0x01;
-        int original_fnum = ((msb << 8) | lsb);
-
-        FMChipType src_chip = p_state->source_fmchip;
-        double src_clock = get_fm_source_clock();
-        double tgt_clock = get_fm_target_clock();
-        int need_conversion = 0;
-        if (src_chip != FMCHIP_YMF262 || fabs(src_clock - tgt_clock) > 1.0) {
-            need_conversion = 1;
-        }
-
-        int out_block = block;
-        int out_fnum = original_fnum;
-
-        if (need_conversion) {
-            double freq;
-            freq = calc_fmchip_frequency(src_chip, src_clock, block, original_fnum);
-            opl3_calc_fnum_block_from_freq(freq, tgt_clock, &out_block, &out_fnum);
-            printf("[CONV][B0] CH=%d srcchip=%d srcclk=%.0fHz tgtclk=%.0fHz block=%d fnum=0x%03X freq=%.4fHz -> OPL3 block=%d fnum=0x%03X keyon=%d\n",
-                ch, src_chip, src_clock, tgt_clock, block, original_fnum, freq, out_block, out_fnum, keyon);
-        }
-
-        uint8_t out_lsb = out_fnum & 0xFF;
-        uint8_t out_msb = ((out_fnum >> 8) & 0x03) | ((out_block & 0x07) << 2) | (keyon ? 0x20 : 0);
-        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, out_lsb);
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, out_msb);
-
-        addtional_bytes += 3;
-        if (opl3_keyon_wait > 0) {
-            vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
-        }
-
-        uint8_t detunedA, detunedB;
-        detune_if_fm(p_state, ch, out_lsb, out_msb, detune, &detunedA, &detunedB);
-        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
-        if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
-            opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB); addtional_bytes += 3;
-        }
-        if (opl3_keyon_wait > 0) {
-            vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
-        }
-        return addtional_bytes;
-    } else if (reg >= 0xC0 && reg <= 0xC8) {
-        int ch = reg - 0xC0;
-        // Stereo panning implementation based on channel number
-        // Even channels: port0->right, port1->left
-        // Odd channels: port0->left, port1->right
-        // This creates alternating stereo placement for a stereo effect
-        uint8_t port0_panning, port1_panning;
-        if (ch_panning) {
-            // Apply stereo panning
-            if (ch % 2 == 0) {
-                // Even channel: port0 gets right channel, port1 gets left channel
-                port0_panning = 0x50;  // Right channel (bit 4 and bit 6)
-                port1_panning = 0xA0;  // Left channel (bit 5 and bit 7)
-            } else {
-                // Odd channel: port0 gets left channel, port1 gets right channel
-                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
-                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
-            }
-        } else {
-                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
-                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
-        }
-        opl3_write_reg(p_state, p_music_data, 0, 0xC0 + ch, (0xF & val) | port0_panning);
-        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, (0xF & val) | port1_panning); addtional_bytes += 3;
-    } else if (reg == 0xBD) {
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-    } else if (reg >= 0xE0 && reg <= 0xF5) {
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
-    } else {
-        // Write to both ports
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
-    }
-    return addtional_bytes;
-}
-
 void convert_opll_patch_to_opl3_param(int voice_index, OPL3OperatorParam *mod, OPL3OperatorParam *car) {
     if (voice_index < 0 || voice_index > 15 || !mod || !car) {
         memset(mod, 0, sizeof(OPL3OperatorParam));
@@ -374,6 +233,127 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
     *p_outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
 
+
+/**
+ * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
+ * @param p_music_data Pointer to VGMBuffer for music data.
+ * @param p_vstat Pointer to VGMStatus.
+ * @param p_state Pointer to OPL3State.
+ * @param reg Register address.
+ * @param val Value to write.
+ * @param detune Detune amount.
+ * @param opl3_keyon_wait KeyOn/Off wait (in samples).
+ * @param ch_panning Channel panning mode.
+ * @param v_ratio0 Volume ratio for port 0.
+ * @param v_ratio1 Volume ratio for port 1.
+ * @return Bytes written to port 1.
+ */
+int duplicate_write_opl3(
+    VGMBuffer *p_music_data,
+    VGMStatus *p_vstat,
+    OPL3State *p_state,
+    uint8_t reg, uint8_t val,
+    double detune, int opl3_keyon_wait, int ch_panning,
+    double v_ratio0, double v_ratio1
+) {
+    int addtional_bytes = 0;
+
+    if (reg == 0x01 || reg == 0x02 || reg == 0x03 || reg == 0x04) {
+        // Write only to port 0
+        opl3_write_reg(p_state, p_music_data, 0, reg, val);
+    } else if (reg == 0x05) {
+        // Handle mode register (only port 1)
+        // Always OPL3 mode
+        opl3_write_reg(p_state, p_music_data, 1, 0x05, val & 0x1);
+    } else if (reg >= 0x40 && reg <= 0x55) {
+        uint8_t val0 = apply_tl_with_ratio(val, v_ratio0);
+        uint8_t val1 = apply_tl_with_ratio(val, v_ratio1);
+        opl3_write_reg(p_state, p_music_data, 0, reg, val0);
+        opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
+    } else if (reg >= 0xA0 && reg <= 0xA8) {
+        // Only write port0 for A0..A8
+        int ch = reg - 0xA0;
+
+        if ((p_state->reg[0xB0 + ch]) & 0x20) {
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
+        } else {
+            // Only update the register buffer (No dump to vgm)
+            p_state->reg_stamp[reg] = p_state->reg[reg];
+            p_state->reg[reg] = val;
+        }
+    } else if (reg >= 0xB0 && reg <= 0xB8) {
+        // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
+        // Get the previous and new KEYON bit values
+        uint8_t prev_val = p_state->reg_stamp[reg];
+        uint8_t keyon_prev = prev_val & 0x20;
+        uint8_t keyon_new  = val & 0x20;
+        // KeyOn occurs: extract and register voice parameters for this channel
+        if (!keyon_prev && keyon_new) {
+            OPL3VoiceParam vp;
+            // Always zero-initialize the whole structure before extracting parameters
+            memset(&vp, 0, sizeof(OPL3VoiceParam));
+            // Extract voice parameters from the OPL3 state
+            extract_voice_param(p_state, &vp);
+            // Set additional fields as needed before DB registration
+            vp.source_fmchip = p_state->source_fmchip;
+            // Register or find voice in the database
+            opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
+        }
+        
+        // Write B0 (KeyOn/Block/FnumMSB) and handle detune
+        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
+        int ch = reg - 0xB0;
+        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
+        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+        // Extra 3 bytes
+        addtional_bytes += 3;
+        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+
+        uint8_t detunedA, detunedB;
+        detune_if_fm(p_state, ch, p_state->reg[0xA0 + ch], val, detune, &detunedA, &detunedB);
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
+        if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
+        }
+        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+    } else if (reg >= 0xC0 && reg <= 0xC8) {
+        int ch = reg - 0xC0;
+        // Stereo panning implementation based on channel number
+        // Even channels: port0->right, port1->left
+        // Odd channels: port0->left, port1->right
+        // This creates alternating stereo placement for a stereo effect
+        uint8_t port0_panning, port1_panning;
+        if (ch_panning) {
+            // Apply stereo panning
+            if (ch % 2 == 0) {
+                // Even channel: port0 gets right channel, port1 gets left channel
+                port0_panning = 0x50;  // Right channel (bit 4 and bit 6)
+                port1_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+            } else {
+                // Odd channel: port0 gets left channel, port1 gets right channel
+                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
+            }
+        } else {
+                port0_panning = 0xA0;  // Left channel (bit 5 and bit 7)
+                port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
+        }
+        opl3_write_reg(p_state, p_music_data, 0, 0xC0 + ch, (0xF & val) | port0_panning);
+        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, (0xF & val) | port1_panning); addtional_bytes += 3;
+    } else if (reg == 0xBD) {
+        opl3_write_reg(p_state, p_music_data, 0, reg, val);
+    } else if (reg >= 0xE0 && reg <= 0xF5) {
+        opl3_write_reg(p_state, p_music_data, 0, reg, val);
+        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
+    } else {
+        // Write to both ports
+        opl3_write_reg(p_state, p_music_data, 0, reg, val);
+        opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
+    }
+    return addtional_bytes;
+}
+
 /**
  * Register all YM2413 ROM patches into OPL3VoiceDB during OPL3 initialization.
  * Each ROM patch is converted to OPL3VoiceParam format and registered in the database.
@@ -504,6 +484,13 @@ static void ym2413_patch_to_opl3_voiceparam(int inst, const uint8_t *ym2413_regs
     vp->is_4op = 0;
     vp->voice_no = inst;
     vp->source_fmchip = FMCHIP_YM2413;
+
+    // --- AR/DR correction ---
+    // OPL3でAR=0だと音が立ち上がらない場合があるため最小値を設定
+    if (vp->op[0].ar < 2) vp->op[0].ar = 2;
+    if (vp->op[1].ar < 2) vp->op[1].ar = 2;
+    if (vp->op[0].dr < 2) vp->op[0].dr = 2;
+    if (vp->op[1].dr < 2) vp->op[1].dr = 2;
 }
 
 // --- YM2413→OPL3 conversion state ---
@@ -526,6 +513,7 @@ static void debug_dump_opl3_voiceparam(int ch, const OPL3VoiceParam* vp, uint8_t
         vp->op[1].mult, vp->op[1].ksl, vp->op[1].am, vp->op[1].vib, vp->op[1].egt, vp->op[1].ksr, vp->op[1].ws);
     printf("  ALG=%u FB=%u CNT=%u\n", vp->cnt[0], vp->fb[0], vp->cnt[0]);
 }
+
 // --- YM2413→OPL3 register conversion main ---
 int duplicate_write_opl3_ym2413(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
@@ -551,32 +539,13 @@ int duplicate_write_opl3_ym2413(
         uint8_t inst = (ym2413_regs[0x30 + ch] >> 4) & 0x0F;
         uint8_t vol  = ym2413_regs[0x30 + ch] & 0x0F;
 
-        uint8_t fnum_lsb = ym2413_regs[0x10 + ch];
-        uint16_t fnum = ((val & 0x01) << 8) | fnum_lsb;          // FNUM正しい9bit
-        uint8_t block = (val >> 1) & 0x07;                       // blockはbit1-3
-        uint8_t keyon = (val & 0x10) ? 1 : 0;                    // KeyOnはbit4
-
         // TL/VOL correction
        // --- TL/VOL correction ---
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_voiceparam(inst, ym2413_regs, &vp);
-
         uint8_t vol_tl = (uint8_t)((15 - vol) / 15.0 * 63.0 + 0.5); // 0=最大, 63=最小
-
-        // Carrier TL に VOL を加算
-        int tl_car = vp.op[1].tl + vol_tl;
-        if (tl_car > 63) tl_car = 63;
-        vp.op[1].tl = 0; (uint8_t)tl_car;
-
-        // モジュレータ TL は固定 (必要に応じて調整可能)
-        vp.op[0].tl = vp.op[0].tl; // 変更なし
-
-        // --- AR/DR correction ---
-        // OPL3でAR=0だと音が立ち上がらない場合があるため最小値を設定
-        if (vp.op[0].ar < 2) vp.op[0].ar = 2;
-        if (vp.op[1].ar < 2) vp.op[1].ar = 2;
-        if (vp.op[0].dr < 2) vp.op[0].dr = 2;
-        if (vp.op[1].dr < 2) vp.op[1].dr = 2;
+        vp.op[1].tl = vol_tl;
+        vp.op[1].tl = 0; // for debug, always max volume  
 
         // --- KeyOff ---
         duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, 0x00, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
@@ -586,6 +555,11 @@ int duplicate_write_opl3_ym2413(
         opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
 
         // --- Frequency conversion (正しいFNUM/blockでHz計算) ---
+        uint8_t  fnum_lsb = ym2413_regs[0x10 + ch];
+        uint16_t fnum = ((val & 0x01) << 8) | fnum_lsb;          // FNUM正しい9bit
+        uint8_t block = (val >> 1) & 0x07;                       // blockはbit1-3
+        uint8_t keyon = (val & 0x10) ? 1 : 0;                    // KeyOnはbit4
+
         double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, fnum);
         int opl3_block, opl3_fnum;
         opl3_calc_fnum_block_from_freq(freq, get_fm_target_clock(), &opl3_block, &opl3_fnum);
@@ -615,23 +589,19 @@ int duplicate_write_opl3_ym2413(
         uint8_t vol  = val & 0x0F;
 
         // --- Register user patch if needed ---
-        if (inst == 15) {
+        if (inst == 0) {
             OPL3VoiceParam user_vp;
-            ym2413_patch_to_opl3_voiceparam(15, ym2413_regs, &user_vp);
+            ym2413_patch_to_opl3_voiceparam(inst, ym2413_regs, &user_vp);
             int found = opl3_voice_db_find_or_add(&p_state->voice_db, &user_vp);
-            printf("[DEBUG] User patch (INST=15) registered to voice_db (voice_no=%d, found=%d)\n", user_vp.voice_no, found);
+            printf("[DEBUG] User patch (INST=0) registered to voice_db (voice_no=%d, found=%d)\n", user_vp.voice_no, found);
         }
 
         // --- TL+VOL補正（即時反映） ---
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_voiceparam(inst, ym2413_regs, &vp);
-        uint8_t vol_tl = (uint8_t)((vol / 15.0) * 63.0 + 0.5);
-        vp.op[1].tl = (vp.op[1].tl > vol_tl) ? vp.op[1].tl : vol_tl;
-        int tl_mod = vp.op[0].tl;
-        int tl_car = vp.op[1].tl + vol_tl;
-        if (tl_car > 63) tl_car = 63;
-        vp.op[0].tl = (uint8_t)tl_mod;
-        vp.op[1].tl = 0;
+        uint8_t vol_tl = (uint8_t)((15 - vol) / 15.0 * 63.0 + 0.5); // 0=最大, 63=最小
+        vp.op[1].tl = vol_tl;
+        vp.op[1].tl = 0; // for debug, always max volume  
 
         // TL書き込み
         duplicate_write_opl3(
@@ -643,7 +613,7 @@ int duplicate_write_opl3_ym2413(
             0x40 + (ch + 3), ((vp.op[1].ksl & 0x03) << 6) | (vp.op[1].tl & 0x3F), detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1
         );
         printf("[DEBUG] VOL update: ch=%d inst=%d vol=%d -> TL_mod=%d (slot_mod=%d), TL_car=%d (slot_car=%d)\n",
-            ch, inst, vol, tl_mod, ch, tl_car, ch + 3);
+            ch, inst, vol, vp.op[0].tl, ch, vp.op[1].tl, ch + 3);
         return 0;
     }
 
