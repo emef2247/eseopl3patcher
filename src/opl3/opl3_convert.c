@@ -21,7 +21,12 @@ double calc_fmchip_frequency(FMChipType chip, double clock, int block, int fnum)
     switch (chip) {
         case FMCHIP_YM2413: // OPLL
             // f_out = (clock / 72) * 2^(block - 1) * (FNUM / 512)
-            return (clock / 72.0) * pow(2.0, block - 1) * ((double)fnum / 512.0);
+            printf("calc_fmchip_frequency YM2413: clock=%.2f, block=%d, fnum=%d\n", clock, block, fnum);
+            //return (clock / 72.0) * pow(2.0, block - 1) * ((double)fnum / 512.0);
+            // f_out = (clock / 72) * (FNUM / 512) * 2^block
+            double base = clock / 72.0;
+            double freq = base * ((double)fnum / 512.0) * pow(2.0, block);
+            return freq;
         case FMCHIP_YMF262: // OPL3
             // f_out = (clock / 288) * 2^(block - 1) * (FNUM / 1024)
             return (clock / 288.0) * pow(2.0, block - 1) * ((double)fnum / 1024.0);
@@ -49,6 +54,9 @@ double opll_fnum_block_to_freq(int fnum, int block, double clock) {
     return freq;
 }
 
+double calc_fmchip_frequency_opll(double clk, int block, int fnum) {
+    return (clk / 72.0) * ((double)fnum) / (double)(1 << (19 - block));
+}
 
 /**
  * Calculate OPL3 FNUM and block for a target frequency.
@@ -58,13 +66,14 @@ double opll_fnum_block_to_freq(int fnum, int block, double clock) {
  * @param[out] block Pointer to integer for resulting block
  * @param[out] fnum Pointer to integer for resulting FNUM
  */
-void opl3_calc_fnum_block_from_freq(double freq, double clock, int* block, int* fnum) {
+void opl3_calc_fnum_block_from_freq(double freq, double clock, uint8_t* block, uint16_t* fnum) {
+    printf("opl3_calc_fnum_block_from_freq 1: freq=%.2fHz, OPL3 clock=%.2fHz\n", freq, clock);
     if (freq <= 0.0 || clock <= 0.0) {
         *block = 0; *fnum = 0;
         return;
     }
-    int best_block = 0;
-    int best_fnum = 0;
+    uint8_t best_block = 0;
+    uint16_t best_fnum = 0;
     double min_err = 1e12;
 
     for (int b = 0; b < 8; ++b) {
@@ -79,50 +88,12 @@ void opl3_calc_fnum_block_from_freq(double freq, double clock, int* block, int* 
             best_fnum = cand_fnum;
         }
     }
+    printf("opl3_calc_fnum_block_from_freq 2: freq=%.2fHz => block=%d(0x%02x), fnum=%d (0x%03x)(err=%.2fHz)\n",
+        freq, best_block, best_block, best_fnum, best_fnum, min_err);
+
     *block = best_block;
     *fnum = best_fnum;
 }
-
-void convert_opll_patch_to_opl3_param(int voice_index, OPL3OperatorParam *mod, OPL3OperatorParam *car) {
-    if (voice_index < 0 || voice_index > 15 || !mod || !car) {
-        memset(mod, 0, sizeof(OPL3OperatorParam));
-        memset(car, 0, sizeof(OPL3OperatorParam));
-        return;
-    }
-    const unsigned char *rom = YM2413_VOICES[voice_index];
-    // Modulator
-    mod->am   = (rom[0] >> 7) & 0x01;
-    mod->vib  = (rom[0] >> 6) & 0x01;
-    mod->egt  = (rom[0] >> 5) & 0x01;
-    mod->ksr  = (rom[0] >> 4) & 0x01;
-    mod->mult = rom[0] & 0x0F;
-    mod->ksl  = (rom[1] >> 6) & 0x03;
-    mod->tl   = rom[1] & 0x3F;
-    mod->ar   = (rom[2] >> 4) & 0x0F;
-    mod->dr   = rom[2] & 0x0F;
-    mod->sl   = (rom[3] >> 4) & 0x0F;
-    mod->rr   = rom[3] & 0x0F;
-    mod->ws   = 0;
-    // Carrier
-    car->am   = (rom[8] >> 7) & 0x01;
-    car->vib  = (rom[8] >> 6) & 0x01;
-    car->egt  = (rom[8] >> 5) & 0x01;
-    car->ksr  = (rom[8] >> 4) & 0x01;
-    car->mult = rom[8] & 0x0F;
-    car->ksl  = (rom[9] >> 6) & 0x03;
-    car->tl   = rom[9] & 0x3F;
-    car->ar   = (rom[10] >> 4) & 0x0F;
-    car->dr   = rom[10] & 0x0F;
-    car->sl   = (rom[11] >> 4) & 0x0F;
-    car->rr   = rom[11] & 0x0F;
-    car->ws   = 0;
-    if (mod->ar < 2) mod->ar = 2;
-    if (mod->dr < 2) mod->dr = 2;
-    if (car->ar < 2) car->ar = 2;
-    if (car->dr < 2) car->dr = 2;
-}
-
-
 
 int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp, double detune, int opl3_keyon_wait,
@@ -232,7 +203,6 @@ void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double
     *p_outA = (uint8_t)(fnum_detuned & 0xFF);
     *p_outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
-
 
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
@@ -354,6 +324,56 @@ int duplicate_write_opl3(
     return addtional_bytes;
 }
 
+
+static void ym2413_patch_to_opl3_voiceparam(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp) {
+    memset(vp, 0, sizeof(OPL3VoiceParam));
+    const uint8_t *src;
+    if (inst == 0 && ym2413_regs) {
+        src = ym2413_regs; // $00-$07: user patch
+    } else {
+        src = YM2413_VOICES[inst-1];
+    }
+    // Modulator
+    vp->op[0].am   = (src[0] >> 7) & 1;
+    vp->op[0].vib  = (src[0] >> 6) & 1;
+    vp->op[0].egt  = (src[0] >> 5) & 1;
+    vp->op[0].ksr  = (src[0] >> 4) & 1;
+    vp->op[0].mult = src[0] & 0x0F;
+    vp->op[0].ksl  = (src[1] >> 6) & 3;
+    vp->op[0].tl   = src[1] & 0x3F;
+    vp->op[0].ar   = (src[2] >> 4) & 0x0F;
+    vp->op[0].dr   = src[2] & 0x0F;
+    vp->op[0].sl   = (src[3] >> 4) & 0x0F;
+    vp->op[0].rr   = src[3] & 0x0F;
+    vp->op[0].ws   = 0;
+    // Carrier
+    int ofs = (inst == 15 && ym2413_regs) ? 4 : 4;
+    vp->op[1].am   = (src[ofs+0] >> 7) & 1;
+    vp->op[1].vib  = (src[ofs+0] >> 6) & 1;
+    vp->op[1].egt  = (src[ofs+0] >> 5) & 1;
+    vp->op[1].ksr  = (src[ofs+0] >> 4) & 1;
+    vp->op[1].mult = src[ofs+0] & 0x0F;
+    vp->op[1].ksl  = (src[ofs+1] >> 6) & 3;
+    vp->op[1].tl   = src[ofs+1] & 0x3F;
+    vp->op[1].ar   = (src[ofs+2] >> 4) & 0x0F;
+    vp->op[1].dr   = src[ofs+2] & 0x0F;
+    vp->op[1].sl   = (src[ofs+3] >> 4) & 0x0F;
+    vp->op[1].rr   = src[ofs+3] & 0x0F;
+    vp->op[1].ws   = 0;
+    // フィードバック値（mod[0] の下位3ビット）
+    vp->fb[0] = src[0] & 0x07;
+    vp->cnt[0] = 0;
+    vp->is_4op = 0;
+    vp->voice_no = inst;
+    vp->source_fmchip = FMCHIP_YM2413;
+
+    // --- AR/DR correction ---
+    if (vp->op[0].ar < 2) vp->op[0].ar = 2;
+    if (vp->op[1].ar < 2) vp->op[1].ar = 2;
+    if (vp->op[0].dr < 2) vp->op[0].dr = 2;
+    if (vp->op[1].dr < 2) vp->op[1].dr = 2;
+}
+
 /**
  * Register all YM2413 ROM patches into OPL3VoiceDB during OPL3 initialization.
  * Each ROM patch is converted to OPL3VoiceParam format and registered in the database.
@@ -361,16 +381,11 @@ int duplicate_write_opl3(
  */
 static void register_all_opll_patches_to_opl3_voice_db(OPL3VoiceDB *db) {
     // Register only preset patches [0..14] (Violin..Synth Bass)
-    for (int i = 0; i < 15; ++i) {
+    for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
-        memset(&vp, 0, sizeof(vp));
-        // Convert YM2413 ROM patch to OPL3 operator parameters
-        convert_opll_patch_to_opl3_param(i, &vp.op[0], &vp.op[1]);
-        vp.is_4op = 0;
-        vp.fb[0]  = 1; // Use FB=1 (safe default for OPL3, not silent)
-        vp.cnt[0] = 0; // Use CNT=0 (algorithm 0, typical FM)
-        vp.source_fmchip = FMCHIP_YM2413;
-        vp.voice_no = i;
+        // YM2413プリセット音色からOPL3VoiceParamへ変換（FB値も含む）
+        ym2413_patch_to_opl3_voiceparam(inst, NULL, &vp);
+        // voice_dbへ登録
         opl3_voice_db_find_or_add(db, &vp);
     }
 }
@@ -401,6 +416,8 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
         }
         // Register all OPLL presets as OPL3 voices (for patch lookup)
         register_all_opll_patches_to_opl3_voice_db(&p_state->voice_db);
+
+        set_fm_source_clock(3579545.0); // Default OPLL clock
     }
 
     // OPL3 global registers (Port 1 only)
@@ -443,61 +460,13 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     }
 }
 
-
-// --- Patch conversion (ROM/user patch to OPL3VoiceParam) ---
-static void ym2413_patch_to_opl3_voiceparam(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp) {
-    memset(vp, 0, sizeof(OPL3VoiceParam));
-    const uint8_t *src;
-    if (inst == 0 && ym2413_regs) {
-        src = ym2413_regs; // $00-$07: user patch
-    } else {
-        src = YM2413_VOICES[inst-1];
-    }
-    // Copy all fields as is (ranges are compatible)
-    vp->op[0].am   = (src[0] >> 7) & 1;
-    vp->op[0].vib  = (src[0] >> 6) & 1;
-    vp->op[0].egt  = (src[0] >> 5) & 1;
-    vp->op[0].ksr  = (src[0] >> 4) & 1;
-    vp->op[0].mult = src[0] & 0x0F;
-    vp->op[0].ksl  = (src[1] >> 6) & 3;
-    vp->op[0].tl   = src[1] & 0x3F;
-    vp->op[0].ar   = (src[2] >> 4) & 0x0F;
-    vp->op[0].dr   = src[2] & 0x0F;
-    vp->op[0].sl   = (src[3] >> 4) & 0x0F;
-    vp->op[0].rr   = src[3] & 0x0F;
-    vp->op[0].ws   = 0;
-    int ofs = (inst == 15 && ym2413_regs) ? 4 : 8;
-    vp->op[1].am   = (src[ofs+0] >> 7) & 1;
-    vp->op[1].vib  = (src[ofs+0] >> 6) & 1;
-    vp->op[1].egt  = (src[ofs+0] >> 5) & 1;
-    vp->op[1].ksr  = (src[ofs+0] >> 4) & 1;
-    vp->op[1].mult = src[ofs+0] & 0x0F;
-    vp->op[1].ksl  = (src[ofs+1] >> 6) & 3;
-    vp->op[1].tl   = src[ofs+1] & 0x3F;
-    vp->op[1].ar   = (src[ofs+2] >> 4) & 0x0F;
-    vp->op[1].dr   = src[ofs+2] & 0x0F;
-    vp->op[1].sl   = (src[ofs+3] >> 4) & 0x0F;
-    vp->op[1].rr   = src[ofs+3] & 0x0F;
-    vp->op[1].ws   = 0;
-    vp->fb[0] = 1;
-    vp->cnt[0] = 0;
-    vp->is_4op = 0;
-    vp->voice_no = inst;
-    vp->source_fmchip = FMCHIP_YM2413;
-
-    // --- AR/DR correction ---
-    // OPL3でAR=0だと音が立ち上がらない場合があるため最小値を設定
-    if (vp->op[0].ar < 2) vp->op[0].ar = 2;
-    if (vp->op[1].ar < 2) vp->op[1].ar = 2;
-    if (vp->op[0].dr < 2) vp->op[0].dr = 2;
-    if (vp->op[1].dr < 2) vp->op[1].dr = 2;
-}
-
 // --- YM2413→OPL3 conversion state ---
 #define YM2413_NUM_CH 9
 #define YM2413_REGS_SIZE 0x40
+
+static uint8_t ym2413_regs_stamp[YM2413_REGS_SIZE] = {0};
 static uint8_t ym2413_regs[YM2413_REGS_SIZE] = {0};
-static uint8_t opl3_keyon_state[YM2413_NUM_CH] = {0}; // 0: KeyOff, 1: KeyOn
+static uint8_t opll_keyon_state[YM2413_NUM_CH] = {0}; // 0: KeyOff, 1: KeyOn
 
 
 // --- YM2413→OPL3 register conversion main ---
@@ -520,70 +489,108 @@ int duplicate_write_opl3_ym2413(
     uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning,
     double v_ratio0, double v_ratio1
 ) {
+    ym2413_regs_stamp[reg] = ym2413_regs[reg];
     ym2413_regs[reg] = val;
 
-    if (reg <= 0x07 || reg == 0x0E) return 0;
+    if (reg <= 0x07 || reg == 0x0E) return 0; // ignore other registers
 
     // $10-$18: FNUM LSB (buffer only)
     if (reg >= 0x10 && reg <= 0x18) {
         int ch = reg - 0x10;
-        ym2413_regs[reg] = val; // just buffer, do NOT emit yet
+
+        // --- OPLL → fnum/block/keyon 抽出 ---
+        // YM2413仕様準拠でレジスタ値を抽出
+        uint8_t  fnum_lsb = ym2413_regs[0x10 + ch];
+        uint8_t  reg_msb  = ym2413_regs[0x20 + ch];
+        uint16_t fnum_9b  = ((reg_msb & 0x01) << 8) | fnum_lsb;   // FNUM[8], FNUM[7:0]
+        uint8_t  block    = (reg_msb >> 1) & 0x07;
+        uint8_t  keyon    = (reg_msb & 0x10) ? 1 : 0;
+        fnum_9b &= 0x1FF; // 9bit
+        block   &= 0x07;  // 3bit
+
+        // 範囲チェック
+        if (fnum_9b > 511) {
+            printf("[WARNING] YM2413 FNUM out of range: %d (ch=%d)\n", fnum_9b, ch);
+            fnum_9b &= 0x1FF;
+        }
+        if (block > 7) {
+            printf("[WARNING] YM2413 BLOCK out of range: %d (ch=%d)\n", block, ch);
+            block &= 0x07;
+        }
+
+        double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, fnum_9b);
+        int opl3_block, opl3_fnum;
+        opl3_calc_fnum_block_from_freq(freq, get_fm_target_clock(), &opl3_block, &opl3_fnum);
+        uint8_t out_lsb = opl3_fnum & 0xFF;      // FNUM LSB
+
+        printf("[DEBUG][YM2413 REGS $1n] ch=%d $1n=%02x (fnum_9b=%d, block=%d, keyon=%d)\n", ch, ym2413_regs[0x10 + ch], fnum_9b, block, keyon);
+        printf("[DEBUG][YMF262 REGS $An] ch=%d $An=%02x \n", ch, out_lsb);
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, out_lsb, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio0);
         return 0;
     }
-
     // $20-$28: KeyOn/FNUM MSB/Block
-    if (reg >= 0x20 && reg <= 0x28) {
+    else if (reg >= 0x20 && reg <= 0x28) {
         int ch = reg - 0x20;
-        ym2413_regs[reg] = val;
+
+        // --- OPLL → fnum/block/keyon 抽出 ---
+        // YM2413仕様準拠でレジスタ値を抽出
+        uint8_t  fnum_lsb = ym2413_regs[0x10 + ch];
+        uint8_t  reg_msb  = ym2413_regs[0x20 + ch];
+        uint16_t fnum_9b  = ((reg_msb & 0x01) << 8) | fnum_lsb;   // FNUM[8], FNUM[7:0]
+        uint8_t  block    = (reg_msb >> 1) & 0x07;
+        uint8_t  keyon    = (reg_msb & 0x10) ? 1 : 0;
+
+        // 範囲チェック
+        fnum_9b &= 0x1FF;
+        block   &= 0x07;
+
+        // 範囲チェック
+        if (fnum_9b > 511) {
+            printf("[WARNING] YM2413 FNUM out of range: %d (ch=%d)\n", fnum_9b, ch);
+            fnum_9b &= 0x1FF;
+        }
+        if (block > 7) {
+            printf("[WARNING] YM2413 BLOCK out of range: %d (ch=%d)\n\n", block, ch);
+            block &= 0x07;
+        }
+
 
         uint8_t inst = (ym2413_regs[0x30 + ch] >> 4) & 0x0F;
         uint8_t vol  = ym2413_regs[0x30 + ch] & 0x0F;
 
         // TL/VOL correction
-       // --- TL/VOL correction ---
+        // --- TL/VOL correction ---
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_voiceparam(inst, ym2413_regs, &vp);
         uint8_t vol_tl = (uint8_t)((15 - vol) / 15.0 * 63.0 + 0.5); // 0=最大, 63=最小
         vp.op[1].tl = vol_tl;
         vp.op[1].tl = 0; // for debug, always max volume  
 
-        // --- KeyOff ---
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, 0x00, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-        //vgm_wait_samples(p_music_data, p_vstat, 1);
-
         // --- Patch apply ---
         opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
 
-        // --- Frequency conversion (正しいFNUM/blockでHz計算) ---
-        uint8_t  fnum_lsb = ym2413_regs[0x10 + ch];
-        uint16_t fnum = ((val & 0x01) << 8) | fnum_lsb;          // FNUM正しい9bit
-        uint8_t block = (val >> 1) & 0x07;                       // blockはbit1-3
-        uint8_t keyon = (val & 0x10) ? 1 : 0;                    // KeyOnはbit4
-
-        double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, fnum);
-        int opl3_block, opl3_fnum;
+        double freq = calc_fmchip_frequency(FMCHIP_YM2413, get_fm_source_clock(), block, fnum_9b);
+        uint8_t opl3_block;
+        uint16_t opl3_fnum;
         opl3_calc_fnum_block_from_freq(freq, get_fm_target_clock(), &opl3_block, &opl3_fnum);
 
+        // --- レジスタ出力値 ---
         uint8_t out_lsb = opl3_fnum & 0xFF;
-        uint8_t out_msb = ((opl3_fnum >> 8) & 0x03) | ((opl3_block & 0x07) << 2) | (keyon ? 0x20 : 0);
-
-        // --- FNUM LSB ---
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, out_lsb, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-
-        // --- KeyOn/Off ---
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, out_msb, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
-
-        //if (keyon) vgm_wait_samples(p_music_data, p_vstat, OPL3_KEYON_WAIT_AFTER_ON_DEFAULT);
-        //else      vgm_wait_samples(p_music_data, p_vstat, 1);
+        uint8_t out_msb = ((opl3_fnum >> 8) & 0x03)   // fnum上位2bit
+                        | (opl3_block << 2)           // block (3bit)
+                        | (keyon ? 0x20 : 0);         // KeyOn
 
         // デバッグ出力
-        printf("[DEBUG][YM2413->OPL3] ch=%d inst=%d vol=%d block=%d fnum=%03X keyon=%d freq=%.2fHz\n",
-            ch, inst, vol, block, fnum, keyon, freq);
+        printf("[DEBUG][YM2413 REGS $2n] ch=%d inst=%d vol=%d block=%d fnum_9b=%03X keyon=%d freq=%.2fHz\n",
+            ch, inst, vol, block, fnum_9b, keyon, freq);
+        // --- KeyOn/Off ---
+        printf("[DEBUG][YMF262 REGS $Bn] ch=%d $Bn=%02x (fnum %d (0x%02x), block %d(0x%02x)\n\n", ch, out_msb,opl3_fnum,opl3_fnum,opl3_block,opl3_block);
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, out_msb, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
 
         return 0;
     }
     // $30-$38: instrument/volume (INST/VOL) immediate handling
-    if (reg >= 0x30 && reg <= 0x38) {
+    else if (reg >= 0x30 && reg <= 0x38) {
         int ch = reg - 0x30;
         uint8_t inst = (val >> 4) & 0x0F;
         uint8_t vol  = val & 0x0F;
