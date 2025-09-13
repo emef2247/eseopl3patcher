@@ -6,6 +6,7 @@
 #include "../vgm/vgm_helpers.h"
 #include "opl3_voice.h"
 #include "opl3_event.h"
+#include "../opll/opll_to_opl3_wrapper.h"
 
 #define OPL3_CLOCK 14318182
 #define OPL3_NUM_CHANNELS 18
@@ -96,6 +97,76 @@ double get_fm_target_clock(void);
  * @param hz The clock frequency in Hz.
  */
 void set_fm_target_clock(double hz);
+
+/**
+ * Calculate OPL3 output frequency from block and FNUM.
+ * @param clock OPL3/target chip clock (Hz)
+ * @param block Block value (0-7)
+ * @param fnum FNUM value (0-1023)
+ * @return Calculated frequency in Hz
+ */
+double calc_opl3_frequency (double clock, unsigned char block, unsigned short fnum);
+
+/**
+ * Calculate OPL3 FNUM and block for a target frequency.
+ * @param freq Frequency in Hz
+ * @param clock OPL3/target chip clock (Hz)
+ * @param[out] out_block Pointer to output block value
+ * @param[out] out_fnum Pointer to output FNUM value
+ */
+void opl3_calc_fnum_block_from_freq(double freq, double clock, unsigned char *out_block, unsigned short *out_fnum);
+
+/**   
+ * Calculate OPL3 FNUM and block for a target frequency using ldexp for better precision.
+ * @param freq Frequency in Hz
+ * @param clock OPL3/target chip clock (Hz)
+ * @param[out] out_block Pointer to output block value
+ * @param[out] out_fnum Pointer to output FNUM value
+ * @param[out] out_err Pointer to output frequency error (in Hz)
+ */
+void opl3_calc_fnum_block_from_freq_ldexp(double freq, double clock,unsigned char *out_block,unsigned short *out_fnum, double *out_err);
+
+/**
+ * Find the best OPL3 FNUM and block for a target frequency using a weighted approach.
+ * @param freq Frequency in Hz
+ * @param clock OPL3/target chip clock (Hz)
+ * @param[out] best_block Pointer to output best block value
+ * @param[out] best_fnum Pointer to output best FNUM value
+ * @param[out] best_err Pointer to output best frequency error (in Hz)
+ * @param pref_block Preferred block value (for weighting)
+ * @param mult_weight Multiplier weight (for weighting)
+ */
+void opl3_find_fnum_block_with_weight(double freq, double clock, unsigned char *best_block, unsigned short *best_fnum, double *best_err, int pref_block, double mult_weight);
+
+/**
+ * Find the best OPL3 FNUM and block for a target frequency using a machine learning approach.
+ * @param freq Frequency in Hz
+ * @param clock OPL3/target chip clock (Hz)
+ * @param[out] best_block Pointer to output best block value
+ * @param[out] best_fnum Pointer to output best FNUM value
+ * @param[out] best_err Pointer to output best frequency error (in Hz)
+ * @param pref_block Preferred block value (for weighting)
+ * @param mult0 Carrier multiplier (for weighting)
+ * @param mult1 Modulator multiplier (for weighting) モジュレータ MULT (2opの場合は0でOK) 
+ */
+void opl3_find_fnum_block_with_ml(double freq, double clock,unsigned char *best_block, unsigned short *best_fnum, double *best_err,int pref_block, double mult0, double mult1);
+
+/**
+ * Find the best OPL3 FNUM and block for a target frequency using a machine learning approach with cents error.
+ * @param freq Frequency in Hz
+ * @param clock OPL3/target chip clock (Hz)
+ * @param[out] best_block Pointer to output best block value
+ * @param[out] best_fnum Pointer to output best FNUM value
+ * @param[out] best_err Pointer to output best frequency error (in cents)
+ * @param pref_block Preferred block value (for weighting)
+ * @param mult0 Carrier multiplier (for weighting)
+ * @param mult1 Modulator multiplier (for weighting) モジュレータ MULT (2opの場合は0でOK) 
+ */
+void opl3_find_fnum_block_with_ml_cents(double freq, double clock,
+                                        unsigned char *best_block, unsigned short *best_fnum,
+                                        double *best_err,
+                                        int pref_block,
+                                        double mult0, double mult1);
 
 /**
  * Calculate OPL3 FNUM and block for a target frequency.

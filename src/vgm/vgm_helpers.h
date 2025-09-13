@@ -128,12 +128,14 @@ typedef struct {
  *   - source_fmchip: The source FM chip type for conversion.
  */
 typedef struct {
-    VGMBuffer buffer;          /**< Data buffer for the VGM stream */
-    VGMTimeStamp timestamp;    /**< Sample clock/timestamp */
-    VGMStatus status;          /**< Status (total samples etc.) */
-    VGMHeaderInfo header;      /**< VGM header (raw + parsed info) */
-    VGMGD3Tag    gd3;          /**< GD3 tag (raw/parsed) */
-    FMChipType source_fmchip;  /**< The source FM chip type for conversion */
+    VGMBuffer buffer;              /**< Data buffer for the VGM stream */
+    VGMTimeStamp timestamp;        /**< Sample clock/timestamp */
+    VGMStatus     status;          /**< Status (total samples etc.) */
+    VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
+    VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */
+    FMChipType    source_fmchip;   /**< The source FM chip type for conversion */
+    double        source_fm_clock; /**< The source FM clock frequency */
+    double        target_fm_clock; /**< The target FM clock frequency */
 } VGMContext;
 
 /**

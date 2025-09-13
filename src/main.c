@@ -7,6 +7,7 @@
 #include "vgm/vgm_header.h"
 #include "opl3/opl3_convert.h"
 #include "opl3/opl3_debug_util.h"
+#include "opll/opll_to_opl3_wrapper.h"
 #include "vgm/gd3_util.h"
 
 #define DEFAULT_DETUNE 1.0
@@ -176,17 +177,17 @@ int main(int argc, char *argv[]) {
     // --- Set source and target clock for FM conversion ---
     // Determine which chip is selected for conversion and set the source clock
     if (chip_flags.convert_ym2413 && chip_flags.has_ym2413) {
-        set_fm_source_clock((double)chip_flags.ym2413_clock);
+        vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
     } else if (chip_flags.convert_ym3812 && chip_flags.has_ym3812) {
-        set_fm_source_clock((double)chip_flags.ym3812_clock);
+       vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
     } else if (chip_flags.convert_ym3526 && chip_flags.has_ym3526) {
-        set_fm_source_clock((double)chip_flags.ym3526_clock);
+        vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
     } else if (chip_flags.convert_y8950 && chip_flags.has_y8950) {
-        set_fm_source_clock((double)chip_flags.y8950_clock);
+        vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
     } else {
-        set_fm_source_clock(0.0);
+        vgmctx.source_fm_clock = -1.0; // No conversion
     }
-    set_fm_target_clock(OPL3_CLOCK); // Always use OPL3 standard clock as target
+    vgmctx.target_fm_clock = OPL3_CLOCK; // Always use OPL3 standard clock as target
 
     if (verbose) {
         printf("[VGM] FM chip usage in header:\n");
@@ -194,7 +195,7 @@ int main(int argc, char *argv[]) {
         printf(" YM3812:   %s (clock=%u)\n",  chip_flags.has_ym3812   ? "YES" : "NO", chip_flags.ym3812_clock);
         printf(" YM3526:   %s (clock=%u)\n",  chip_flags.has_ym3526   ? "YES" : "NO", chip_flags.ym3526_clock);
         printf(" Y8950:    %s (clock=%u)\n",  chip_flags.has_y8950    ? "YES" : "NO", chip_flags.y8950_clock);
-        printf("[VGM] FM conversion source clock: %.0f Hz, target clock: %.0f Hz\n", get_fm_source_clock(), get_fm_target_clock());
+        printf("[VGM] FM conversion source clock: %.0f Hz, target clock: %.0f Hz\n",vgmctx.source_fm_clock, vgmctx.target_fm_clock);
     }
 
     OPL3State state = {0};
@@ -204,10 +205,6 @@ int main(int argc, char *argv[]) {
     long read_done_byte = data_start;
     uint32_t additional_bytes = 0;
     long loop_start_in_buffer = -1;
-
-    // YM2413 register image
-    uint8_t curr_regs_ym2413[0x40] = {0};
-    bool ym2413_frame_dirty = false;
 
     // Main VGM parse loop
     while (read_done_byte < filesize) {
@@ -222,22 +219,22 @@ int main(int argc, char *argv[]) {
                 chip_flags.convert_ym2413 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x51;
-                set_fm_source_clock((double)chip_flags.ym2413_clock);
+                vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
             } else if (cmd == 0x5A && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3812 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5A;
-                set_fm_source_clock((double)chip_flags.ym3812_clock);
+                vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
             } else if (cmd == 0x5B && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3526 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5B;
-                set_fm_source_clock((double)chip_flags.ym3526_clock);
+                vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
             } else if (cmd == 0x5C && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_y8950 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5C;
-                set_fm_source_clock((double)chip_flags.y8950_clock);
+                vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
             }
         }
 
@@ -247,14 +244,13 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_ym2413) {
-                curr_regs_ym2413[reg] = val;
                 // Directly emit converted OPL3 sequence (1:1 immediate conversion)
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
                     state.opl3_mode_initialized = true;
                 }
-                duplicate_write_opl3_ym2413(
-                    &vgmctx.buffer, &vgmctx.status, &state,
+                opll_write_register(
+                    &vgmctx.buffer, &vgmctx, &state,
                     reg, val, detune, opl3_keyon_wait, ch_panning,
                     v_ratio0, v_ratio1
                 );
@@ -379,8 +375,7 @@ int main(int argc, char *argv[]) {
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
         ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
-        get_converted_opl_chip_name(&chip_flags),
-        detune, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
+        get_converted_opl_chip_name(&chip_flags),detune,opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
     VGMBuffer gd3;
     vgm_buffer_init(&gd3);
