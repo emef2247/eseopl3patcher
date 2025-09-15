@@ -1,7 +1,7 @@
 #include "vgm_helpers.h"
 #include <string.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 static uint32_t read_le_uint32(const unsigned char *p_ptr) {
     return (uint32_t)p_ptr[0] | ((uint32_t)p_ptr[1] << 8) | ((uint32_t)p_ptr[2] << 16) | ((uint32_t)p_ptr[3] << 24);
 }
@@ -26,7 +26,13 @@ void vgm_buffer_append(VGMBuffer *p_buf, const void *p_data, size_t len) {
     if (p_buf->size + len > p_buf->capacity) {
         size_t new_capacity = (p_buf->capacity ? p_buf->capacity * 2 : 256);
         while (new_capacity < p_buf->size + len) new_capacity *= 2;
-        p_buf->data = realloc(p_buf->data, new_capacity);
+        uint8_t *new_data = realloc(p_buf->data, new_capacity);
+        if (!new_data) {
+            // メモリ確保失敗
+            fprintf(stderr, "vgm_buffer_append: realloc failed (request %zu bytes)\n", new_capacity);
+            abort();
+        }
+        p_buf->data = new_data;
         p_buf->capacity = new_capacity;
     }
     memcpy(p_buf->data + p_buf->size, p_data, len);
@@ -40,8 +46,10 @@ void vgm_buffer_append(VGMBuffer *p_buf, const void *p_data, size_t len) {
  * Release memory allocated for a VGMBuffer.
  */
 void vgm_buffer_free(VGMBuffer *p_buf) {
-    free(p_buf->data);
-    p_buf->data = NULL;
+    if (p_buf && p_buf->data) {
+        free(p_buf->data);
+        p_buf->data = NULL;
+    }
     p_buf->size = 0;
     p_buf->capacity = 0;
 }

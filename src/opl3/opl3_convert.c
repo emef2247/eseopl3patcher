@@ -400,6 +400,31 @@ void get_detuned_value(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, d
     *p_outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
 
+uint8_t opl3_make_keyoff(uint8_t val) {
+    return (val & ~(1 << 6)); //  Clear bit 6 (KeyOn)
+}
+
+int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
+    VGMStatus *p_vstat,
+    OPL3State *p_state,
+    uint8_t    ch,
+    uint8_t    block,
+    uint16_t   fnum,
+    int       keyon,
+    const CommandOptions *opts) {
+
+    int bytes_written = 0;
+    uint8_t value_a = fnum & 0xFF;
+    uint8_t value_b = ((fnum >> 8) & 0x03) | (block << 2) | (keyon ? 0x20 : 0x00);
+
+    // Write FNUM LSB (A0..A8)
+    bytes_written += duplicate_write_opl3(p_state, p_music_data, 0, 0xA0 + ch, value_a, opts);
+    // Write FNUM MSB (B0..B8)
+    bytes_written += duplicate_write_opl3(p_state, p_music_data, 0, 0xB0 + ch, value_b, opts);
+
+    return bytes_written;
+}
+
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
  * @param p_music_data Pointer to VGMBuffer for music data.
@@ -418,9 +443,8 @@ int duplicate_write_opl3(
     VGMBuffer *p_music_data,
     VGMStatus *p_vstat,
     OPL3State *p_state,
-    uint8_t reg, uint8_t val,
-    double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
+    uint8_t reg, uint8_t val, const CommandOptions *opts
+    // double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1
 ) {
     int addtional_bytes = 0;
 
@@ -432,8 +456,8 @@ int duplicate_write_opl3(
         // Always OPL3 mode
         opl3_write_reg(p_state, p_music_data, 1, 0x05, val & 0x1);
     } else if (reg >= 0x40 && reg <= 0x55) {
-        uint8_t val0 = apply_tl_with_ratio(val, v_ratio0);
-        uint8_t val1 = apply_tl_with_ratio(val, v_ratio1);
+        uint8_t val0 = apply_tl_with_ratio(val, opts->v_ratio0);
+        uint8_t val1 = apply_tl_with_ratio(val, opts->v_ratio1);
         opl3_write_reg(p_state, p_music_data, 0, reg, val0);
         opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
     } else if (reg >= 0xA0 && reg <= 0xA8) {
@@ -474,15 +498,15 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
         // Extra 3 bytes
         addtional_bytes += 3;
-        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+        vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
 
         uint8_t detunedA, detunedB;
-        get_detuned_value(p_state, ch, p_state->reg[0xA0 + ch], val, detune, &detunedA, &detunedB);
+        get_detuned_value(p_state, ch, p_state->reg[0xA0 + ch], val, opts->detune, &detunedA, &detunedB);
         opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
             opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
         }
-        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+        vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -490,7 +514,7 @@ int duplicate_write_opl3(
         // Odd channels: port0->left, port1->right
         // This creates alternating stereo placement for a stereo effect
         uint8_t port0_panning, port1_panning;
-        if (ch_panning) {
+        if (opts->ch_panning) {
             // Apply stereo panning
             if (ch % 2 == 0) {
                 // Even channel: port0 gets right channel, port1 gets left channel

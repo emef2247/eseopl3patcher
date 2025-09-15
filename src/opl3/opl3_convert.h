@@ -184,8 +184,8 @@ void calc_opl3_fnum_block(double freq, double clock, int* block, int* fnum);
  */
 int duplicate_write_opl3(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
+    uint8_t reg, uint8_t val, const CommandOptions *opts
+   // double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1
 );
 
 /**
@@ -220,24 +220,5 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
  */
 OPL3VoiceParam* opl3_voice_db_find_by_voiceid(OPL3State *p_state, int voice_id);
 
-/**
- * Apply OPL3 voice parameters to a channel.
- * @return Number of bytes written.
- */
-int opl3_voiceparam_apply(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, double detune, int opl3_keyon_wait,
-    int ch_panning, double v_ratio0, double v_ratio1
-);
-
-/**
- * Main YM2413 to OPL3 register conversion entry point.
- * @return 0 on success.
- */
-int duplicate_write_opl3_ym2413(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    uint8_t reg, uint8_t val, double detune, int opl3_keyon_wait, int ch_panning,
-    double v_ratio0, double v_ratio1
-);
 
 #endif // OPL3_CONVERT_H

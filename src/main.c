@@ -110,6 +110,15 @@ int main(int argc, char *argv[]) {
     VGMChipClockFlags chip_flags = {0};
     parse_chip_conversion_flags(argc, argv, &chip_flags);
 
+    // Command options
+     CommandOptions cmd_opts = {
+        .detune = detune,
+        .opl3_keyon_wait = opl3_keyon_wait,
+        .ch_panning = ch_panning,
+        .v_ratio0 = v_ratio0,
+        .v_ratio1 = v_ratio1
+    };
+
     char default_out[256];
     if (!p_output_path) {
         make_default_output_name(p_input_vgm, default_out, sizeof(default_out));
@@ -243,17 +252,35 @@ int main(int argc, char *argv[]) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
+            printf("YM2413 write:  cmd=0x%02X reg=0x%02X val=0x%02X (read_done_byte=%ld/filesize=%ld)\n", cmd, reg, val, read_done_byte, filesize);
+
             if (chip_flags.convert_ym2413) {
                 // Directly emit converted OPL3 sequence (1:1 immediate conversion)
                 if (!state.opl3_mode_initialized) {
+                    printf("Initializing OPL3 mode for YM2413...\n");
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
                     state.opl3_mode_initialized = true;
                 }
-                opll_write_register(
-                    &vgmctx.buffer, &vgmctx, &state,
-                    reg, val, detune, opl3_keyon_wait, ch_panning,
-                    v_ratio0, v_ratio1
-                );
+                uint8_t next_cmd = p_vgm_data[read_done_byte];
+                read_done_byte++;
+                // Wait commands
+                bool is_wait_cmd = false;
+                uint16_t wait_samples = 0;
+                if (next_cmd >= 0x70 && next_cmd <= 0x7F) {
+                    wait_samples = (next_cmd & 0x0F) + 1;
+                } else if (next_cmd == 0x61 && read_done_byte + 2 < filesize) {
+                    uint8_t lo = p_vgm_data[read_done_byte ];
+                    uint8_t hi = p_vgm_data[read_done_byte + 1];
+                    read_done_byte += 2;
+                    wait_samples = lo | (hi << 8);
+                } else if (next_cmd == 0x62) {                       
+                    wait_samples = 735;
+                } else if (next_cmd == 0x63) {
+                    wait_samples = 882;
+                }
+                printf("---> YM2413 write: reg 0x%02x val:0x%02X with next_cmd=0x%02X next_wait_samples=%d (read_done_byte=%ld/filesize=%ld)\n", reg, val, next_cmd, wait_samples, read_done_byte, filesize );
+                opll_write_register(&vgmctx.buffer, &vgmctx, &state, reg, val, wait_samples, &cmd_opts);
+                is_wait_cmd = false;
             } else {
                 // Just write through if not converting
                 forward_write(&vgmctx.buffer, 0, reg, val);
@@ -270,7 +297,7 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -286,7 +313,7 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -302,7 +329,7 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, detune, opl3_keyon_wait, ch_panning, v_ratio0, v_ratio1);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }

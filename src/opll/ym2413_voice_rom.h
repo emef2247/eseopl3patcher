@@ -2,20 +2,20 @@
 #define YM2413_VOICE_ROM_H
 
 /**
- * YM2413 (OPLL) Built-in Instrument ROM
- * --------------------------------------
- * 出典・根拠:
+ * YM2413 (OPLL) Built-in Instrument ROM - Official Preset Table
+ * -------------------------------------------------------------
+ * Source:
  *   - Yamaha YM2413 Application Manual (1986), "INSTRUMENT DATA" Table (p. 19, Table 3)
- *   - 実チップダンプ・各種OPLLエミュレータ (Nuke.YKT/y8950, vgmtrans, mame, openMSX, etc.)
- *   - 業界標準的な音色順・バイト配列
- *
- * 配列仕様:
- *   - 各音色: 8バイト [modulator(4), carrier(4)] (mod0,mod1,mod2,mod3,car0,car1,car2,car3)
- *   - 配列index: [0]=Violin (Preset 1), [1]=Guitar (2), ..., [14]=Synth Bass (15)
- *   - YM2413のINSTレジスタ値1～15は「配列index+1」に対応
- *   - 各バイトのビット割り当て:
- *      [0]=AM/VIB/EG/KSR/ML, [1]=KSL/TL, [2]=AR/DR, [3]=SL/RR
- *      (AM:bit7, VIB:6, EG:5, KSR:4, ML:3-0 / KSL:7-6, TL:5-0 / AR:7-4, DR:3-0 / SL:7-4, RR:3-0)
+ *     https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *   - Used by many emulators (e.g., openMSX, MAME) as the canonical reference.
+ * Notes:
+ *   - Each melodic preset: 8 bytes [modulator(4), carrier(4)]
+ *   - Array index: [0]=Violin (Preset 1), [1]=Guitar (2), ..., [14]=Electric Guitar (15)
+ *   - INST register value 1..15 corresponds to array index+1.
+ *   - Byte format:
+ *       [0]=AM/VIB/EG/KSR/ML, [1]=KSL/TL, [2]=AR/DR, [3]=SL/RR
+ *       (AM:bit7, VIB:6, EG:5, KSR:4, ML:3-0 / KSL:7-6, TL:5-0 / AR:7-4, DR:3-0 / SL:7-4, RR:3-0)
+ *   - User patch (INST=0) is not included here; should be set at runtime.
  */
 
 static const unsigned char YM2413_VOICES[15][8] = {
@@ -68,7 +68,50 @@ static const unsigned char YM2413_VOICES[15][8] = {
     INST=13 Synth Bass      [12]
     INST=14 Wood Bass       [13]
     INST=15 Electric Guitar [14]
-    INST=0  User patch (not included here, to be set at runtime)
+    INST=0  User patch (not included here)
+*/
+
+/**
+ * YM2413 (OPLL) Built-in Rhythm Instrument ROM - Official Rhythm Table
+ * --------------------------------------------------------------------
+ * Source:
+ *   - Yamaha YM2413 Application Manual (1986), "RHYTHM INSTRUMENT DATA" Table (p. 20, Table 4)
+ *     https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *   - Used for rhythm mode channels (BD, SD, TOM, CYM, HH).
+ * Notes:
+ *   - Each entry: 8 bytes (for BD: 2OP, for SD/TOM/CYM/HH: 1OP, use first 4 bytes)
+ *   - Array index: [0]=Bass Drum (BD), [1]=Snare Drum (SD), [2]=Tom-Tom (TOM), [3]=Cymbal (CYM), [4]=Hi-Hat (HH)
+ *   - When using voice id 15-19 for rhythm, map as:
+ *       15=BD, 16=SD, 17=TOM, 18=CYM, 19=HH
+ *   - Channel/operator relation:
+ *       BD  = ch6 (mod+car, 2OP)
+ *       SD  = ch7 (car)
+ *       TOM = ch8 (mod)
+ *       CYM = ch8 (car)
+ *       HH  = ch7 (mod)
+ */
+
+static const unsigned char YM2413_RHYTHM_VOICES[5][8] = {
+    // Bass Drum (BD, 2OP: modulator[4], carrier[4])
+    {0x21,0x01,0x0C,0x07, 0xA1,0x01,0x0C,0x07},
+    // Snare Drum (SD, 1OP: modulator[4], rest zero)
+    {0x01,0x01,0x08,0x05, 0,0,0,0},
+    // Tom-Tom (TOM, 1OP: modulator[4], rest zero)
+    {0x01,0x01,0x0A,0x04, 0,0,0,0},
+    // Cymbal (CYM, 1OP: modulator[4], rest zero)
+    {0x11,0x01,0x08,0x05, 0,0,0,0},
+    // Hi-Hat (HH, 1OP: modulator[4], rest zero)
+    {0x31,0x01,0x08,0x04, 0,0,0,0}
+};
+
+/*
+  Rhythm Instrument Map:
+    [0] Bass Drum (BD, 2OP)
+    [1] Snare Drum (SD, 1OP)
+    [2] Tom-Tom (TOM, 1OP)
+    [3] Cymbal (CYM, 1OP)
+    [4] Hi-Hat (HH, 1OP)
+    (For OPLL voice_id: 15=BD, 16=SD, 17=TOM, 18=CYM, 19=HH)
 */
 
 #endif // YM2413_VOICE_ROM_H

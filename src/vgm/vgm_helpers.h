@@ -43,6 +43,17 @@ typedef enum {
     FMCHIP_MAX
 } FMChipType;
 
+/**
+ * Command options for OPL3 register writes, encapsulates command control parameters.
+ */
+typedef struct {
+    double detune;            // Detune amount (cents or percent)
+    int opl3_keyon_wait;      // KeyOn/Off wait time (in samples)
+    int ch_panning;           // Channel panning mode
+    double v_ratio0;          // Volume ratio for port 0
+    double v_ratio1;          // Volume ratio for port 1
+} CommandOptions;
+
 
 /**
  * Dynamic buffer for VGM data stream.
@@ -78,9 +89,6 @@ typedef struct {
 /**
  * VGM header information.
  */
-/**
- * VGM header information.
- */
 typedef struct {
     uint8_t raw[0x100];    /**< Raw VGM header data (0x100 bytes) */
     uint32_t version;      /**< Parsed VGM version (0x08) */
@@ -105,17 +113,6 @@ typedef struct {
     // Optionally: parsed title/artist/etc. fields can be added
 } VGMGD3Tag;
 
-/**
- * VGMContext
- * Super-structure to manage all VGM stream state and metadata.
- * Fields:
- *   - buffer: Dynamic data buffer for the VGM stream.
- *   - timestamp: Sample clock/timestamp management.
- *   - status: Status information (e.g., total samples written).
- *   - header: VGM header information (raw and parsed).
- *   - gd3: GD3 tag data (raw and/or parsed).
- *   - source_fmchip: The source FM chip type for conversion.
- */
 /**
  * VGMContext
  * Super-structure to manage all VGM stream state and metadata.

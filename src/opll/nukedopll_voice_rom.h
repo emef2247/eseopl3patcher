@@ -2,13 +2,20 @@
 #define NUKEDOPLL_VOICE_ROM_H
 
 /**
- * Nuked-OPLL Built-in Instrument ROM
- * --------------------------------------
- * 出典・根拠:
- *   - Nuked-OPLL ソースコード (https://github.com/Nuked-OPLL/Nuked-OPLL)
- *  - 実チップダンプ・各種OPLLエミュレータ (Nuke.YKT/y8950, vgmtrans, mame, openMSX, etc.)
+ * Nuked-OPLL Built-in Instrument ROM - Real Chip Dump Table
+ * ---------------------------------------------------------
+ * Source:
+ *   - Nuked-OPLL source code (ym2413_std.c):
+ *       https://github.com/nukeykt/Nuked-OPLL/blob/master/roms/ym2413_std.c
+ *   - Based on actual ROM dump from YM2413 chip
+ *   - Also referenced by other emulators (e.g., MAME, openMSX, VGMTrans, y8950)
+ * Notes:
+ *   - Each preset: 8 bytes [modulator(4), carrier(4)]
+ *   - Array index: [0]=Violin (Preset 1), [1]=Guitar (2), ..., [14]=SynthBell (15), [15]=User patch (default/empty)
+ *   - Rhythm instrument voices are included as a separate array.
  */
-const uint8_t NUKEDOPLL_VOICES[16][8] = {
+
+static const uint8_t NUKEDOPLL_VOICES[16][8] = {
     {0x71,0x61,0x1E,0x17,0xD0,0x76,0x00,0x17}, // Violin
     {0x13,0x41,0x16,0x0E,0xD8,0x76,0x17,0x17}, // Guitar
     {0x13,0x01,0x19,0x06,0xF8,0xF4,0x23,0x12}, // Piano
@@ -24,7 +31,22 @@ const uint8_t NUKEDOPLL_VOICES[16][8] = {
     {0x61,0x61,0x1E,0x07,0xD0,0x70,0x00,0x17}, // SynthLead
     {0x21,0x61,0x1E,0x07,0xC8,0x76,0x22,0x13}, // SynthPad
     {0x13,0x01,0x1A,0x0F,0xE8,0xF6,0x13,0x02}, // SynthBell
-    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}  // User (空/デフォルト)
+    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}  // User patch (empty/default)
 };
 
-#endif // NUKEDOPLL_VOICE_ROM_H 
+/**
+ * Nuked-OPLL Rhythm Instrument ROM
+ * -------------------------------
+ * Array index: [0]=Bass Drum, [1]=Snare Drum, [2]=Tom-Tom, [3]=Cymbal, [4]=Hi-Hat
+ * Each entry: 8 bytes (use [0..3] for 1OP, [0..7] for 2OP)
+ * Only used in rhythm mode.
+ */
+static const unsigned char NUKEDOPLL_RYTHM_VOICES[5][8] = {
+    {0x21,0x01,0x0C,0x07, 0xA1,0x01,0x0C,0x07}, // Bass Drum (2OP)
+    {0x01,0x01,0x08,0x05, 0,0,0,0},             // Snare Drum (1OP)
+    {0x01,0x01,0x0A,0x04, 0,0,0,0},             // Tom-Tom (1OP)
+    {0x11,0x01,0x08,0x05, 0,0,0,0},             // Cymbal (1OP)
+    {0x31,0x01,0x08,0x04, 0,0,0,0}              // Hi-Hat (1OP)
+};
+
+#endif // NUKEDOPLL_VOICE_ROM_H
