@@ -264,7 +264,6 @@ int main(int argc, char *argv[]) {
                 uint8_t next_cmd = p_vgm_data[read_done_byte];
                 read_done_byte++;
                 // Wait commands
-                bool is_wait_cmd = false;
                 uint16_t wait_samples = 0;
                 if (next_cmd >= 0x70 && next_cmd <= 0x7F) {
                     wait_samples = (next_cmd & 0x0F) + 1;
@@ -280,7 +279,6 @@ int main(int argc, char *argv[]) {
                 }
                 printf("---> YM2413 write: reg 0x%02x val:0x%02X with next_cmd=0x%02X next_wait_samples=%d (read_done_byte=%ld/filesize=%ld)\n", reg, val, next_cmd, wait_samples, read_done_byte, filesize );
                 opll_write_register(&vgmctx.buffer, &vgmctx, &state, reg, val, wait_samples, &cmd_opts);
-                is_wait_cmd = false;
             } else {
                 // Just write through if not converting
                 forward_write(&vgmctx.buffer, 0, reg, val);

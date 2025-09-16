@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../vgm/vgm_helpers.h"
+#include "../vgm/vgm_header.h"
 #include "opl3_voice.h"
 #include "opl3_event.h"
 #include "../opll/opll_to_opl3_wrapper.h"
@@ -176,6 +177,27 @@ void opl3_find_fnum_block_with_ml_cents(double freq, double clock,
  * @param[out] fnum Pointer to int for resulting FNUM value
  */
 void calc_opl3_fnum_block(double freq, double clock, int* block, int* fnum);
+
+/**
+ * Write frequency and KeyOn/Off to OPL3 registers for a given channel.
+ * @param p_music_data Pointer to VGMBuffer for music data.
+ * @param p_vstat Pointer to VGMStatus for tracking status.
+ * @param p_state Pointer to OPL3State for OPL3 state.
+ * @param ch OPL3 channel (0-17).
+ * @param block Block value (0-7).
+ * @param fnum FNUM value (0-1023).
+ * @param keyon KeyOn flag (1=KeyOn, 0=KeyOff).
+ * @param opts Pointer to CommandOptions for additional options.
+ * @return Bytes written to port 1.
+ */
+int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
+    VGMStatus *p_vstat,
+    OPL3State *p_state,
+    uint8_t    ch,
+    uint8_t    block,
+    uint16_t   fnum,
+    int       keyon,
+    const CommandOptions *opts);
 
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).

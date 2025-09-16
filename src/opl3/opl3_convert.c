@@ -404,6 +404,8 @@ uint8_t opl3_make_keyoff(uint8_t val) {
     return (val & ~(1 << 6)); //  Clear bit 6 (KeyOn)
 }
 
+
+
 int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
     VGMStatus *p_vstat,
     OPL3State *p_state,
@@ -418,10 +420,9 @@ int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
     uint8_t value_b = ((fnum >> 8) & 0x03) | (block << 2) | (keyon ? 0x20 : 0x00);
 
     // Write FNUM LSB (A0..A8)
-    bytes_written += duplicate_write_opl3(p_state, p_music_data, 0, 0xA0 + ch, value_a, opts);
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts);
     // Write FNUM MSB (B0..B8)
-    bytes_written += duplicate_write_opl3(p_state, p_music_data, 0, 0xB0 + ch, value_b, opts);
-
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts);
     return bytes_written;
 }
 
