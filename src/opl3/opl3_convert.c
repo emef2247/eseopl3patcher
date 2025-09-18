@@ -576,7 +576,7 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS
 
     // Port 1 general init
-    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
+    // opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
 
     // Channel-level control
     for (uint8_t i = 0; i < 9; ++i) {
