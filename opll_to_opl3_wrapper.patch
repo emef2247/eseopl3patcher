@@ -1,0 +1,34 @@
+--- a/opll_to_opl3_wrapper.c
++++ b/opll_to_opl3_wrapper.c
+@@
+-/* ==== ★修正: CALIB v2 レートマップ ... 中略 ... */
++/* ==== ★修正: CALIB v2 レートマップ
++ * (0..3 過剰短縮を緩和 2,3,4,5 -> 1,2,3,4) */
+@@
+-#define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 13
++#define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 11
+@@
++/* ★追加: gap 判定で > を使うか (0=>=, 1=>) */
++#ifndef OPLL_SHAPE_FIX_USE_STRICT_GT
++#define OPLL_SHAPE_FIX_USE_STRICT_GT 0
++#endif
+@@ static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr){
+-    if (D > A && (uint8_t)(D - A) >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD) {
++    if (D > A) {
++        uint8_t gap = (uint8_t)(D - A);
++#if OPLL_SHAPE_FIX_USE_STRICT_GT
++        int cond = (gap > OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
++#else
++        int cond = (gap >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
++#endif
++        if (cond) {
+             ...
++        } else {
++            printf("[SHAPEFIX] inst=%d op=%d no-fix AR=%u DR=%u gap=%u th=%d\n",
++                   inst, op_index, A, D, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
++        }
++    } else {
++        printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n",
++               inst, op_index, A, D);
+     }
+ }
