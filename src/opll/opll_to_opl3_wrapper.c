@@ -1,22 +1,5 @@
-/**
- * opll_to_opl3_wrapper.c (Refactored)
- *
- * Changes:
- *  - Added program argument storage (opll_set_program_args).
- *  - Added void opll_init(OPL3State*) that:
- *      * Runs converter_init() internally (parses --override).
- *      * Registers all YM2413 patches to the OPL3 voice DB.
- *      * Clears OPLL register & pending state.
- *  - Separated OPLL-specific initialization from generic opl3_init().
- *  - Maintained existing logging and rate/shape logic.
- *
- * NOTE:
- *  - Add prototypes to opll_to_opl3_wrapper.h:
- *      void opll_set_program_args(int argc, char **argv);
- *      void opll_init(OPL3State *state);
- */
-
 #include "../vgm/vgm_helpers.h"
+#include "../opl3/opl3_voice.h"
 #include "../opl3/opl3_convert.h"
 #include "ym2413_voice_rom.h"
 #include "nukedopll_voice_rom.h"
@@ -26,19 +9,37 @@
 #include <stdio.h>
 #include "../override_apply.h"
 #include "../override_loader.h"
-#include "../compat_bool.h"   // portability bool
+#include "../compat_bool.h"
+#include "../compat_string.h"
 
-// ---- Program argument retention for converter_init() ----
+/* ---------- Global OPLL state (move near top) ---------- */
+#define YM2413_NUM_CH 9
+#define YM2413_REGS_SIZE 0x40
+
+uint8_t       g_ym2413_regs[YM2413_REGS_SIZE] = {0};
+OpllPendingCh g_pend[YM2413_NUM_CH] = {0};
+OpllStampCh   g_stamp[YM2413_NUM_CH] = {0};
+static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
+
+/* ---------- Forward static prototypes (avoid impl    if (g_saved_argv) converter_init(g_saved_argc, g_saved_argv);
+icit) ---------- */
+static void ym2413_patch_to_opl3_with_fb(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp);
+static inline void stamp_clear(OpllStampCh *s);
+static inline void opll_pending_clear(OpllPendingCh *p);
+
+/* other internal helpers forward if needed */
+static inline int ch_from_addr(uint8_t addr);
+static inline int reg_kind(uint8_t addr);
+
+/* ---------- Program arg retention ---------- */
 static int    g_saved_argc = 0;
 static char **g_saved_argv = NULL;
 
-/** Store program arguments for later converter_init() call. */
 void opll_set_program_args(int argc, char **argv) {
     g_saved_argc = argc;
     g_saved_argv = argv;
 }
 
-/** Internal converter init wrapper (kept original behavior). */
 static void converter_init(int argc, char **argv) {
     override_init();
     const char *override_path = NULL;
@@ -49,21 +50,14 @@ static void converter_init(int argc, char **argv) {
     }
     if (override_path) {
         if (override_loader_load_json(override_path) == 0) {
-            override_dump_table(); // Optional debug
+            override_dump_table();
         }
     }
 }
 
-/** Public OPLL initialization separated from generic OPL3 init. */
 void opll_init(OPL3State *p_state) {
     if (!p_state) return;
 
-    // Run override / converter setup only once.
-    if (g_saved_argv) {
-        converter_init(g_saved_argc, g_saved_argv);
-    }
-
-    // Register YM2413 patches into voice DB (instrument library)
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
@@ -74,7 +68,6 @@ void opll_init(OPL3State *p_state) {
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
         opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
     }
-
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
     for (int i = 0; i < YM2413_NUM_CH; ++i) {
         opll_pending_clear(&g_pend[i]);
@@ -83,29 +76,13 @@ void opll_init(OPL3State *p_state) {
     }
 }
 
-/* ------------------------------------------------
- *  Constants / Macros (整理済み)
- * ------------------------------------------------ */
-
-
-#define OPLL_RHYTHM_BD   (1 << 4)
-#define OPLL_RHYTHM_SD   (1 << 3)
-#define OPLL_RHYTHM_TOM  (1 << 2)
-#define OPLL_RHYTHM_CYM  (1 << 1)
-#define OPLL_RHYTHM_HH   (1 << 0)
-#define OPLL_RHYTHM_MASK (OPLL_RHYTHM_BD | OPLL_RHYTHM_SD | OPLL_RHYTHM_TOM | OPLL_RHYTHM_CYM | OPLL_RHYTHM_HH)
-
-/* Note-On 発音直前に $3n / $1n を待つ短い猶予サンプル数 */
+/* --- Macros (retain) --- */
 #ifndef KEYON_WAIT_GRACE_SAMPLES
 #define KEYON_WAIT_GRACE_SAMPLES 16
 #endif
-
-/* 音色( $3n ) が不明のまま Note-On 状態で待てる最大サンプル */
 #ifndef KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES
 #define KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES 512
 #endif
-
-/* 可変機能フラグ */
 #ifndef OPLL_ENABLE_RATE_MAP
 #define OPLL_ENABLE_RATE_MAP 1
 #endif
@@ -118,86 +95,51 @@ void opll_init(OPL3State *p_state) {
 #ifndef OPLL_ENABLE_ARDR_MIN_CLAMP
 #define OPLL_ENABLE_ARDR_MIN_CLAMP 0
 #endif
-
-/* レートマップモード
- * 0 = 生値
- * 1 = SIMPLE (旧簡易)
- * 2 = CALIB v2 (低AR緩和)
- */
 #ifndef OPLL_RATE_MAP_MODE
 #define OPLL_RATE_MAP_MODE 1
 #endif
-
-/* Attack Rate 強制最低値 (AR<この値なら引き上げ) */
 #ifndef OPLL_FORCE_MIN_ATTACK_RATE
 #define OPLL_FORCE_MIN_ATTACK_RATE 2
 #endif
 #ifndef OPLL_DEBUG_ENFORCE_MIN_AR
 #define OPLL_DEBUG_ENFORCE_MIN_AR 1
 #endif
-
-/* Shape Fix (AR << DR の極端差を抑制) */
 #ifndef OPLL_ENABLE_ENVELOPE_SHAPE_FIX
 #define OPLL_ENABLE_ENVELOPE_SHAPE_FIX 0
 #endif
-/* 差 (DR-AR) 閾値 (>= で発火: STRICT_GT=1 なら >) */
 #ifndef OPLL_SHAPE_FIX_DR_GAP_THRESHOLD
 #define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 11
 #endif
-/* 補正後 DR の上限 (過大な速い減衰を抑制) */
 #ifndef OPLL_SHAPE_FIX_DR_MAX_AFTER
 #define OPLL_SHAPE_FIX_DR_MAX_AFTER 12
 #endif
 #ifndef OPLL_DEBUG_SHAPE_FIX
 #define OPLL_DEBUG_SHAPE_FIX 1
 #endif
-/* 0: gap>=th, 1: gap>th */
 #ifndef OPLL_SHAPE_FIX_USE_STRICT_GT
 #define OPLL_SHAPE_FIX_USE_STRICT_GT 0
 #endif
-
-/* デバッグ */
 #ifndef OPLL_DEBUG_RATE_PICK
 #define OPLL_DEBUG_RATE_PICK 1
 #endif
 
-/* 旧簡易 RateMap */
 static const uint8_t kOPLLRateToOPL3_SIMPLE[16] = {
     0,1,2,3,5,6,7,8,9,10,11,12,13,14,15,15
 };
-
-/* CALIB v2: 低AR過剰短縮緩和 (0..3 を 1,2,3,4 に) */
 static const uint8_t kOPLLRateToOPL3_CALIB[16] = {
-    1,2,3,4,  /* 0..3 */
-    6,7,8,9,  /* 4..7 */
-    10,11,12,13,
-    14,15,15,15
+    1,2,3,4,6,7,8,9,10,11,12,13,14,15,15,15
 };
-
-/* Identity */
 static const uint8_t kOPLLRateToOPL3_ID[16] = {
     0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
 };
-
-/* Mod TL 補正テーブル (inst=0..15) */
 static const int8_t kModTLAddTable[16] = {
-/*U ,Vi ,Gt ,Pi ,Fl ,Cl ,Ob ,Tr ,Or ,Hr ,SyS,Har,Vib,SyB,AcB,EGt */
-  0,  0,  4,  2,  0,  2,  2,  0,  0,  2,  2,  3,  0,  3,  3,  4
+    0,0,4,2,0,2,2,0,0,2,2,3,0,3,3,4
 };
 
-#define YM2413_NUM_CH 9
-#define YM2413_REGS_SIZE 0x40
+/* ---- Utilities ---- */
+static inline void stamp_clear(OpllStampCh *s){ memset(s,0,sizeof(*s)); }
+static inline void opll_pending_clear(OpllPendingCh *p){ memset(p,0,sizeof(*p)); }
 
-#define YM2413_NUM_CH 9
-#define YM2413_REGS_SIZE 0x40
-uint8_t g_ym2413_regs[YM2413_REGS_SIZE] = {0}; // Now non-static for possible reuse
-OpllPendingCh g_pend[YM2413_NUM_CH] = {0};
-OpllStampCh   g_stamp[YM2413_NUM_CH] = {0};
-static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
-
-/* ------------------------------------------------
- * Utility
- * ------------------------------------------------ */
 static inline int ch_from_addr(uint8_t addr) {
     if (addr >= 0x10 && addr <= 0x18) return addr - 0x10;
     if (addr >= 0x20 && addr <= 0x28) return addr - 0x20;
@@ -210,12 +152,15 @@ static inline int reg_kind(uint8_t addr) {
     if (addr >= 0x30 && addr <= 0x38) return 3;
     return 0;
 }
-static inline void stamp_clear(OpllStampCh* s) { memset(s,0,sizeof(*s)); }
-static inline void opll_pending_clear(OpllPendingCh* p){ memset(p,0,sizeof(*p)); }
 
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
     printf("[DEBUG] calc_opllfrequency: clock=%.0f block=%u fnum=%u\n", clock, block, fnum);
     return (clock / 72.0) * ldexp((double)fnum / 512.0, block - 1);
+}
+
+/* YM2413 reg2n の KeyOn ビット(0x10) を落として KeyOff 値を得る補助 */
+static inline uint8_t opll_make_keyoff(uint8_t reg2n) {
+    return (uint8_t)(reg2n & (uint8_t)~0x10);
 }
 
 /* ---- Forward prototypes (avoid implicit declarations) ---- */
@@ -365,47 +310,80 @@ static inline uint8_t enforce_min_attack(uint8_t ar,const char* stage,int inst,i
 /* ------------------------------------------------
  * Envelope Shape Fix
  * ------------------------------------------------ */
-static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr){
-#if OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-    if(!ar || !dr) return;
-    uint8_t A=*ar, D=*dr;
-    if (D > A) {
-        uint8_t gap = (uint8_t)(D - A);
-#if OPLL_SHAPE_FIX_USE_STRICT_GT
-        int cond = (gap > OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
-#else
-        int cond = (gap >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
-#endif
-        if (cond) {
-            uint8_t newD = D;
-            if (newD > OPLL_SHAPE_FIX_DR_MAX_AFTER) newD = OPLL_SHAPE_FIX_DR_MAX_AFTER;
-            if (newD < (uint8_t)(A+1)) newD = (uint8_t)(A+1);
-            if (newD != D) {
-#if OPLL_DEBUG_SHAPE_FIX
-                printf("[SHAPEFIX] inst=%d op=%d AR=%u DR=%u gap=%u -> DR'=%u (th=%d)\n",
-                       inst, op_index, A, D, gap, newD, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
-#endif
-                *dr = newD;
-            } else {
-#if OPLL_DEBUG_SHAPE_FIX
-                printf("[SHAPEFIX] inst=%d op=%d gap=%u no-change (within limit)\n",
-                       inst, op_index, gap);
-#endif
-            }
-        } else {
-#if OPLL_DEBUG_SHAPE_FIX
-            printf("[SHAPEFIX] inst=%d op=%d no-fix AR=%u DR=%u gap=%u th=%d\n",
-                   inst, op_index, A, D, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
-#endif
-        }
-    } else {
+/* ------------------------------------------------
+ * Envelope Shape Fix
+ *  - AR(attack) と DR(decay) のギャップが大きすぎる場合に
+ *    DR を抑えて極端な落差を緩和する。
+ * ------------------------------------------------ */
+#if !OPLL_ENABLE_ENVELOPE_SHAPE_FIX
+
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr)
+{
+    (void)inst; (void)op_index; (void)ar; (void)dr;
+    /* 機能無効時は何もしない */
+}
+
+#else  /* OPLL_ENABLE_ENVELOPE_SHAPE_FIX == 1 */
+
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr)
+{
+    if (!ar || !dr) return;
+
+    uint8_t A = (uint8_t)(*ar & 0x0F);
+    uint8_t D = (uint8_t)(*dr & 0x0F);
+
+    /* D <= A ならそもそも逆転/同値なので調整不要 */
+    if (D <= A) {
 #if OPLL_DEBUG_SHAPE_FIX
         printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n",
                inst, op_index, A, D);
 #endif
+        return;
     }
+
+    uint8_t gap = (uint8_t)(D - A);
+
+#if OPLL_SHAPE_FIX_USE_STRICT_GT
+    int cond = (gap > OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
+#else
+    int cond = (gap >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
 #endif
+
+    if (!cond) {
+#if OPLL_DEBUG_SHAPE_FIX
+        printf("[SHAPEFIX] inst=%d op=%d no-fix gap=%u th=%d AR=%u DR=%u\n",
+               inst, op_index, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, A, D);
+#endif
+        return;
+    }
+
+    uint8_t newD = D;
+
+    /* 上限クランプ */
+    if (newD > OPLL_SHAPE_FIX_DR_MAX_AFTER)
+        newD = (uint8_t)OPLL_SHAPE_FIX_DR_MAX_AFTER;
+
+    /* AR+1 未満には下げない（DR <= AR を避ける） */
+    if (newD < (uint8_t)(A + 1))
+        newD = (uint8_t)(A + 1);
+
+    if (newD != D) {
+#if OPLL_DEBUG_SHAPE_FIX
+        printf("[SHAPEFIX] inst=%d op=%d AR=%u DR=%u gap=%u -> DR'=%u (th=%d, max=%d)\n",
+               inst, op_index, A, D, gap, newD,
+               OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
+#endif
+        *dr = newD;
+    } else {
+#if OPLL_DEBUG_SHAPE_FIX
+        printf("[SHAPEFIX] inst=%d op=%d gap=%u cond=1 but newD==D (AR=%u DR=%u) (th=%d max=%d)\n",
+               inst, op_index, gap, A, D,
+               OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
+#endif
+    }
 }
+
+#endif /* OPLL_ENABLE_ENVELOPE_SHAPE_FIX */
 
 /* ------------------------------------------------
  * YM2413 patch -> OPL3VoiceParam

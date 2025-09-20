@@ -1,21 +1,27 @@
-#ifndef OPL3_DEBUG_UTIL_H
-#define OPL3_DEBUG_UTIL_H
+#ifndef ESEOPL3PATCHER_OPL3_CONVERT_H
+#define ESEOPL3PATCHER_OPL3_CONVERT_H
 
-#include "opl3_convert.h"
-#include "opl3_voice.h"
+#include "../vgm/vgm_helpers.h"   /* FMChipType / CommandOptions */
+#include "opl3_state.h"
+#include "../compat_bool.h"
 
-// Print a voice parameter structure (all operators and channel fields)
-void print_opl3_voice_param(const OPL3VoiceParam *vp);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-static inline int opl3_voice_db_count(const OPL3VoiceDB *p_db) {
-    return p_db->count;
+void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip);
+
+int  duplicate_write_opl3(VGMBuffer *p_music_data, VGMStatus *p_vstat,
+                          OPL3State *p_state, uint8_t reg, uint8_t val,
+                          const CommandOptions *opts);
+
+void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data,
+                    int port, uint8_t reg, uint8_t value);
+
+double calc_fmchip_frequency(FMChipType chip, double clock,
+                             unsigned char block, unsigned short fnum);
+
+#ifdef __cplusplus
 }
-static inline const OPL3VoiceParam* opl3_voice_db_last(const OPL3VoiceDB *p_db) {
-    return (p_db->count > 0) ? &p_db->p_voices[p_db->count-1] : NULL;
-}
-int opl3_voice_param_cmp(const OPL3VoiceParam *a, const OPL3VoiceParam *b);
-
-void debug_dump_opl3_voiceparam(int ch, const OPL3VoiceParam* vp, uint8_t fnum_lsb, uint8_t fnum_msb, uint8_t block, uint8_t keyon);
-
-
-#endif // OPL3_DEBUG_UTIL_H
+#endif
+#endif /* ESEOPL3PATCHER_OPL3_CONVERT_H */

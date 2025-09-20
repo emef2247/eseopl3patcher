@@ -9,17 +9,17 @@
 extern "C" {
 #endif
 
-/**
- * Enumeration for FM sound chip types supported in VGM.
- */
+/* ---- FMChipType / CommandOptions guard to avoid redefinition ---- */
+#ifndef ESEOPL3PATCHER_FMCHIPTYPE_DEFINED
+#define ESEOPL3PATCHER_FMCHIPTYPE_DEFINED
 typedef enum {
-    FMCHIP_NONE = 0,    /**< Undefined / not set */
+    FMCHIP_NONE = 0,
     FMCHIP_YM2413,
     FMCHIP_YM2612,
     FMCHIP_YM2151,
     FMCHIP_YM2203,
     FMCHIP_YM2608,
-    FMCHIP_YM2610,      /**< YM2610 and YM2610B (treat as same) */
+    FMCHIP_YM2610,
     FMCHIP_YM3812,
     FMCHIP_YM3526,
     FMCHIP_Y8950,
@@ -32,7 +32,7 @@ typedef enum {
     FMCHIP_2xYM2151,
     FMCHIP_2xYM2203,
     FMCHIP_2xYM2608,
-    FMCHIP_2xYM2610,      /**< YM2610 and YM2610B (treat as same) */
+    FMCHIP_2xYM2610,
     FMCHIP_2xYM3812,
     FMCHIP_2xYM3526,
     FMCHIP_2xY8950,
@@ -43,17 +43,14 @@ typedef enum {
     FMCHIP_MAX
 } FMChipType;
 
-/**
- * Command options for OPL3 register writes, encapsulates command control parameters.
- */
 typedef struct {
-    double detune;            // Detune amount (cents or percent)
-    int opl3_keyon_wait;      // KeyOn/Off wait time (in samples)
-    int ch_panning;           // Channel panning mode
-    double v_ratio0;          // Volume ratio for port 0
-    double v_ratio1;          // Volume ratio for port 1
+    double detune;
+    int    opl3_keyon_wait;
+    int    ch_panning;
+    double v_ratio0;
+    double v_ratio1;
 } CommandOptions;
-
+#endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
 
 /**
  * Dynamic buffer for VGM data stream.

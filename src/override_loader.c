@@ -63,8 +63,10 @@ static int parse_variant_key(char **pp, char *out_variant, size_t out_sz) {
     p = skip_ws(p);
     if (*p != ':') return 0;
     p++;
-    strncpy(out_variant, tmp, out_sz-1);
-    out_variant[out_sz-1] = '\0';
+    size_t copy_len = strlen(tmp);
+    if (copy_len >= out_sz) copy_len = out_sz - 1;
+    memcpy(out_variant, tmp, copy_len);
+    out_variant[copy_len] = '\0';
     *pp = p;
     return 1;
 }

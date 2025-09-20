@@ -1,3 +1,4 @@
+#include "compat_string.h"
 #include "ratemap_integrated.h"
 #include <stdio.h>
 

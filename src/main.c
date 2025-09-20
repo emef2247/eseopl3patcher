@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "compat_string.h"
 #include "compat_bool.h"
 #include "vgm/vgm_helpers.h"
 #include "vgm/vgm_header.h"

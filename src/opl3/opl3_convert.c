@@ -1,11 +1,12 @@
 #include "opl3_convert.h"
+#include "opl3_voice.h"
 #include "../opll/opll_to_opl3_wrapper.h"
 #include "../vgm/vgm_helpers.h"
+#include "../vgm/vgm_header.h"       /* OPL3_CLOCK */
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
-
 
 // --- Global FM conversion environment ---
 static double g_fm_source_clock = 0;
@@ -75,7 +76,7 @@ void opl3_calc_fnum_block_from_freq(double freq, double clock, unsigned char *ou
 
     for (block = 0; block < 8; ++block) {
         fnum = (unsigned short)(freq * 1024.0 / (base * (1 << block)) + 0.5);
-        if (fnum < 0 || fnum > 1023) continue;
+        if (fnum > 1023) continue;
 
         // Check if this is a valid block/FNUM combination
         double calc_freq = base * (1 << block) * ((double)fnum / 1024.0);
@@ -133,23 +134,21 @@ void opl3_calc_fnum_block_from_freq_ldexp(double freq, double clock,unsigned cha
 
 
 /** Find the best OPL3 FNUM and block for a given frequency. */
-void opl3_find_fnum_block_with_pref_block(double freq, double clock, unsigned char *best_block, unsigned short *best_fnum, double *best_err, int pref_block /* OPLL block を渡す */) {
+void opl3_find_fnum_block_with_pref_block(double freq, double clock,
+                                          unsigned char *best_block,
+                                          unsigned short *best_fnum,
+                                          double *best_err, int pref_block) {
     double min_cost = DBL_MAX;
     unsigned char b_best = 0;
     unsigned short f_best = 0;
-
     for (unsigned char b = 0; b < 8; ++b) {
         double base = (clock / 288.0) * (1 << b);
         int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
         if (cand_fnum < 0 || cand_fnum > 1023) continue;
-
         double calc_freq = base * ((double)cand_fnum / 1024.0);
-        double freq_err = fabs(calc_freq - freq);
-
-        // Block のズレにペナルティをつける
-        double block_penalty = fabs((int)b - pref_block) * 0.5; // 重み調整
+        double freq_err  = fabs(calc_freq - freq);
+        double block_penalty = fabs((double)b - (double)pref_block) * 0.5;
         double cost = freq_err + block_penalty;
-
         if (cost < min_cost) {
             min_cost = cost;
             b_best = b;
@@ -161,32 +160,25 @@ void opl3_find_fnum_block_with_pref_block(double freq, double clock, unsigned ch
     *best_err   = min_cost;
 }
 
-
-void opl3_find_fnum_block_with_weight(double freq, double clock, unsigned char *best_block, unsigned short *best_fnum, double *best_err, int pref_block, double mult_weight) // ← MULTIを渡す
-{
+void opl3_find_fnum_block_with_weight(double freq, double clock,
+                                      unsigned char *best_block, unsigned short *best_fnum,
+                                      double *best_err, int pref_block, double mult_weight) {
     double min_cost = DBL_MAX;
     double best_freq_err = DBL_MAX;
     unsigned char b_best = 0;
     unsigned short f_best = 0;
-
     for (unsigned char b = 0; b < 8; ++b) {
         double base = (clock / 288.0) * (1 << b);
         int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
         if (cand_fnum < 0 || cand_fnum > 1023) continue;
-
         double calc_freq = base * ((double)cand_fnum / 1024.0);
         double freq_err = fabs(calc_freq - freq);
-
         double block_penalty = 0.0;
         if (pref_block >= 0) {
-            // MULTI値をスケールして重みとする
-            double weight = 0.25 + (mult_weight * 0.25); 
-            // 例: mult=1 → 0.5, mult=2 → 0.75, mult=4 → 1.25
-            block_penalty = fabs((int)b - pref_block) * weight;
+            double weight = 0.25 + (mult_weight * 0.25);
+            block_penalty = fabs((double)b - (double)pref_block) * weight;
         }
-
         double cost = freq_err + block_penalty;
-
         if (cost < min_cost) {
             min_cost = cost;
             best_freq_err = freq_err;
@@ -194,51 +186,42 @@ void opl3_find_fnum_block_with_weight(double freq, double clock, unsigned char *
             f_best = (unsigned short)cand_fnum;
         }
     }
-
     *best_block = b_best;
     *best_fnum  = f_best;
     *best_err   = best_freq_err;
 }
 
-void opl3_find_fnum_block_with_ml(double freq, double clock,unsigned char *best_block, unsigned short *best_fnum, double *best_err,int pref_block,     /* OPLL block を渡す、-1なら無視 */double mult0,       /* キャリア MULT */double mult1)       /* モジュレータ MULT (2opの場合は0でOK) */
-{
+void opl3_find_fnum_block_with_ml(double freq, double clock,
+                                  unsigned char *best_block, unsigned short *best_fnum,
+                                  double *best_err,int pref_block,
+                                  double mult0,double mult1) {
     double min_cost = DBL_MAX;
     double best_freq_err = DBL_MAX;
     unsigned char b_best = 0;
     unsigned short f_best = 0;
-
-    // MLの合成 weight（2opならキャリアのみ）
-    double ml_weight = 1.0 + 0.1 * ((mult0 + mult1) / 2.0); // 例: 0.1倍程度に抑える
-
+    double ml_weight = 1.0 + 0.1 * ((mult0 + mult1) / 2.0);
     for (unsigned char b = 0; b < 8; ++b) {
         double base = (clock / 288.0) * (1 << b);
         int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
         if (cand_fnum < 0 || cand_fnum > 1023) continue;
-
         double calc_freq = base * ((double)cand_fnum / 1024.0);
         double freq_err = fabs(calc_freq - freq);
-
         double block_penalty = 0.0;
         if (pref_block >= 0) {
-            // ML に応じて軽く block 差ペナルティを加える
-            block_penalty = fabs((int)b - pref_block) * ml_weight * 0.1; // 0.1倍程度
+            block_penalty = fabs((double)b - (double)pref_block) * ml_weight * 0.1;
         }
-
         double cost = freq_err + block_penalty;
-
         if (cost < min_cost) {
             min_cost = cost;
-            best_freq_err = freq_err; // 周波数誤差だけ保持
+            best_freq_err = freq_err;
             b_best = b;
             f_best = (unsigned short)cand_fnum;
         }
     }
-
     *best_block = b_best;
     *best_fnum  = f_best;
     *best_err   = best_freq_err;
 }
-
 
 /*
  * freq : 目標周波数 (Hz) - ここには calc_fmchip_frequency(FMCHIP_YM2413, ...) の戻り値を渡す
