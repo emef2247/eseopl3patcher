@@ -4,6 +4,7 @@
 #include "ym2413_voice_rom.h"
 #include "nukedopll_voice_rom.h"
 #include "opll_to_opl3_wrapper.h"
+#include "../debug_opts.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@
 #include "../compat_bool.h"
 #include "../compat_string.h"
 
-/* ---------- Global OPLL state (move near top) ---------- */
+// ---------- Global OPLL state ----------
 #define YM2413_NUM_CH 9
 #define YM2413_REGS_SIZE 0x40
 
@@ -21,25 +22,17 @@ OpllPendingCh g_pend[YM2413_NUM_CH] = {0};
 OpllStampCh   g_stamp[YM2413_NUM_CH] = {0};
 static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
 
-/* ---------- Forward static prototypes (avoid impl    if (g_saved_argv) converter_init(g_saved_argc, g_saved_argv);
-icit) ---------- */
-static void ym2413_patch_to_opl3_with_fb(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp);
-static inline void stamp_clear(OpllStampCh *s);
-static inline void opll_pending_clear(OpllPendingCh *p);
-
-/* other internal helpers forward if needed */
-static inline int ch_from_addr(uint8_t addr);
-static inline int reg_kind(uint8_t addr);
-
-/* ---------- Program arg retention ---------- */
+// ---------- Program argument retention ----------
 static int    g_saved_argc = 0;
 static char **g_saved_argv = NULL;
 
+/** Store program arguments for later use */
 void opll_set_program_args(int argc, char **argv) {
     g_saved_argc = argc;
     g_saved_argv = argv;
 }
 
+/** Initialize converter and load overrides if specified */
 static void converter_init(int argc, char **argv) {
     override_init();
     const char *override_path = NULL;
@@ -55,9 +48,9 @@ static void converter_init(int argc, char **argv) {
     }
 }
 
+/** Initialize OPLL/OPL3 voice DB and state */
 void opll_init(OPL3State *p_state) {
     if (!p_state) return;
-
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
@@ -76,7 +69,7 @@ void opll_init(OPL3State *p_state) {
     }
 }
 
-/* --- Macros (retain) --- */
+// ---------- Macro definitions ----------
 #ifndef KEYON_WAIT_GRACE_SAMPLES
 #define KEYON_WAIT_GRACE_SAMPLES 16
 #endif
@@ -136,16 +129,43 @@ static const int8_t kModTLAddTable[16] = {
     0,0,4,2,0,2,2,0,0,2,2,3,0,3,3,4
 };
 
-/* ---- Utilities ---- */
-static inline void stamp_clear(OpllStampCh *s){ memset(s,0,sizeof(*s)); }
-static inline void opll_pending_clear(OpllPendingCh *p){ memset(p,0,sizeof(*p)); }
+// ---------- Utility functions ----------
 
+/** Apply debug overrides (fast attack / additive / mute modulator, etc.) */
+static inline void apply_debug_overrides(OPL3VoiceParam *vp) {
+    if (g_dbg.fast_attack) {
+        for (int i = 0; i < 2; i++) {
+            vp->op[i].ar = 15;
+            if (vp->op[i].dr < 4) vp->op[i].dr = 4;
+            vp->op[i].rr = (vp->op[i].rr < 2) ? 2 : vp->op[i].rr;
+        }
+        vp->op[1].tl = 0;
+    }
+    if (g_dbg.test_tone) {
+        vp->cnt[0] = 1;  // Use additive (algorithm bit) if engine uses cnt
+        vp->op[0].tl = 63; // Mute modulator for clarity
+    }
+}
+
+/** Suppress duplicate B0 writes if key state is unchanged */
+static bool key_state_already(OPL3State *p_state, int ch, bool key_on) {
+    if (p_state->last_key[ch] == (key_on ? 1 : 0)) return true;
+    p_state->last_key[ch] = key_on ? 1 : 0;
+    return false;
+}
+
+/** Clear stamp structure */
+static inline void stamp_clear(OpllStampCh *s) { memset(s, 0, sizeof(*s)); }
+/** Clear pending structure */
+static inline void opll_pending_clear(OpllPendingCh *p) { memset(p, 0, sizeof(*p)); }
+/** Get channel index from register address */
 static inline int ch_from_addr(uint8_t addr) {
     if (addr >= 0x10 && addr <= 0x18) return addr - 0x10;
     if (addr >= 0x20 && addr <= 0x28) return addr - 0x20;
     if (addr >= 0x30 && addr <= 0x38) return addr - 0x30;
     return -1;
 }
+/** Get register kind (1n,2n,3n) from address */
 static inline int reg_kind(uint8_t addr) {
     if (addr >= 0x10 && addr <= 0x18) return 1;
     if (addr >= 0x20 && addr <= 0x28) return 2;
@@ -153,153 +173,115 @@ static inline int reg_kind(uint8_t addr) {
     return 0;
 }
 
+/** Calculate OPLL frequency for debugging */
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
     printf("[DEBUG] calc_opllfrequency: clock=%.0f block=%u fnum=%u\n", clock, block, fnum);
     return (clock / 72.0) * ldexp((double)fnum / 512.0, block - 1);
 }
 
-/* YM2413 reg2n の KeyOn ビット(0x10) を落として KeyOff 値を得る補助 */
+/** Get KeyOff value for reg2n (clear KeyOn bit) */
 static inline uint8_t opll_make_keyoff(uint8_t reg2n) {
     return (uint8_t)(reg2n & (uint8_t)~0x10);
 }
 
-/* ---- Forward prototypes (avoid implicit declarations) ---- */
-static inline void flush_channel_ch(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
-    OpllPendingCh* p, OpllStampCh* s);
-
-static inline void flush_channel(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
-    OpllPendingCh* p, OpllStampCh* s);
-
-/* ------------------------------------------------
- * Volume / TL
- * ------------------------------------------------ */
-static inline uint8_t opll_vol_to_opl3_carrier_tl_abs(uint8_t vol) {
-    static const uint8_t kVolToTL_Abs[16] = {
-        0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,63
-    };
-    return kVolToTL_Abs[vol & 0x0F];
-}
-static uint8_t opll_vol_to_opl3_tl(uint8_t base_tl,uint8_t opll_vol){
-    static const uint8_t t[16]={0,2,4,6,8,11,13,15,17,19,21,23,26,29,32,63};
-    uint16_t tl=base_tl + t[opll_vol & 0x0F];
-    if(tl>63) tl=63;
-    return (uint8_t)tl;
-}
-static inline uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp,uint8_t reg3n){
-    uint8_t vol = reg3n & 0x0F;
-    uint8_t tl  = opll_vol_to_opl3_carrier_tl_abs(vol);
-    uint8_t ksl_bits = (uint8_t)((vp->op[1].ksl & 0x03)<<6);
-    return (uint8_t)(ksl_bits | (tl & 0x3F));
-}
-
-/* ------------------------------------------------
- * Pending helpers
- * ------------------------------------------------ */
-static inline void set_pending_from_opll_write_ch(OpllPendingCh* p,const OpllStampCh* s,uint8_t addr,uint8_t value){
+/** Set pending values from OPLL write */
+static inline void set_pending_from_opll_write_ch(OpllPendingCh* p, const OpllStampCh* s, uint8_t addr, uint8_t value) {
     (void)s;
-    switch(reg_kind(addr)){
-        case 1: p->has_1n=true; p->reg1n=value; break;
-        case 2: p->has_2n=true; p->reg2n=value; break;
-        case 3: p->has_3n=true; p->reg3n=value; break;
+    switch (reg_kind(addr)) {
+        case 1: p->has_1n = 1; p->reg1n = value; break;
+        case 2: p->has_2n = 1; p->reg2n = value; break;
+        case 3: p->has_3n = 1; p->reg3n = value; break;
         default: break;
     }
 }
-static inline void set_pending_from_opll_write(OpllPendingCh pend[],const OpllStampCh stamp[],uint8_t addr,uint8_t value){
-    int ch=ch_from_addr(addr); if(ch<0) return;
-    set_pending_from_opll_write_ch(&pend[ch],&stamp[ch],addr,value);
+static inline void set_pending_from_opll_write(OpllPendingCh pend[], const OpllStampCh stamp[], uint8_t addr, uint8_t value) {
+    int ch = ch_from_addr(addr); if (ch < 0) return;
+    set_pending_from_opll_write_ch(&pend[ch], &stamp[ch], addr, value);
 }
-static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p,const OpllStampCh* s){
-    PendingEdgeInfo info={0};
-    if(!p||!s||!p->has_2n) return info;
-    bool ko_next=(p->reg2n & 0x10)!=0;
-    info.has_2n=true;
-    info.ko_next=ko_next;
-    info.note_on_edge = (!s->ko && ko_next);
-    info.note_off_edge= ( s->ko && !ko_next);
+
+/** Analyze pending edge state (note on/off detection) */
+static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p, const OpllStampCh* s) {
+    PendingEdgeInfo info = {0};
+    if (!p || !s || !p->has_2n) return info;
+    bool ko_next = (p->reg2n & 0x10) != 0;
+    info.has_2n = 1;
+    info.ko_next = ko_next;
+    info.note_on_edge  = (!s->ko && ko_next);
+    info.note_off_edge = ( s->ko && !ko_next);
     return info;
 }
-static inline bool should_pend(uint8_t addr,uint8_t value,const OpllStampCh* stamp_ch,uint16_t next_wait_samples){
-    switch(reg_kind(addr)){
-        case 1: return stamp_ch && (stamp_ch->ko==false);
-        case 3: return stamp_ch && (stamp_ch->ko==false);
-        case 2:{
-            if(!stamp_ch) return false;
-            bool ko_next=(value & 0x10)!=0;
-            if(!stamp_ch->ko && ko_next)
-                return (next_wait_samples<=KEYON_WAIT_GRACE_SAMPLES);
-            return false;
+
+/** Check if pending is needed for next write */
+static inline bool should_pend(uint8_t addr, uint8_t value, const OpllStampCh* stamp_ch, uint16_t next_wait_samples) {
+    switch (reg_kind(addr)) {
+        case 1: return stamp_ch && (stamp_ch->ko == 0);
+        case 3: return stamp_ch && (stamp_ch->ko == 0);
+        case 2: {
+            if (!stamp_ch) return 0;
+            bool ko_next = (value & 0x10) != 0;
+            if (!stamp_ch->ko && ko_next)
+                return (next_wait_samples <= KEYON_WAIT_GRACE_SAMPLES);
+            return 0;
         }
-        default: return false;
+        default: return 0;
     }
 }
 
-/* ------------------------------------------------
- * Freq combine
- * ------------------------------------------------ */
-static inline uint8_t opll_to_opl3_an(uint8_t reg1n){ return reg1n; }
-static inline uint8_t opll_to_opl3_bn(uint8_t reg2n){
+/** Convert OPLL 1n/2n register values to OPL3 format */
+static inline uint8_t opll_to_opl3_an(uint8_t reg1n) { return reg1n; }
+static inline uint8_t opll_to_opl3_bn(uint8_t reg2n) {
     uint8_t fnum_msb_2b = (reg2n & 0x01);
-    uint8_t block_3b    = (reg2n >>1) & 0x07;
-    uint8_t ko_bit      = (reg2n & 0x10)?0x20:0x00;
-    return (fnum_msb_2b) | (block_3b<<2) | ko_bit;
+    uint8_t block_3b    = (reg2n >> 1) & 0x07;
+    uint8_t ko_bit      = (reg2n & 0x10) ? 0x20 : 0x00;
+    return (fnum_msb_2b) | (block_3b << 2) | ko_bit;
 }
 
-/* ------------------------------------------------
- * Slot mapping
- * ------------------------------------------------ */
-static inline uint8_t opl3_local_mod_slot(uint8_t ch_local){
-    return (uint8_t)((ch_local%3)+(ch_local/3)*8);
+/** Slot mapping for OPL3 operators */
+static inline uint8_t opl3_local_mod_slot(uint8_t ch_local) {
+    return (uint8_t)((ch_local % 3) + (ch_local / 3) * 8);
 }
-static inline uint8_t opl3_local_car_slot(uint8_t ch_local){
-    return (uint8_t)(opl3_local_mod_slot(ch_local)+3);
+static inline uint8_t opl3_local_car_slot(uint8_t ch_local) {
+    return (uint8_t)(opl3_local_mod_slot(ch_local) + 3);
 }
-static inline uint8_t opl3_opreg_addr(uint8_t base,uint8_t ch_local,int is_carrier){
-    uint8_t slot=is_carrier?opl3_local_car_slot(ch_local):opl3_local_mod_slot(ch_local);
-    return (uint8_t)(base+slot);
+static inline uint8_t opl3_opreg_addr(uint8_t base, uint8_t ch_local, int is_carrier) {
+    uint8_t slot = is_carrier ? opl3_local_car_slot(ch_local) : opl3_local_mod_slot(ch_local);
+    return (uint8_t)(base + slot);
 }
 
-/* ------------------------------------------------
- * Rate map selection
- * ------------------------------------------------ */
-static inline uint8_t rate_map_pick(uint8_t raw){
+/** Rate map selection (ID/SIMPLE/CALIB) */
+static inline uint8_t rate_map_pick(uint8_t raw) {
 #if !OPLL_ENABLE_RATE_MAP
     return raw & 0x0F;
 #else
  #if OPLL_RATE_MAP_MODE==0
-    uint8_t v=kOPLLRateToOPL3_ID[raw & 0x0F];
+    uint8_t v = kOPLLRateToOPL3_ID[raw & 0x0F];
     #if OPLL_DEBUG_RATE_PICK
-    printf("[RATEMAP] MODE=ID raw=%u -> %u\n",raw,v);
+    printf("[RATEMAP] MODE=ID raw=%u -> %u\n", raw, v);
     #endif
     return v;
  #elif OPLL_RATE_MAP_MODE==1
-    uint8_t v=kOPLLRateToOPL3_SIMPLE[raw & 0x0F];
+    uint8_t v = kOPLLRateToOPL3_SIMPLE[raw & 0x0F];
     #if OPLL_DEBUG_RATE_PICK
-    printf("[RATEMAP] MODE=SIMPLE raw=%u -> %u\n",raw,v);
+    printf("[RATEMAP] MODE=SIMPLE raw=%u -> %u\n", raw, v);
     #endif
     return v;
  #else
-    uint8_t v=kOPLLRateToOPL3_CALIB[raw & 0x0F];
+    uint8_t v = kOPLLRateToOPL3_CALIB[raw & 0x0F];
     #if OPLL_DEBUG_RATE_PICK
-    printf("[RATEMAP] MODE=CALIBv2 raw=%u -> %u\n",raw,v);
+    printf("[RATEMAP] MODE=CALIBv2 raw=%u -> %u\n", raw, v);
     #endif
     return v;
  #endif
 #endif
 }
 
-/* ------------------------------------------------
- * Attack enforce helper
- * ------------------------------------------------ */
-static inline uint8_t enforce_min_attack(uint8_t ar,const char* stage,int inst,int op_index){
+/** Enforce minimum attack rate (for envelope stability) */
+static inline uint8_t enforce_min_attack(uint8_t ar, const char* stage, int inst, int op_index) {
 #if OPLL_FORCE_MIN_ATTACK_RATE > 0
-    if(ar < OPLL_FORCE_MIN_ATTACK_RATE){
+    if (ar < OPLL_FORCE_MIN_ATTACK_RATE) {
 #if OPLL_DEBUG_ENFORCE_MIN_AR
         printf("[DEBUG] AR-MinClamp inst=%d op=%d %s rawAR=%u -> %u\n",
-               inst,op_index,stage,ar,(unsigned)OPLL_FORCE_MIN_ATTACK_RATE);
+               inst, op_index, stage, ar, (unsigned)OPLL_FORCE_MIN_ATTACK_RATE);
 #endif
         return (uint8_t)OPLL_FORCE_MIN_ATTACK_RATE;
     }
@@ -307,206 +289,172 @@ static inline uint8_t enforce_min_attack(uint8_t ar,const char* stage,int inst,i
     return ar;
 }
 
-/* ------------------------------------------------
- * Envelope Shape Fix
- * ------------------------------------------------ */
-/* ------------------------------------------------
- * Envelope Shape Fix
- *  - AR(attack) と DR(decay) のギャップが大きすぎる場合に
- *    DR を抑えて極端な落差を緩和する。
- * ------------------------------------------------ */
+/** Envelope shape fix for steep AR/DR gaps */
 #if !OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-
-static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr)
-{
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr) {
     (void)inst; (void)op_index; (void)ar; (void)dr;
-    /* 機能無効時は何もしない */
 }
-
-#else  /* OPLL_ENABLE_ENVELOPE_SHAPE_FIX == 1 */
-
-static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr)
-{
+#else
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr) {
     if (!ar || !dr) return;
-
     uint8_t A = (uint8_t)(*ar & 0x0F);
     uint8_t D = (uint8_t)(*dr & 0x0F);
-
-    /* D <= A ならそもそも逆転/同値なので調整不要 */
     if (D <= A) {
 #if OPLL_DEBUG_SHAPE_FIX
-        printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n",
-               inst, op_index, A, D);
+        printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n", inst, op_index, A, D);
 #endif
         return;
     }
-
     uint8_t gap = (uint8_t)(D - A);
-
 #if OPLL_SHAPE_FIX_USE_STRICT_GT
     int cond = (gap > OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
 #else
     int cond = (gap >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
 #endif
-
     if (!cond) {
 #if OPLL_DEBUG_SHAPE_FIX
-        printf("[SHAPEFIX] inst=%d op=%d no-fix gap=%u th=%d AR=%u DR=%u\n",
-               inst, op_index, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, A, D);
+        printf("[SHAPEFIX] inst=%d op=%d no-fix gap=%u th=%d AR=%u DR=%u\n", inst, op_index, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, A, D);
 #endif
         return;
     }
-
     uint8_t newD = D;
-
-    /* 上限クランプ */
     if (newD > OPLL_SHAPE_FIX_DR_MAX_AFTER)
         newD = (uint8_t)OPLL_SHAPE_FIX_DR_MAX_AFTER;
-
-    /* AR+1 未満には下げない（DR <= AR を避ける） */
     if (newD < (uint8_t)(A + 1))
         newD = (uint8_t)(A + 1);
-
     if (newD != D) {
 #if OPLL_DEBUG_SHAPE_FIX
         printf("[SHAPEFIX] inst=%d op=%d AR=%u DR=%u gap=%u -> DR'=%u (th=%d, max=%d)\n",
-               inst, op_index, A, D, gap, newD,
-               OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
+               inst, op_index, A, D, gap, newD, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
 #endif
         *dr = newD;
     } else {
 #if OPLL_DEBUG_SHAPE_FIX
         printf("[SHAPEFIX] inst=%d op=%d gap=%u cond=1 but newD==D (AR=%u DR=%u) (th=%d max=%d)\n",
-               inst, op_index, gap, A, D,
-               OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
+               inst, op_index, gap, A, D, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD, OPLL_SHAPE_FIX_DR_MAX_AFTER);
 #endif
     }
 }
+#endif
 
-#endif /* OPLL_ENABLE_ENVELOPE_SHAPE_FIX */
-
-/* ------------------------------------------------
- * YM2413 patch -> OPL3VoiceParam
- * ------------------------------------------------ */
-static void ym2413_patch_to_opl3_with_fb(int inst,const uint8_t *ym2413_regs,OPL3VoiceParam *vp){
-    memset(vp,0,sizeof(*vp));
+/** Convert YM2413 patch to OPL3VoiceParam (with debug/override) */
+static void ym2413_patch_to_opl3_with_fb(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp) {
+    memset(vp, 0, sizeof(*vp));
     const uint8_t *src;
-    if(inst==0 && ym2413_regs) src=ym2413_regs;
-    else if(inst>=1 && inst<=15) src=YM2413_VOICES[inst-1];
-    else if(inst>=16 && inst<=20) src=YM2413_RHYTHM_VOICES[inst-16];
-    else src=YM2413_VOICES[0];
+    if (inst == 0 && ym2413_regs) src = ym2413_regs;
+    else if (inst >= 1 && inst <= 15) src = YM2413_VOICES[inst - 1];
+    else if (inst >= 16 && inst <= 20) src = YM2413_RHYTHM_VOICES[inst - 16];
+    else src = YM2413_VOICES[0];
 
     printf("[DEBUG] YM2413 patch %d -> OPL3 Source: %02X %02X %02X %02X\n",
-           inst, src[0],src[1],src[2],src[3]);
+           inst, src[0], src[1], src[2], src[3]);
 
-    uint8_t raw_mod_ar=(src[2]>>4)&0x0F;
-    uint8_t raw_mod_dr= src[2]    &0x0F;
-    int ofs=4;
-    uint8_t raw_car_ar=(src[ofs+2]>>4)&0x0F;
-    uint8_t raw_car_dr= src[ofs+2]    &0x0F;
+    uint8_t raw_mod_ar = (src[2] >> 4) & 0x0F;
+    uint8_t raw_mod_dr = src[2] & 0x0F;
+    int ofs = 4;
+    uint8_t raw_car_ar = (src[ofs + 2] >> 4) & 0x0F;
+    uint8_t raw_car_dr = src[ofs + 2] & 0x0F;
 
     // Modulator
-    vp->op[0].am  =(src[0]>>7)&1;
-    vp->op[0].vib =(src[0]>>6)&1;
-    vp->op[0].egt =(src[0]>>5)&1;
-    vp->op[0].ksr =(src[0]>>4)&1;
-    vp->op[0].mult= src[0]     &0x0F;
-    vp->op[0].ksl =(src[1]>>6)&3;
-    vp->op[0].tl  = src[1]     &0x3F;
-    vp->op[0].ar  = rate_map_pick(raw_mod_ar);
-    vp->op[0].dr  = rate_map_pick(raw_mod_dr);
-    vp->op[0].sl  =(src[3]>>4)&0x0F;
-    vp->op[0].rr  = src[3]     &0x0F;
-    vp->op[0].ws  = 1;
-    vp->op[0].ar = enforce_min_attack(vp->op[0].ar,"Mod",inst,0);
+    vp->op[0].am   = (src[0] >> 7) & 1;
+    vp->op[0].vib  = (src[0] >> 6) & 1;
+    vp->op[0].egt  = (src[0] >> 5) & 1;
+    vp->op[0].ksr  = (src[0] >> 4) & 1;
+    vp->op[0].mult = src[0] & 0x0F;
+    vp->op[0].ksl  = (src[1] >> 6) & 3;
+    vp->op[0].tl   = src[1] & 0x3F;
+    vp->op[0].ar   = rate_map_pick(raw_mod_ar);
+    vp->op[0].dr   = rate_map_pick(raw_mod_dr);
+    vp->op[0].sl   = (src[3] >> 4) & 0x0F;
+    vp->op[0].rr   = src[3] & 0x0F;
+    vp->op[0].ws   = 1;
+    vp->op[0].ar   = enforce_min_attack(vp->op[0].ar, "Mod", inst, 0);
 
     printf("[DEBUG] YM2413 patch %d -> RateMap(Mod): rawAR=%u->%u rawDR=%u->%u\n",
-           inst,raw_mod_ar,vp->op[0].ar,raw_mod_dr,vp->op[0].dr);
+           inst, raw_mod_ar, vp->op[0].ar, raw_mod_dr, vp->op[0].dr);
 
     printf("[DEBUG] YM2413 patch %d -> OPL3 Modulator: AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-           inst,
-           vp->op[0].am,vp->op[0].vib,vp->op[0].egt,vp->op[0].ksr,vp->op[0].mult,
-           vp->op[0].ksl,vp->op[0].tl,vp->op[0].ar,vp->op[0].dr,vp->op[0].sl,vp->op[0].rr,vp->op[0].ws);
+           inst, vp->op[0].am, vp->op[0].vib, vp->op[0].egt, vp->op[0].ksr, vp->op[0].mult,
+           vp->op[0].ksl, vp->op[0].tl, vp->op[0].ar, vp->op[0].dr, vp->op[0].sl, vp->op[0].rr, vp->op[0].ws);
 
     printf("[DEBUG] YM2413 patch %d -> OPL3 Source: %02X %02X %02X %02X\n",
-           inst,src[ofs+0],src[ofs+1],src[ofs+2],src[ofs+3]);
+           inst, src[ofs + 0], src[ofs + 1], src[ofs + 2], src[ofs + 3]);
 
     // Carrier
-    vp->op[1].am  =(src[ofs+0]>>7)&1;
-    vp->op[1].vib =(src[ofs+0]>>6)&1;
-    vp->op[1].egt =(src[ofs+0]>>5)&1;
-    vp->op[1].ksr =(src[ofs+0]>>4)&1;
-    vp->op[1].mult= src[ofs+0]     &0x0F;
-    vp->op[1].ksl =(src[ofs+1]>>6)&3;
-    vp->op[1].tl  = src[ofs+1]     &0x3F;
-    vp->op[1].ar  = rate_map_pick(raw_car_ar);
-    vp->op[1].dr  = rate_map_pick(raw_car_dr);
-    vp->op[1].sl  =(src[ofs+3]>>4)&0x0F;
-    vp->op[1].rr  = src[ofs+3]     &0x0F;
-    vp->op[1].ws  = 0;
-    vp->op[1].ar = enforce_min_attack(vp->op[1].ar,"Car",inst,1);
+    vp->op[1].am   = (src[ofs + 0] >> 7) & 1;
+    vp->op[1].vib  = (src[ofs + 0] >> 6) & 1;
+    vp->op[1].egt  = (src[ofs + 0] >> 5) & 1;
+    vp->op[1].ksr  = (src[ofs + 0] >> 4) & 1;
+    vp->op[1].mult = src[ofs + 0] & 0x0F;
+    vp->op[1].ksl  = (src[ofs + 1] >> 6) & 3;
+    vp->op[1].tl   = src[ofs + 1] & 0x3F;
+    vp->op[1].ar   = rate_map_pick(raw_car_ar);
+    vp->op[1].dr   = rate_map_pick(raw_car_dr);
+    vp->op[1].sl   = (src[ofs + 3] >> 4) & 0x0F;
+    vp->op[1].rr   = src[ofs + 3] & 0x0F;
+    vp->op[1].ws   = 0;
+    vp->op[1].ar   = enforce_min_attack(vp->op[1].ar, "Car", inst, 1);
 
     printf("[DEBUG] YM2413 patch %d -> RateMap(Car): rawAR=%u->%u rawDR=%u->%u\n",
-           inst,raw_car_ar,vp->op[1].ar,raw_car_dr,vp->op[1].dr);
+           inst, raw_car_ar, vp->op[1].ar, raw_car_dr, vp->op[1].dr);
 
     printf("[DEBUG] YM2413 patch %d -> OPL3 Carrier: AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-           inst,
-           vp->op[1].am,vp->op[1].vib,vp->op[1].egt,vp->op[1].ksr,vp->op[1].mult,
-           vp->op[1].ksl,vp->op[1].tl,vp->op[1].ar,vp->op[1].dr,vp->op[1].sl,vp->op[1].rr,vp->op[1].ws);
+           inst, vp->op[1].am, vp->op[1].vib, vp->op[1].egt, vp->op[1].ksr, vp->op[1].mult,
+           vp->op[1].ksl, vp->op[1].tl, vp->op[1].ar, vp->op[1].dr, vp->op[1].sl, vp->op[1].rr, vp->op[1].ws);
 
-    vp->fb[0]= (src[0] & 0x07);
-    vp->cnt[0]=0;
-    vp->is_4op=0;
-    vp->voice_no=inst;
-    vp->source_fmchip=FMCHIP_YM2413;
+    vp->fb[0] = (src[0] & 0x07);
+    vp->cnt[0] = 0;
+    vp->is_4op = 0;
+    vp->voice_no = inst;
+    vp->source_fmchip = FMCHIP_YM2413;
 
     printf("[DEBUG] YM2413 patch %d -> OPL3 Feedback/Alg: FB=%d CNT=%d 4OP=%d VOICE_NO=%d\n",
-           inst,vp->fb[0],vp->cnt[0],vp->is_4op,inst);
+           inst, vp->fb[0], vp->cnt[0], vp->is_4op, inst);
 
 #if OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-    maybe_shape_fix(inst,0,&vp->op[0].ar,&vp->op[0].dr);
-    maybe_shape_fix(inst,1,&vp->op[1].ar,&vp->op[1].dr);
+    maybe_shape_fix(inst, 0, &vp->op[0].ar, &vp->op[0].dr);
+    maybe_shape_fix(inst, 1, &vp->op[1].ar, &vp->op[1].dr);
 #endif
 
 #if OPLL_ENABLE_ARDR_MIN_CLAMP
-    if(vp->op[0].ar<2) vp->op[0].ar=2;
-    if(vp->op[1].ar<2) vp->op[1].ar=2;
-    if(vp->op[0].dr<2) vp->op[0].dr=2;
-    if(vp->op[1].dr<2) vp->op[1].dr=2;
+    if (vp->op[0].ar < 2) vp->op[0].ar = 2;
+    if (vp->op[1].ar < 2) vp->op[1].ar = 2;
+    if (vp->op[0].dr < 2) vp->op[0].dr = 2;
+    if (vp->op[1].dr < 2) vp->op[1].dr = 2;
 #endif
 
 #if OPLL_ENABLE_MOD_TL_ADJ
     {
-        int idx=inst; if(idx<0) idx=0; if(idx>15) idx=15;
-        uint8_t raw_tl=vp->op[0].tl;
-        int add=kModTLAddTable[idx];
-        int new_tl=raw_tl+add;
-        if(new_tl<0) new_tl=0;
-        if(new_tl>63) new_tl=63;
-        if(add!=0){
+        int idx = inst; if (idx < 0) idx = 0; if (idx > 15) idx = 15;
+        uint8_t raw_tl = vp->op[0].tl;
+        int add = kModTLAddTable[idx];
+        int new_tl = raw_tl + add;
+        if (new_tl < 0) new_tl = 0;
+        if (new_tl > 63) new_tl = 63;
+        if (add != 0) {
             printf("[DEBUG] YM2413 patch %d -> ModTL adjust: raw=%u add=%d final=%d\n",
-                   inst,raw_tl,add,new_tl);
-            vp->op[0].tl=(uint8_t)new_tl;
+                   inst, raw_tl, add, new_tl);
+            vp->op[0].tl = (uint8_t)new_tl;
         }
     }
 #endif
 
+    apply_debug_overrides(vp);
+
     printf("[DEBUG] YM2413 patch %d -> OPL3 Adjusted: Modulator AR=%d DR=%d, Carrier AR=%d DR=%d\n",
-           inst,vp->op[0].ar,vp->op[0].dr,vp->op[1].ar,vp->op[1].dr);
+           inst, vp->op[0].ar, vp->op[0].dr, vp->op[1].ar, vp->op[1].dr);
     printf("[DEBUG] YM2413 patch %d -> OPL3 Final: Modulator TL=%d, Carrier TL=%d\n",
-           inst,vp->op[0].tl,vp->op[1].tl);
+           inst, vp->op[0].tl, vp->op[1].tl);
     printf("\n");
 }
 
-/* ------------------------------------------------
- * Apply voice params to channel
- * ------------------------------------------------ */
+/** Apply OPL3VoiceParam to channel */
 int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *opts) {
     if (!vp || ch < 0 || ch >= 9) return 0;
     int bytes = 0;
-    int slot_mod = opl3_opreg_addr(0,ch,0);
-    int slot_car = opl3_opreg_addr(0,ch,1);
+    int slot_mod = opl3_opreg_addr(0, ch, 0);
+    int slot_car = opl3_opreg_addr(0, ch, 1);
 
     printf("[DEBUG] Apply OPL3 VoiceParam to ch=%d\n", ch);
 
@@ -541,7 +489,7 @@ int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State
     return bytes;
 }
 
-/* ROM パッチ登録 */
+/** Register all YM2413 patches to OPL3 voice DB */
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db) {
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
@@ -555,7 +503,7 @@ void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db) {
     }
 }
 
-/* 音色適用（KeyOn直前） */
+/** Apply voice params to channel before KeyOn */
 static inline void apply_inst_before_keyon(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
                                            int ch, uint8_t reg3n, const CommandOptions *opts) {
     int8_t inst = (reg3n >> 4) & 0x0F;
@@ -567,10 +515,12 @@ static inline void apply_inst_before_keyon(VGMBuffer *p_music_data, VGMStatus *p
     duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0, opts);
 }
 
+/** Check if channel has effective 3n value */
 static inline bool has_effective_3n(const OpllPendingCh* p, const OpllStampCh* s) {
     return (p && p->has_3n) || (s && s->valid_3n);
 }
 
+/** Update pending on elapsed for KeyOn timeout */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
     const CommandOptions *opts, uint16_t wait_samples)
@@ -595,7 +545,7 @@ static inline void opll_tick_pending_on_elapsed(
     }
 }
 
-/* 簡易 KSL 影響デバッグ (Mod TL) */
+/** Debug: calculate effective modulator TL from KSL and block */
 static inline uint8_t debug_effective_mod_tl(uint8_t raw_tl, uint8_t ksl, uint8_t block) {
     uint8_t add = 0;
     if (block >= 5) add = (uint8_t)(ksl * 2);
@@ -605,11 +555,13 @@ static inline uint8_t debug_effective_mod_tl(uint8_t raw_tl, uint8_t ksl, uint8_
     return (uint8_t)eff;
 }
 
-/* flush (ch) */
-static inline void flush_channel_ch (
+/** Flush pending channel state (KeyOn/KeyOff/param writes) */
+static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s) {
-
+    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts,
+    OpllPendingCh* p, OpllStampCh* s)
+{
+    // Determine which pending registers need update
     bool need_1n = p->has_1n && (!s->valid_1n || p->reg1n != s->last_1n);
     bool need_3n = p->has_3n && (!s->valid_3n || p->reg3n != s->last_3n);
     bool need_2n = p->has_2n && (!s->valid_2n || p->reg2n != s->last_2n);
@@ -618,17 +570,18 @@ static inline void flush_channel_ch (
 
     fprintf(stderr,
         "[FLUSH] ch=%d pend{1:%s 3:%s 2:%s} edge{on:%d off:%d}\n",
-        ch, p->has_1n?"Y":"n", p->has_3n?"Y":"n", p->has_2n?"Y":"n",
-        e.note_on_edge?1:0, e.note_off_edge?1:0);
+        ch, p->has_1n ? "Y" : "n", p->has_3n ? "Y" : "n", p->has_2n ? "Y" : "n",
+        e.note_on_edge ? 1 : 0, e.note_off_edge ? 1 : 0);
 
     uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
 
     if (e.has_2n && e.note_on_edge) {
+        // KeyOn edge detected
         uint8_t reg3n_eff = p->has_3n ? p->reg3n : (s->valid_3n ? s->last_3n : 0x00);
         uint8_t reg2n_eff = p->reg2n;
         uint8_t reg1n_eff = p->has_1n ? p->reg1n : (s->valid_1n ? s->last_1n : 0x00);
         apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, opts);
-
+        // A0 first
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
                              0xA0 + ch, opll_to_opl3_an(reg1n_eff), opts);
 
@@ -655,11 +608,13 @@ static inline void flush_channel_ch (
                 car_raw_tl, car_final_tl, vp_tmp.fb[0], vp_tmp.cnt[0]);
         }
 #endif
-
-        duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                             0xB0 + ch, opll_to_opl3_bn(reg2n_eff), opts);
-
-    } else if (e.has_2n && e.note_off_edge) {
+        // B0 only if key state not already on
+        if (!key_state_already(p_state, ch, true)) {
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), opts);
+        }
+    }
+    else if (e.has_2n && e.note_off_edge) {
+        // KeyOff edge detected
         uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
         duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, opts);
 
@@ -675,8 +630,9 @@ static inline void flush_channel_ch (
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
                                  0x40 + car_slot, car40, opts);
         }
-
-    } else {
+    }
+    else {
+        // No edge; just flush any changed params
         if (need_1n) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
                                  0xA0 + ch, opll_to_opl3_an(p->reg1n), opts);
@@ -695,29 +651,31 @@ static inline void flush_channel_ch (
         }
     }
 
-    if (p->has_1n && need_1n) { s->last_1n = p->reg1n; s->valid_1n = true; }
-    if (p->has_3n && need_3n) { s->last_3n = p->reg3n; s->valid_3n = true; }
-    if (p->has_2n) { s->last_2n = p->reg2n; s->valid_2n = true; s->ko = (p->reg2n & 0x10) != 0; }
+    // Update stamp state
+    if (p->has_1n && need_1n) { s->last_1n = p->reg1n; s->valid_1n = 1; }
+    if (p->has_3n && need_3n) { s->last_3n = p->reg3n; s->valid_3n = 1; }
+    if (p->has_2n) { s->last_2n = p->reg2n; s->valid_2n = 1; s->ko = (p->reg2n & 0x10) != 0; }
     opll_pending_clear(p);
 }
 
-static inline void flush_channel (
-      VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s) {
+/** Flush channel wrapper (calls flush_channel_ch) */
+static inline void flush_channel(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s)
+{
     (void)vp;
     flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, opts, p, s);
 }
 
-/* ------------------------------------------------
- * Register write entrypoint
- * ------------------------------------------------ */
+/** Main register write entrypoint for OPLL emulation */
 int opll_write_register(
     VGMBuffer *p_music_data,
     VGMContext *p_vgm_context,
     OPL3State *p_state,
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
-    const CommandOptions *opts) {
-
+    const CommandOptions *opts)
+{
+    // Handle global registers (0x00 - 0x07)
     if (addr <= 0x07) {
         g_ym2413_regs[addr] = val;
         for (int c = 0; c < YM2413_NUM_CH; ++c) {
@@ -741,7 +699,7 @@ int opll_write_register(
         const bool pend_note_on =
             g_pend[ch].has_2n && !g_stamp[ch].ko && ((g_pend[ch].reg2n & 0x10) != 0);
 
-        if (kind == 1) { /* $1n */
+        if (kind == 1) { // $1n
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
@@ -750,12 +708,11 @@ int opll_write_register(
             } else if (g_stamp[ch].ko) {
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                      0xA0 + ch, opll_to_opl3_an(val), opts);
-                g_stamp[ch].last_1n = val; g_stamp[ch].valid_1n = true;
+                g_stamp[ch].last_1n = val; g_stamp[ch].valid_1n = 1;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
             }
-
-        } else if (kind == 3) { /* $3n */
+        } else if (kind == 3) { // $3n
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
@@ -769,12 +726,11 @@ int opll_write_register(
                 uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                      0x40 + car_slot, car40, opts);
-                g_stamp[ch].last_3n = val; g_stamp[ch].valid_3n = true;
+                g_stamp[ch].last_3n = val; g_stamp[ch].valid_3n = 1;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
             }
-
-        } else if (kind == 2) { /* $2n */
+        } else if (kind == 2) { // $2n
             bool ko_next = (val & 0x10) != 0;
             if (!g_stamp[ch].ko && ko_next) {
                 if (should_pend(addr, val, &g_stamp[ch], next_wait_samples)) {
@@ -790,11 +746,12 @@ int opll_write_register(
             } else {
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                      0xB0 + ch, opll_to_opl3_bn(val), opts);
-                g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = true; g_stamp[ch].ko = ko_next;
+                g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = ko_next;
             }
         }
     }
 
+    // Handle waits
     if (is_wait_samples_done == 0 && next_wait_samples > 0) {
         opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, opts, next_wait_samples);
         vgm_wait_samples(p_music_data, &p_vgm_context->status, next_wait_samples);

@@ -4,6 +4,7 @@
         "opl3_convert.h": "c",
         "opl3_voice.h": "c",
         "opl3_event.h": "c",
-        "opll_to_opl3_wrapper.h": "c"
+        "opll_to_opl3_wrapper.h": "c",
+        "gd3_util.h": "c"
     }
 }
