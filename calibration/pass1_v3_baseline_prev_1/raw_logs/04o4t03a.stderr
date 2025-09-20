@@ -1,0 +1,2 @@
+[FLUSH] ch=0 pend{1:Y 3:Y 2:Y} edge{on:1 off:0}
+[DEBUG] KeyOnDbg ch=0 inst=4 fnum=172 block=3 modSlot=0 modTLraw=33 modKSL=1 effModTL=33 carTLraw=36 carTLvol=0 FB=1 CNT=0

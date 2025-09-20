@@ -1,32 +1,39 @@
-# Calibration 専用 Makefile
-# ルートの patcher バイナリ (./eseopl3patcher_*) がビルド済み前提
-# RMAP_PROFILE 環境変数で RateMap 選択: SIMPLE / calibv2 / calibv3
-
 SHELL := /bin/bash
+# 明示的に .PHONY
+.PHONY: pass1 pass1-resume pass1-summary pass1-clean pass1-check
 
-PASS1_REPORTS := $(addprefix reports/report_,$(addsuffix _pass1.json,$(shell awk '/bases:/,/^$$/ {if($$1 ~ /-/) {gsub("-","");print $$2}}' config.yaml)))
-PASS2_REPORTS := $(addprefix reports/report_,$(addsuffix _pass2.json,$(shell awk '/bases:/,/^$$/ {if($$1 ~ /-/) {gsub("-","");print $$2}}' config.yaml)))
+# 設定ファイル (相対パス)
+CONFIG ?= config.yaml
 
-.PHONY: pass1 pass2 balance summarize clean
+# config.yaml の存在チェック (CRLF 等を避けるため簡潔に)
+pass1-check:
+	@echo "=== PASS1 CONFIG CHECK ==="
+	@if [ ! -f "$(CONFIG)" ]; then \
+	  echo "!! NOT FOUND: $(CONFIG) (cwd=$$(pwd))"; \
+	  echo "   -> 行末 CRLF かディレクトリ違いの可能性"; \
+	  exit 1; \
+	else \
+	  echo "Found config.yaml"; \
+	fi
+	@echo "Config path : $(CONFIG)"
+	@echo "Corpus list : $$(./scripts/config_get.py $(CONFIG) corpus_list 2>/dev/null || echo '(key missing)')"
+	@echo "Binary      : $$(./scripts/config_get.py $(CONFIG) binary 2>/dev/null || echo '(key missing)')"
+	@echo "Out root    : $$(./scripts/config_get.py $(CONFIG) out_root 2>/dev/null || echo '(key missing)')"
+	@echo "Jobs        : $$(./scripts/config_get.py $(CONFIG) jobs 2>/dev/null || echo '(key missing)')"
+	@echo "Timeout     : $$(./scripts/config_get.py $(CONFIG) timeout_sec_per_file 2>/dev/null || echo '(key missing)')"
 
 pass1:
-	@echo "[CALIB] PASS1 (RMAP_PROFILE=$${RMAP_PROFILE:-SIMPLE})"
-	@./scripts/calib_pass1.sh
-	@python3 ./scripts/summarize_enhanced.py --pass pass1 --warn --out reports/summarize_pass1.csv > reports/warn_pass1.txt
+	@./scripts/calib_pass1.sh -c $(CONFIG)
 
-balance:
-	@echo "[CALIB] Harmonic balance from PASS1"
-	@python3 ./scripts/harmonic_balance.py
+pass1-resume:
+	@./scripts/calib_pass1.sh -c $(CONFIG) --resume
 
-pass2: balance
-	@echo "[CALIB] PASS2 (apply overrides)"
-	@./scripts/calib_pass2.sh
-	@python3 ./scripts/summarize_enhanced.py --pass pass2 --warn --out reports/summarize_pass2.csv > reports/warn_pass2.txt
+pass1-summary:
+	@python3 scripts/extract_stats.py \
+	  "$$(./scripts/config_get.py $(CONFIG) out_root)/stats_lines" \
+	  "$$(./scripts/config_get.py $(CONFIG) out_root)/json" \
+	  "$$(./scripts/config_get.py $(CONFIG) out_root)/aggregate/aggregate_stats.json"
 
-summarize:
-	@python3 ./scripts/summarize_enhanced.py --pass pass1 --warn
-	@python3 ./scripts/summarize_enhanced.py --pass pass2 --warn || true
-
-clean:
-	rm -f reports/report_*_pass*.json reports/summarize_pass*.csv reports/warn_pass*.txt overrides/overrides_pass2.json
-	rm -f p??o4_*_pass1.vgm p??o4_*_pass2.vgm p??o4_*_pass1.wav p??o4_*_pass2.wav
+pass1-clean:
+	@OUT="$$(./scripts/config_get.py $(CONFIG) out_root 2>/dev/null || echo 'calibration/pass1_v3_baseline')"; \
+	echo "Removing $$OUT"; rm -rf "$$OUT"

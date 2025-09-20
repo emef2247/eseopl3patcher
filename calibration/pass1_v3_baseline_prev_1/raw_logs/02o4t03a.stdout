@@ -1,0 +1,358 @@
+YM2413 write:  cmd=0x51 reg=0x30 val=0x2F (read_done_byte=259/filesize=281)
+Initializing OPL3 mode for YM2413...
+[DEBUG] YM2413 patch 1 -> OPL3 Source: 71 61 1E 17
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=1 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 1 -> RateMap(Mod): rawAR=1->2 rawDR=14->15
+[DEBUG] YM2413 patch 1 -> OPL3 Modulator: AM=0 VIB=1 EGT=1 KSR=1 MULT=1 KSL=1 TL=33 AR=2 DR=15 SL=1 RR=7 WS=1
+[DEBUG] YM2413 patch 1 -> OPL3 Source: D0 78 00 17
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=1 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 1 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 1 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=0 KSL=1 TL=56 AR=2 DR=0 SL=1 RR=7 WS=0
+[DEBUG] YM2413 patch 1 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=1
+[DEBUG] YM2413 patch 1 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 1 -> OPL3 Final: Modulator TL=33, Carrier TL=56
+
+[DEBUG] YM2413 patch 2 -> OPL3 Source: 13 41 16 0E
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=6 -> 7
+[DEBUG] AR-MinClamp inst=2 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 2 -> RateMap(Mod): rawAR=1->2 rawDR=6->7
+[DEBUG] YM2413 patch 2 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=1 TL=1 AR=2 DR=7 SL=0 RR=14 WS=1
+[DEBUG] YM2413 patch 2 -> OPL3 Source: D8 F6 23 12
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] YM2413 patch 2 -> RateMap(Car): rawAR=2->2 rawDR=3->3
+[DEBUG] YM2413 patch 2 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=8 KSL=3 TL=54 AR=2 DR=3 SL=1 RR=2 WS=0
+[DEBUG] YM2413 patch 2 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=2
+[DEBUG] YM2413 patch 2 -> OPL3 Adjusted: Modulator AR=2 DR=7, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 2 -> OPL3 Final: Modulator TL=1, Carrier TL=54
+
+[DEBUG] YM2413 patch 3 -> OPL3 Source: 13 01 19 0F
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=9 -> 10
+[DEBUG] AR-MinClamp inst=3 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 3 -> RateMap(Mod): rawAR=1->2 rawDR=9->10
+[DEBUG] YM2413 patch 3 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=0 TL=1 AR=2 DR=10 SL=0 RR=15 WS=1
+[DEBUG] YM2413 patch 3 -> OPL3 Source: D8 F6 13 02
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] AR-MinClamp inst=3 op=1 Car rawAR=1 -> 2
+[DEBUG] YM2413 patch 3 -> RateMap(Car): rawAR=1->2 rawDR=3->3
+[DEBUG] YM2413 patch 3 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=8 KSL=3 TL=54 AR=2 DR=3 SL=0 RR=2 WS=0
+[DEBUG] YM2413 patch 3 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=3
+[DEBUG] YM2413 patch 3 -> OPL3 Adjusted: Modulator AR=2 DR=10, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 3 -> OPL3 Final: Modulator TL=1, Carrier TL=54
+
+[DEBUG] YM2413 patch 4 -> OPL3 Source: 31 61 1A 0D
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=10 -> 11
+[DEBUG] AR-MinClamp inst=4 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 4 -> RateMap(Mod): rawAR=1->2 rawDR=10->11
+[DEBUG] YM2413 patch 4 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=1 MULT=1 KSL=1 TL=33 AR=2 DR=11 SL=0 RR=13 WS=1
+[DEBUG] YM2413 patch 4 -> OPL3 Source: C8 64 70 13
+[RATEMAP] MODE=SIMPLE raw=7 -> 8
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] YM2413 patch 4 -> RateMap(Car): rawAR=7->8 rawDR=0->0
+[DEBUG] YM2413 patch 4 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=0 MULT=8 KSL=1 TL=36 AR=8 DR=0 SL=1 RR=3 WS=0
+[DEBUG] YM2413 patch 4 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=4
+[DEBUG] YM2413 patch 4 -> OPL3 Adjusted: Modulator AR=2 DR=11, Carrier AR=8 DR=0
+[DEBUG] YM2413 patch 4 -> OPL3 Final: Modulator TL=33, Carrier TL=36
+
+[DEBUG] YM2413 patch 5 -> OPL3 Source: 22 21 1E 06
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=5 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 5 -> RateMap(Mod): rawAR=1->2 rawDR=14->15
+[DEBUG] YM2413 patch 5 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=2 KSL=0 TL=33 AR=2 DR=15 SL=0 RR=6 WS=1
+[DEBUG] YM2413 patch 5 -> OPL3 Source: E0 76 22 12
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[DEBUG] YM2413 patch 5 -> RateMap(Car): rawAR=2->2 rawDR=2->2
+[DEBUG] YM2413 patch 5 -> OPL3 Carrier: AM=1 VIB=1 EGT=1 KSR=0 MULT=0 KSL=1 TL=54 AR=2 DR=2 SL=1 RR=2 WS=0
+[DEBUG] YM2413 patch 5 -> OPL3 Feedback/Alg: FB=2 CNT=0 4OP=0 VOICE_NO=5
+[DEBUG] YM2413 patch 5 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=2
+[DEBUG] YM2413 patch 5 -> OPL3 Final: Modulator TL=33, Carrier TL=54
+
+[DEBUG] YM2413 patch 6 -> OPL3 Source: 21 61 1D 07
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=13 -> 14
+[DEBUG] AR-MinClamp inst=6 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 6 -> RateMap(Mod): rawAR=1->2 rawDR=13->14
+[DEBUG] YM2413 patch 6 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=1 KSL=1 TL=33 AR=2 DR=14 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 6 -> OPL3 Source: 82 6A 20 11
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] YM2413 patch 6 -> RateMap(Car): rawAR=2->2 rawDR=0->0
+[DEBUG] YM2413 patch 6 -> OPL3 Carrier: AM=1 VIB=0 EGT=0 KSR=0 MULT=2 KSL=1 TL=42 AR=2 DR=0 SL=1 RR=1 WS=0
+[DEBUG] YM2413 patch 6 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=6
+[DEBUG] YM2413 patch 6 -> OPL3 Adjusted: Modulator AR=2 DR=14, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 6 -> OPL3 Final: Modulator TL=33, Carrier TL=42
+
+[DEBUG] YM2413 patch 7 -> OPL3 Source: 23 21 22 17
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[DEBUG] YM2413 patch 7 -> RateMap(Mod): rawAR=2->2 rawDR=2->2
+[DEBUG] YM2413 patch 7 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=3 KSL=0 TL=33 AR=2 DR=2 SL=1 RR=7 WS=1
+[DEBUG] YM2413 patch 7 -> OPL3 Source: A2 64 21 61
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[DEBUG] YM2413 patch 7 -> RateMap(Car): rawAR=2->2 rawDR=1->1
+[DEBUG] YM2413 patch 7 -> OPL3 Carrier: AM=1 VIB=0 EGT=1 KSR=0 MULT=2 KSL=1 TL=36 AR=2 DR=1 SL=6 RR=1 WS=0
+[DEBUG] YM2413 patch 7 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=7
+[DEBUG] YM2413 patch 7 -> OPL3 Adjusted: Modulator AR=2 DR=2, Carrier AR=2 DR=1
+[DEBUG] YM2413 patch 7 -> OPL3 Final: Modulator TL=33, Carrier TL=36
+
+[DEBUG] YM2413 patch 8 -> OPL3 Source: 61 61 0E 07
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=8 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 8 -> RateMap(Mod): rawAR=0->2 rawDR=14->15
+[DEBUG] YM2413 patch 8 -> OPL3 Modulator: AM=0 VIB=1 EGT=1 KSR=0 MULT=1 KSL=1 TL=33 AR=2 DR=15 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 8 -> OPL3 Source: A0 71 00 13
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=8 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 8 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 8 -> OPL3 Carrier: AM=1 VIB=0 EGT=1 KSR=0 MULT=0 KSL=1 TL=49 AR=2 DR=0 SL=1 RR=3 WS=0
+[DEBUG] YM2413 patch 8 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=8
+[DEBUG] YM2413 patch 8 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 8 -> OPL3 Final: Modulator TL=33, Carrier TL=49
+
+[DEBUG] YM2413 patch 9 -> OPL3 Source: 23 21 1E 07
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=9 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 9 -> RateMap(Mod): rawAR=1->2 rawDR=14->15
+[DEBUG] YM2413 patch 9 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=3 KSL=0 TL=33 AR=2 DR=15 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 9 -> OPL3 Source: E0 71 22 21
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[DEBUG] YM2413 patch 9 -> RateMap(Car): rawAR=2->2 rawDR=2->2
+[DEBUG] YM2413 patch 9 -> OPL3 Carrier: AM=1 VIB=1 EGT=1 KSR=0 MULT=0 KSL=1 TL=49 AR=2 DR=2 SL=2 RR=1 WS=0
+[DEBUG] YM2413 patch 9 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=9
+[DEBUG] YM2413 patch 9 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=2
+[DEBUG] YM2413 patch 9 -> OPL3 Final: Modulator TL=33, Carrier TL=49
+
+[DEBUG] YM2413 patch 10 -> OPL3 Source: 21 20 0C 08
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=12 -> 13
+[DEBUG] AR-MinClamp inst=10 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 10 -> RateMap(Mod): rawAR=0->2 rawDR=12->13
+[DEBUG] YM2413 patch 10 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=1 KSL=0 TL=32 AR=2 DR=13 SL=0 RR=8 WS=1
+[DEBUG] YM2413 patch 10 -> OPL3 Source: A0 73 22 21
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[DEBUG] YM2413 patch 10 -> RateMap(Car): rawAR=2->2 rawDR=2->2
+[DEBUG] YM2413 patch 10 -> OPL3 Carrier: AM=1 VIB=0 EGT=1 KSR=0 MULT=0 KSL=1 TL=51 AR=2 DR=2 SL=2 RR=1 WS=0
+[DEBUG] YM2413 patch 10 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=10
+[DEBUG] YM2413 patch 10 -> OPL3 Adjusted: Modulator AR=2 DR=13, Carrier AR=2 DR=2
+[DEBUG] YM2413 patch 10 -> OPL3 Final: Modulator TL=32, Carrier TL=51
+
+[DEBUG] YM2413 patch 11 -> OPL3 Source: 13 41 18 0F
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=8 -> 9
+[DEBUG] AR-MinClamp inst=11 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 11 -> RateMap(Mod): rawAR=1->2 rawDR=8->9
+[DEBUG] YM2413 patch 11 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=1 TL=1 AR=2 DR=9 SL=0 RR=15 WS=1
+[DEBUG] YM2413 patch 11 -> OPL3 Source: F8 F4 23 13
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] YM2413 patch 11 -> RateMap(Car): rawAR=2->2 rawDR=3->3
+[DEBUG] YM2413 patch 11 -> OPL3 Carrier: AM=1 VIB=1 EGT=1 KSR=1 MULT=8 KSL=3 TL=52 AR=2 DR=3 SL=1 RR=3 WS=0
+[DEBUG] YM2413 patch 11 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=11
+[DEBUG] YM2413 patch 11 -> OPL3 Adjusted: Modulator AR=2 DR=9, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 11 -> OPL3 Final: Modulator TL=1, Carrier TL=52
+
+[DEBUG] YM2413 patch 12 -> OPL3 Source: 31 61 0C 08
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=12 -> 13
+[DEBUG] AR-MinClamp inst=12 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 12 -> RateMap(Mod): rawAR=0->2 rawDR=12->13
+[DEBUG] YM2413 patch 12 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=1 MULT=1 KSL=1 TL=33 AR=2 DR=13 SL=0 RR=8 WS=1
+[DEBUG] YM2413 patch 12 -> OPL3 Source: B0 72 73 13
+[RATEMAP] MODE=SIMPLE raw=7 -> 8
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] YM2413 patch 12 -> RateMap(Car): rawAR=7->8 rawDR=3->3
+[DEBUG] YM2413 patch 12 -> OPL3 Carrier: AM=1 VIB=0 EGT=1 KSR=1 MULT=0 KSL=1 TL=50 AR=8 DR=3 SL=1 RR=3 WS=0
+[DEBUG] YM2413 patch 12 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=12
+[DEBUG] YM2413 patch 12 -> OPL3 Adjusted: Modulator AR=2 DR=13, Carrier AR=8 DR=3
+[DEBUG] YM2413 patch 12 -> OPL3 Final: Modulator TL=33, Carrier TL=50
+
+[DEBUG] YM2413 patch 13 -> OPL3 Source: 61 61 1E 07
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=13 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 13 -> RateMap(Mod): rawAR=1->2 rawDR=14->15
+[DEBUG] YM2413 patch 13 -> OPL3 Modulator: AM=0 VIB=1 EGT=1 KSR=0 MULT=1 KSL=1 TL=33 AR=2 DR=15 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 13 -> OPL3 Source: D0 70 00 17
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=13 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 13 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 13 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=0 KSL=1 TL=48 AR=2 DR=0 SL=1 RR=7 WS=0
+[DEBUG] YM2413 patch 13 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=13
+[DEBUG] YM2413 patch 13 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 13 -> OPL3 Final: Modulator TL=33, Carrier TL=48
+
+[DEBUG] YM2413 patch 14 -> OPL3 Source: 21 61 1E 07
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=14 -> 15
+[DEBUG] AR-MinClamp inst=14 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 14 -> RateMap(Mod): rawAR=1->2 rawDR=14->15
+[DEBUG] YM2413 patch 14 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=1 KSL=1 TL=33 AR=2 DR=15 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 14 -> OPL3 Source: C8 76 22 13
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[DEBUG] YM2413 patch 14 -> RateMap(Car): rawAR=2->2 rawDR=2->2
+[DEBUG] YM2413 patch 14 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=0 MULT=8 KSL=1 TL=54 AR=2 DR=2 SL=1 RR=3 WS=0
+[DEBUG] YM2413 patch 14 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=14
+[DEBUG] YM2413 patch 14 -> OPL3 Adjusted: Modulator AR=2 DR=15, Carrier AR=2 DR=2
+[DEBUG] YM2413 patch 14 -> OPL3 Final: Modulator TL=33, Carrier TL=54
+
+[DEBUG] YM2413 patch 15 -> OPL3 Source: 13 01 1A 0F
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=10 -> 11
+[DEBUG] AR-MinClamp inst=15 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 15 -> RateMap(Mod): rawAR=1->2 rawDR=10->11
+[DEBUG] YM2413 patch 15 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=0 TL=1 AR=2 DR=11 SL=0 RR=15 WS=1
+[DEBUG] YM2413 patch 15 -> OPL3 Source: E8 F6 13 02
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] AR-MinClamp inst=15 op=1 Car rawAR=1 -> 2
+[DEBUG] YM2413 patch 15 -> RateMap(Car): rawAR=1->2 rawDR=3->3
+[DEBUG] YM2413 patch 15 -> OPL3 Carrier: AM=1 VIB=1 EGT=1 KSR=0 MULT=8 KSL=3 TL=54 AR=2 DR=3 SL=0 RR=2 WS=0
+[DEBUG] YM2413 patch 15 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=15
+[DEBUG] YM2413 patch 15 -> OPL3 Adjusted: Modulator AR=2 DR=11, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 15 -> OPL3 Final: Modulator TL=1, Carrier TL=54
+
+[DEBUG] YM2413 patch 16 -> OPL3 Source: 21 01 0C 07
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=12 -> 13
+[DEBUG] AR-MinClamp inst=16 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 16 -> RateMap(Mod): rawAR=0->2 rawDR=12->13
+[DEBUG] YM2413 patch 16 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=0 MULT=1 KSL=0 TL=1 AR=2 DR=13 SL=0 RR=7 WS=1
+[DEBUG] YM2413 patch 16 -> OPL3 Source: A1 01 0C 07
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=12 -> 13
+[DEBUG] AR-MinClamp inst=16 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 16 -> RateMap(Car): rawAR=0->2 rawDR=12->13
+[DEBUG] YM2413 patch 16 -> OPL3 Carrier: AM=1 VIB=0 EGT=1 KSR=0 MULT=1 KSL=0 TL=1 AR=2 DR=13 SL=0 RR=7 WS=0
+[DEBUG] YM2413 patch 16 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=16
+[DEBUG] YM2413 patch 16 -> OPL3 Adjusted: Modulator AR=2 DR=13, Carrier AR=2 DR=13
+[DEBUG] YM2413 patch 16 -> OPL3 Final: Modulator TL=1, Carrier TL=1
+
+[DEBUG] YM2413 patch 17 -> OPL3 Source: 01 01 08 05
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=8 -> 9
+[DEBUG] AR-MinClamp inst=17 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 17 -> RateMap(Mod): rawAR=0->2 rawDR=8->9
+[DEBUG] YM2413 patch 17 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=0 MULT=1 KSL=0 TL=1 AR=2 DR=9 SL=0 RR=5 WS=1
+[DEBUG] YM2413 patch 17 -> OPL3 Source: 00 00 00 00
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=17 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 17 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 17 -> OPL3 Carrier: AM=0 VIB=0 EGT=0 KSR=0 MULT=0 KSL=0 TL=0 AR=2 DR=0 SL=0 RR=0 WS=0
+[DEBUG] YM2413 patch 17 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=17
+[DEBUG] YM2413 patch 17 -> OPL3 Adjusted: Modulator AR=2 DR=9, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 17 -> OPL3 Final: Modulator TL=1, Carrier TL=0
+
+[DEBUG] YM2413 patch 18 -> OPL3 Source: 01 01 0A 04
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=10 -> 11
+[DEBUG] AR-MinClamp inst=18 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 18 -> RateMap(Mod): rawAR=0->2 rawDR=10->11
+[DEBUG] YM2413 patch 18 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=0 MULT=1 KSL=0 TL=1 AR=2 DR=11 SL=0 RR=4 WS=1
+[DEBUG] YM2413 patch 18 -> OPL3 Source: 00 00 00 00
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=18 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 18 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 18 -> OPL3 Carrier: AM=0 VIB=0 EGT=0 KSR=0 MULT=0 KSL=0 TL=0 AR=2 DR=0 SL=0 RR=0 WS=0
+[DEBUG] YM2413 patch 18 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=18
+[DEBUG] YM2413 patch 18 -> OPL3 Adjusted: Modulator AR=2 DR=11, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 18 -> OPL3 Final: Modulator TL=1, Carrier TL=0
+
+[DEBUG] YM2413 patch 19 -> OPL3 Source: 11 01 08 05
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=8 -> 9
+[DEBUG] AR-MinClamp inst=19 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 19 -> RateMap(Mod): rawAR=0->2 rawDR=8->9
+[DEBUG] YM2413 patch 19 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=1 KSL=0 TL=1 AR=2 DR=9 SL=0 RR=5 WS=1
+[DEBUG] YM2413 patch 19 -> OPL3 Source: 00 00 00 00
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=19 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 19 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 19 -> OPL3 Carrier: AM=0 VIB=0 EGT=0 KSR=0 MULT=0 KSL=0 TL=0 AR=2 DR=0 SL=0 RR=0 WS=0
+[DEBUG] YM2413 patch 19 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=19
+[DEBUG] YM2413 patch 19 -> OPL3 Adjusted: Modulator AR=2 DR=9, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 19 -> OPL3 Final: Modulator TL=1, Carrier TL=0
+
+[DEBUG] YM2413 patch 20 -> OPL3 Source: 31 01 08 04
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=8 -> 9
+[DEBUG] AR-MinClamp inst=20 op=0 Mod rawAR=0 -> 2
+[DEBUG] YM2413 patch 20 -> RateMap(Mod): rawAR=0->2 rawDR=8->9
+[DEBUG] YM2413 patch 20 -> OPL3 Modulator: AM=0 VIB=0 EGT=1 KSR=1 MULT=1 KSL=0 TL=1 AR=2 DR=9 SL=0 RR=4 WS=1
+[DEBUG] YM2413 patch 20 -> OPL3 Source: 00 00 00 00
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[RATEMAP] MODE=SIMPLE raw=0 -> 0
+[DEBUG] AR-MinClamp inst=20 op=1 Car rawAR=0 -> 2
+[DEBUG] YM2413 patch 20 -> RateMap(Car): rawAR=0->2 rawDR=0->0
+[DEBUG] YM2413 patch 20 -> OPL3 Carrier: AM=0 VIB=0 EGT=0 KSR=0 MULT=0 KSL=0 TL=0 AR=2 DR=0 SL=0 RR=0 WS=0
+[DEBUG] YM2413 patch 20 -> OPL3 Feedback/Alg: FB=1 CNT=0 4OP=0 VOICE_NO=20
+[DEBUG] YM2413 patch 20 -> OPL3 Adjusted: Modulator AR=2 DR=9, Carrier AR=2 DR=0
+[DEBUG] YM2413 patch 20 -> OPL3 Final: Modulator TL=1, Carrier TL=0
+
+---> YM2413 write: reg 0x30 val:0x2F with next_cmd=0x61 next_wait_samples=7 (read_done_byte=262/filesize=281)
+YM2413 write:  cmd=0x51 reg=0x30 val=0x20 (read_done_byte=265/filesize=281)
+---> YM2413 write: reg 0x30 val:0x20 with next_cmd=0x61 next_wait_samples=1 (read_done_byte=268/filesize=281)
+YM2413 write:  cmd=0x51 reg=0x10 val=0xAC (read_done_byte=271/filesize=281)
+---> YM2413 write: reg 0x10 val:0xAC with next_cmd=0x61 next_wait_samples=4 (read_done_byte=274/filesize=281)
+YM2413 write:  cmd=0x51 reg=0x20 val=0x16 (read_done_byte=277/filesize=281)
+---> YM2413 write: reg 0x20 val:0x16 with next_cmd=0x61 next_wait_samples=16912 (read_done_byte=280/filesize=281)
+[DEBUG] YM2413 patch 2 -> OPL3 Source: 13 41 16 0E
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=6 -> 7
+[DEBUG] AR-MinClamp inst=2 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 2 -> RateMap(Mod): rawAR=1->2 rawDR=6->7
+[DEBUG] YM2413 patch 2 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=1 TL=1 AR=2 DR=7 SL=0 RR=14 WS=1
+[DEBUG] YM2413 patch 2 -> OPL3 Source: D8 F6 23 12
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] YM2413 patch 2 -> RateMap(Car): rawAR=2->2 rawDR=3->3
+[DEBUG] YM2413 patch 2 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=8 KSL=3 TL=54 AR=2 DR=3 SL=1 RR=2 WS=0
+[DEBUG] YM2413 patch 2 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=2
+[DEBUG] YM2413 patch 2 -> OPL3 Adjusted: Modulator AR=2 DR=7, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 2 -> OPL3 Final: Modulator TL=1, Carrier TL=54
+
+[DEBUG] Apply OPL3 VoiceParam to ch=0
+[DEBUG] YM2413 patch 2 -> OPL3 Source: 13 41 16 0E
+[RATEMAP] MODE=SIMPLE raw=1 -> 1
+[RATEMAP] MODE=SIMPLE raw=6 -> 7
+[DEBUG] AR-MinClamp inst=2 op=0 Mod rawAR=1 -> 2
+[DEBUG] YM2413 patch 2 -> RateMap(Mod): rawAR=1->2 rawDR=6->7
+[DEBUG] YM2413 patch 2 -> OPL3 Modulator: AM=0 VIB=0 EGT=0 KSR=1 MULT=3 KSL=1 TL=1 AR=2 DR=7 SL=0 RR=14 WS=1
+[DEBUG] YM2413 patch 2 -> OPL3 Source: D8 F6 23 12
+[RATEMAP] MODE=SIMPLE raw=2 -> 2
+[RATEMAP] MODE=SIMPLE raw=3 -> 3
+[DEBUG] YM2413 patch 2 -> RateMap(Car): rawAR=2->2 rawDR=3->3
+[DEBUG] YM2413 patch 2 -> OPL3 Carrier: AM=1 VIB=1 EGT=0 KSR=1 MULT=8 KSL=3 TL=54 AR=2 DR=3 SL=1 RR=2 WS=0
+[DEBUG] YM2413 patch 2 -> OPL3 Feedback/Alg: FB=3 CNT=0 4OP=0 VOICE_NO=2
+[DEBUG] YM2413 patch 2 -> OPL3 Adjusted: Modulator AR=2 DR=7, Carrier AR=2 DR=3
+[DEBUG] YM2413 patch 2 -> OPL3 Final: Modulator TL=1, Carrier TL=54
+
+[OPL3] Converted VGM written to: /mnt/c/repositories/emef2247/eseopl3patcher/calibration/02o4t03aOPL3.vgm
+[OPL3] <detune f> Detune value: 1%
+[OPL3] Wait value: 0
+[OPL3] Creator: eseopl3patcher
+[OPL3] Channel Panning Mode: 0
+[OPL3] Port0 Volume: 100.00%
+[OPL3] Port1 Volume: 80.00%
+
+

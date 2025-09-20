@@ -1,3 +1,7 @@
+# =========================================================
+# Calibration / PASS1 統合設定ファイル
+# =========================================================
+
 bases:
   - 01o4
   - 02o4
@@ -10,7 +14,6 @@ variants:
   - m2s1t0
 
 frequency_default: 261.63
-# もし音程別指定するなら:
 # frequency_map:
 #   02o4: 293.66
 
@@ -21,12 +24,58 @@ analysis:
 
 harmonic_balance:
   enable: true
-  rel_h2_clip_db: 10.0          # 異常過大判定
-  rel_h2_target_center_db: 0.0  # 目標
-  rel_h2_gain_factor: 0.35      # TL変換係数(経験的)
+  rel_h2_clip_db: 10.0
+  rel_h2_target_center_db: 0.0
+  rel_h2_gain_factor: 0.35
   max_mod_tl_delta: 12
   max_car_tl_delta: 6
   feedback_adjust:
     enable: true
     threshold_db: 12.0
-    reduce_step: 1              # FB を 1 減らす
+    reduce_step: 1
+
+# variant → 意味付けメタ
+variant_profiles:
+  m1s0t0: { rate_map_mode: 1, shape_fix: 0, mod_tl_adj: 0 }
+  m1s1t0: { rate_map_mode: 1, shape_fix: 1, mod_tl_adj: 0 }
+  m2s0t0: { rate_map_mode: 2, shape_fix: 0, mod_tl_adj: 0 }
+  m2s1t0: { rate_map_mode: 2, shape_fix: 1, mod_tl_adj: 0 }
+
+# =========================================================
+# PASS1 実行系 (calib_pass1.sh / Makefile が参照)
+# =========================================================
+
+corpus_list: /mnt/c/repositories/emef2247/eseopl3patcher/list/corpus_vgm.txt
+pass1_variant: m1s0t0
+
+binary_variants:
+  m1s0t0: bin/eseopl3patcher_m1s0t0
+  m1s1t0: bin/eseopl3patcher_m1s1t0
+  m2s0t0: bin/eseopl3patcher_m2s0t0
+  m2s1t0: bin/eseopl3patcher_m2s1t0
+
+# 実際に使うバイナリ（初回は m1s0t0）
+binary: /mnt/c/repositories/emef2247/eseopl3patcher/bin/eseopl3patcher_m1s0t0
+
+detune: 1.0
+wait: 0
+jobs: 4
+timeout_sec_per_file: 60
+out_root: pass1_v3_baseline
+
+stat_keywords:
+  - RATEMAP
+  - SHAPEFIX
+  - KeyOnDbg
+  - Apply OPL3 VoiceParam
+
+retry: 0
+
+# 記録用メタ
+rate_map_mode: 1
+shape_fix: 0
+mod_tl_adj: 0
+
+build_meta:
+  commit: null
+  note: "initial pass1 baseline"

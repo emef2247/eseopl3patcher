@@ -1,0 +1,8 @@
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/02o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/04o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/03o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/01o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/06o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/05o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/07o4t03a.vgm
+/mnt/c/repositories/emef2247/eseopl3patcher/calibration/08o4t03a.vgm

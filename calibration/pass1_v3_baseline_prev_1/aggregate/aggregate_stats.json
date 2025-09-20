@@ -1,0 +1,40 @@
+{
+  "global": {
+    "rate_pairs": {},
+    "shape": {}
+  },
+  "per_file": {
+    "01o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "02o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "03o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "04o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "05o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "06o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "07o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    },
+    "08o4t03a": {
+      "rate_pairs": {},
+      "shape_gap_count": 0
+    }
+  }
+}
