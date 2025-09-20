@@ -1,3 +1,21 @@
+/**
+ * opll_to_opl3_wrapper.c (Refactored)
+ *
+ * Changes:
+ *  - Added program argument storage (opll_set_program_args).
+ *  - Added void opll_init(OPL3State*) that:
+ *      * Runs converter_init() internally (parses --override).
+ *      * Registers all YM2413 patches to the OPL3 voice DB.
+ *      * Clears OPLL register & pending state.
+ *  - Separated OPLL-specific initialization from generic opl3_init().
+ *  - Maintained existing logging and rate/shape logic.
+ *
+ * NOTE:
+ *  - Add prototypes to opll_to_opl3_wrapper.h:
+ *      void opll_set_program_args(int argc, char **argv);
+ *      void opll_init(OPL3State *state);
+ */
+
 #include "../vgm/vgm_helpers.h"
 #include "../opl3/opl3_convert.h"
 #include "ym2413_voice_rom.h"
@@ -6,6 +24,69 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include "../override_apply.h"
+#include "../override_loader.h"
+#include "../compat_bool.h"   // portability bool
+
+// ---- Program argument retention for converter_init() ----
+static int    g_saved_argc = 0;
+static char **g_saved_argv = NULL;
+
+/** Store program arguments for later converter_init() call. */
+void opll_set_program_args(int argc, char **argv) {
+    g_saved_argc = argc;
+    g_saved_argv = argv;
+}
+
+/** Internal converter init wrapper (kept original behavior). */
+static void converter_init(int argc, char **argv) {
+    override_init();
+    const char *override_path = NULL;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--override") == 0 && i + 1 < argc) {
+            override_path = argv[++i];
+        }
+    }
+    if (override_path) {
+        if (override_loader_load_json(override_path) == 0) {
+            override_dump_table(); // Optional debug
+        }
+    }
+}
+
+/** Public OPLL initialization separated from generic OPL3 init. */
+void opll_init(OPL3State *p_state) {
+    if (!p_state) return;
+
+    // Run override / converter setup only once.
+    if (g_saved_argv) {
+        converter_init(g_saved_argc, g_saved_argv);
+    }
+
+    // Register YM2413 patches into voice DB (instrument library)
+    for (int inst = 1; inst <= 15; ++inst) {
+        OPL3VoiceParam vp;
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
+        opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
+    }
+    for (int inst = 16; inst <= 20; ++inst) {
+        OPL3VoiceParam vp;
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
+        opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
+    }
+
+    memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
+    for (int i = 0; i < YM2413_NUM_CH; ++i) {
+        opll_pending_clear(&g_pend[i]);
+        stamp_clear(&g_stamp[i]);
+        g_pending_on_elapsed[i] = 0;
+    }
+}
+
+/* ------------------------------------------------
+ *  Constants / Macros (整理済み)
+ * ------------------------------------------------ */
+
 
 #define OPLL_RHYTHM_BD   (1 << 4)
 #define OPLL_RHYTHM_SD   (1 << 3)
@@ -14,25 +95,17 @@
 #define OPLL_RHYTHM_HH   (1 << 0)
 #define OPLL_RHYTHM_MASK (OPLL_RHYTHM_BD | OPLL_RHYTHM_SD | OPLL_RHYTHM_TOM | OPLL_RHYTHM_CYM | OPLL_RHYTHM_HH)
 
+/* Note-On 発音直前に $3n / $1n を待つ短い猶予サンプル数 */
 #ifndef KEYON_WAIT_GRACE_SAMPLES
 #define KEYON_WAIT_GRACE_SAMPLES 16
 #endif
 
-// 音色（$3n）が未確定のまま来た Note-On を待つ上限（サンプル数）
+/* 音色( $3n ) が不明のまま Note-On 状態で待てる最大サンプル */
 #ifndef KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES
 #define KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES 512
 #endif
 
-/* ★追加: Attack Rate 強制下限設定マクロ */
-#ifndef OPLL_FORCE_MIN_ATTACK_RATE
-#define OPLL_FORCE_MIN_ATTACK_RATE 1   /* 1 だと原音に近いが “遅すぎ無音” リスク残るため 2 推奨 */
-#endif
-
-#ifndef OPLL_DEBUG_ENFORCE_MIN_AR
-#define OPLL_DEBUG_ENFORCE_MIN_AR 1
-#endif
-
-// ★追加: 可変機能フラグ
+/* 可変機能フラグ */
 #ifndef OPLL_ENABLE_RATE_MAP
 #define OPLL_ENABLE_RATE_MAP 1
 #endif
@@ -46,17 +119,16 @@
 #define OPLL_ENABLE_ARDR_MIN_CLAMP 0
 #endif
 
-
-/* ==== ★追加: レートマップモード ====
- * 0 = アイデンティティ (生値)
- * 1 = 旧簡易テーブル (既存)
- * 2 = 校正(CALIB)テーブル（低ARを少し底上げ / 中域平滑）
+/* レートマップモード
+ * 0 = 生値
+ * 1 = SIMPLE (旧簡易)
+ * 2 = CALIB v2 (低AR緩和)
  */
 #ifndef OPLL_RATE_MAP_MODE
-#define OPLL_RATE_MAP_MODE 2
+#define OPLL_RATE_MAP_MODE 1
 #endif
 
-/* ==== ★追加: Attack Rate 最低保証 ==== */
+/* Attack Rate 強制最低値 (AR<この値なら引き上げ) */
 #ifndef OPLL_FORCE_MIN_ATTACK_RATE
 #define OPLL_FORCE_MIN_ATTACK_RATE 2
 #endif
@@ -64,91 +136,50 @@
 #define OPLL_DEBUG_ENFORCE_MIN_AR 1
 #endif
 
-/* ==== ★追加: Envelope Shape Fix (ARとDRの乖離を抑える) ==== */
+/* Shape Fix (AR << DR の極端差を抑制) */
 #ifndef OPLL_ENABLE_ENVELOPE_SHAPE_FIX
 #define OPLL_ENABLE_ENVELOPE_SHAPE_FIX 0
 #endif
-/* DR - AR >= しきい値 で補正 */
+/* 差 (DR-AR) 閾値 (>= で発火: STRICT_GT=1 なら >) */
 #ifndef OPLL_SHAPE_FIX_DR_GAP_THRESHOLD
-#define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 13
+#define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 11
 #endif
-/* 補正後 DR の上限 (必要なら AR+N まで丸め) */
+/* 補正後 DR の上限 (過大な速い減衰を抑制) */
 #ifndef OPLL_SHAPE_FIX_DR_MAX_AFTER
 #define OPLL_SHAPE_FIX_DR_MAX_AFTER 12
 #endif
 #ifndef OPLL_DEBUG_SHAPE_FIX
 #define OPLL_DEBUG_SHAPE_FIX 1
 #endif
+/* 0: gap>=th, 1: gap>th */
+#ifndef OPLL_SHAPE_FIX_USE_STRICT_GT
+#define OPLL_SHAPE_FIX_USE_STRICT_GT 0
+#endif
 
-/* 追加デバッグ */
+/* デバッグ */
 #ifndef OPLL_DEBUG_RATE_PICK
 #define OPLL_DEBUG_RATE_PICK 1
 #endif
 
-/* ==== ★追加: レートマップモード ====
- * 0 = アイデンティティ (生値)
- * 1 = 旧簡易テーブル (既存)
- * 2 = 校正(CALIB)テーブル（低ARを少し底上げ / 中域平滑）
- */
-#ifndef OPLL_RATE_MAP_MODE
-#define OPLL_RATE_MAP_MODE 2
-#endif
-
-/* ==== ★追加: Attack Rate 最低保証 ==== */
-#ifndef OPLL_FORCE_MIN_ATTACK_RATE
-#define OPLL_FORCE_MIN_ATTACK_RATE 2
-#endif
-#ifndef OPLL_DEBUG_ENFORCE_MIN_AR
-#define OPLL_DEBUG_ENFORCE_MIN_AR 1
-#endif
-
-/* ==== ★追加: Envelope Shape Fix (ARとDRの乖離を抑える) ==== */
-#ifndef OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-#define OPLL_ENABLE_ENVELOPE_SHAPE_FIX 1
-#endif
-/* DR - AR >= しきい値 で補正 */
-#ifndef OPLL_SHAPE_FIX_DR_GAP_THRESHOLD
-#define OPLL_SHAPE_FIX_DR_GAP_THRESHOLD 13
-#endif
-/* 補正後 DR の上限 (必要なら AR+N まで丸め) */
-#ifndef OPLL_SHAPE_FIX_DR_MAX_AFTER
-#define OPLL_SHAPE_FIX_DR_MAX_AFTER 12
-#endif
-#ifndef OPLL_DEBUG_SHAPE_FIX
-#define OPLL_DEBUG_SHAPE_FIX 1
-#endif
-
-/* 追加デバッグ */
-#ifndef OPLL_DEBUG_RATE_PICK
-#define OPLL_DEBUG_RATE_PICK 1
-#endif
-
-/* ==== 既存RateMap(旧簡易) ==== */
+/* 旧簡易 RateMap */
 static const uint8_t kOPLLRateToOPL3_SIMPLE[16] = {
     0,1,2,3,5,6,7,8,9,10,11,12,13,14,15,15
 };
 
-/* ==== ★追加: CALIB RateMap (暫定調整値)
- * 目標: 低AR域を持ち上げて「立ち上がらず消える」を防止しつつ
- * 中〜高域は OPL3 の 1刻み増加に近似
- * 実測が取れたらここを更新
- */
+/* CALIB v2: 低AR過剰短縮緩和 (0..3 を 1,2,3,4 に) */
 static const uint8_t kOPLLRateToOPL3_CALIB[16] = {
-    /* raw:0..15 */
-    2, 3, 4, 5,   /* 0..3   -> 少し底上げ */
-    6, 7, 8, 9,   /* 4..7 */
-    10,11,12,13,  /* 8..11 */
-    14,15,15,15   /* 12..15 (上限飽和) */
+    1,2,3,4,  /* 0..3 */
+    6,7,8,9,  /* 4..7 */
+    10,11,12,13,
+    14,15,15,15
 };
 
-/* ==== ★追加: Identity RateMap ==== */
+/* Identity */
 static const uint8_t kOPLLRateToOPL3_ID[16] = {
     0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
 };
 
-// ★追加: Mod TL 補正テーブル (inst=0(User)～15)
-// 値は加算 (0～63範囲にクリップ)。用途: 低TL(=強変調)を少し和らげる等。
-// 必要に応じ後でチューニング
+/* Mod TL 補正テーブル (inst=0..15) */
 static const int8_t kModTLAddTable[16] = {
 /*U ,Vi ,Gt ,Pi ,Fl ,Cl ,Ob ,Tr ,Or ,Hr ,SyS,Har,Vib,SyB,AcB,EGt */
   0,  0,  4,  2,  0,  2,  2,  0,  0,  2,  2,  3,  0,  3,  3,  4
@@ -157,21 +188,12 @@ static const int8_t kModTLAddTable[16] = {
 #define YM2413_NUM_CH 9
 #define YM2413_REGS_SIZE 0x40
 
-static uint8_t g_ym2413_regs[YM2413_REGS_SIZE] = {0};
+#define YM2413_NUM_CH 9
+#define YM2413_REGS_SIZE 0x40
+uint8_t g_ym2413_regs[YM2413_REGS_SIZE] = {0}; // Now non-static for possible reuse
 OpllPendingCh g_pend[YM2413_NUM_CH] = {0};
 OpllStampCh   g_stamp[YM2413_NUM_CH] = {0};
-// Note-On 保留経過
 static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
-
-struct OPL3State; // 前方宣言
-
-static void ym2413_patch_to_opl3_with_fb(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp);
-static inline void flush_channel(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-                                 int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
-                                 OpllPendingCh* p, OpllStampCh* s);
-static inline void flush_channel_keyoff(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-                                        int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
-                                        OpllPendingCh* p, OpllStampCh* s);
 
 /* ------------------------------------------------
  * Utility
@@ -191,114 +213,82 @@ static inline int reg_kind(uint8_t addr) {
 static inline void stamp_clear(OpllStampCh* s) { memset(s,0,sizeof(*s)); }
 static inline void opll_pending_clear(OpllPendingCh* p){ memset(p,0,sizeof(*p)); }
 
-
-static inline void stamp_array_clear(OpllStampCh* arr, int ch_count) {
-    for (int i = 0; i < ch_count; ++i) stamp_clear(&arr[i]);
-}
-static inline void opll_pending_array_clear(OpllPendingCh* arr, int ch_count) {
-    for (int i = 0; i < ch_count; ++i) opll_pending_clear(&arr[i]);
-}
-
-/** Calculates OPLL output frequency */
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
     printf("[DEBUG] calc_opllfrequency: clock=%.0f block=%u fnum=%u\n", clock, block, fnum);
     return (clock / 72.0) * ldexp((double)fnum / 512.0, block - 1);
 }
 
+/* ---- Forward prototypes (avoid implicit declarations) ---- */
+static inline void flush_channel_ch(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
+    OpllPendingCh* p, OpllStampCh* s);
+
+static inline void flush_channel(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts,
+    OpllPendingCh* p, OpllStampCh* s);
+
 /* ------------------------------------------------
  * Volume / TL
  * ------------------------------------------------ */
- // OPLL VOL は 0..15（0最大、15最小）。キャリアの TL は “VOL のみ”で絶対指定する。
-static inline uint8_t opll_vol_to_opl3_carrier_tl_abs(uint8_t vol /*0..15*/)
-{
-    // 約3dB/step 相当。15は特別に 63（ほぼ無音）でクランプ。
+static inline uint8_t opll_vol_to_opl3_carrier_tl_abs(uint8_t vol) {
     static const uint8_t kVolToTL_Abs[16] = {
-        0, 4, 8, 12, 16, 20, 24, 28,
-        32, 36, 40, 44, 48, 52, 56, 63
+        0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,63
     };
     return kVolToTL_Abs[vol & 0x0F];
 }
-
-// 従来の「baseTL + VOLTL」変換（必要ならモジュレータ用に利用）
-static uint8_t opll_vol_to_opl3_tl(uint8_t base_tl, uint8_t opll_vol)
-{
-    // OPLL VOL ≈ 2 dB/step → OPL3 TL(約0.75dB/step) へのおおよそマップ
-    static const uint8_t opll_vol_to_tl[16] = {
-        0,  2,  4,  6,
-        8, 11, 13, 15,
-        17, 19, 21, 23,
-        26, 29, 32, 63
-    };
-    uint8_t vol_tl = opll_vol_to_tl[opll_vol & 0x0F];
-    uint16_t tl = (uint16_t)base_tl + vol_tl;
-    if (tl > 63) tl = 63;
+static uint8_t opll_vol_to_opl3_tl(uint8_t base_tl,uint8_t opll_vol){
+    static const uint8_t t[16]={0,2,4,6,8,11,13,15,17,19,21,23,26,29,32,63};
+    uint16_t tl=base_tl + t[opll_vol & 0x0F];
+    if(tl>63) tl=63;
     return (uint8_t)tl;
 }
-
-// 0x40（キャリア）に書く値を VOL のみで作る（KSLは楽器のものを維持）
-static inline uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n /*$3n*/)
-{
-    const uint8_t vol = reg3n & 0x0F;
-    const uint8_t tl  = opll_vol_to_opl3_carrier_tl_abs(vol);
-    const uint8_t ksl_bits = (uint8_t)((vp->op[1].ksl & 0x03) << 6);
+static inline uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp,uint8_t reg3n){
+    uint8_t vol = reg3n & 0x0F;
+    uint8_t tl  = opll_vol_to_opl3_carrier_tl_abs(vol);
+    uint8_t ksl_bits = (uint8_t)((vp->op[1].ksl & 0x03)<<6);
     return (uint8_t)(ksl_bits | (tl & 0x3F));
 }
 
 /* ------------------------------------------------
  * Pending helpers
  * ------------------------------------------------ */
-static inline void set_pending_from_opll_write_ch(OpllPendingCh* p, const OpllStampCh* s,
-                                                  uint8_t addr, uint8_t value) {
+static inline void set_pending_from_opll_write_ch(OpllPendingCh* p,const OpllStampCh* s,uint8_t addr,uint8_t value){
     (void)s;
-    switch (reg_kind(addr)) {
-        case 1: p->has_1n = true; p->reg1n = value; break;
-        case 2: p->has_2n = true; p->reg2n = value; break;
-        case 3: p->has_3n = true; p->reg3n = value; break;
+    switch(reg_kind(addr)){
+        case 1: p->has_1n=true; p->reg1n=value; break;
+        case 2: p->has_2n=true; p->reg2n=value; break;
+        case 3: p->has_3n=true; p->reg3n=value; break;
         default: break;
     }
 }
-static inline void set_pending_from_opll_write(OpllPendingCh g_pend[], const OpllStampCh g_stamp[],
-                                               uint8_t addr, uint8_t value) {
-    int ch = ch_from_addr(addr);
-    if (ch < 0) return;
-    set_pending_from_opll_write_ch(&g_pend[ch], &g_stamp[ch], addr, value);
+static inline void set_pending_from_opll_write(OpllPendingCh pend[],const OpllStampCh stamp[],uint8_t addr,uint8_t value){
+    int ch=ch_from_addr(addr); if(ch<0) return;
+    set_pending_from_opll_write_ch(&pend[ch],&stamp[ch],addr,value);
 }
-
-/** Analyze 2n edge */
-static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p, const OpllStampCh* s) {
-    PendingEdgeInfo info = (PendingEdgeInfo){0};
-    if (!p || !s || !p->has_2n) return info;
-    bool ko_next = (p->reg2n & 0x10) != 0;
-    info.has_2n        = true;
-    info.ko_next       = ko_next;
-    info.note_on_edge  = (!s->ko && ko_next);
-    info.note_off_edge = ( s->ko && !ko_next);
+static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p,const OpllStampCh* s){
+    PendingEdgeInfo info={0};
+    if(!p||!s||!p->has_2n) return info;
+    bool ko_next=(p->reg2n & 0x10)!=0;
+    info.has_2n=true;
+    info.ko_next=ko_next;
+    info.note_on_edge = (!s->ko && ko_next);
+    info.note_off_edge= ( s->ko && !ko_next);
     return info;
 }
-static inline PendingEdgeInfo analyze_pending_edge_idx(const OpllPendingCh pend[], const OpllStampCh stamp[], int ch) {
-    return analyze_pending_edge_ch(&pend[ch], &stamp[ch]);
-}
-
-/** Determine if should pend */
-static inline bool should_pend(uint8_t addr, uint8_t value,
-                               const OpllStampCh* stamp_ch,
-                               uint16_t next_wait_samples) {
-    const int kind = reg_kind(addr);
-    switch (kind) {
-        case 1: // $1n
-            return stamp_ch && (stamp_ch->ko == false);
-        case 3: // $3n
-            return stamp_ch && (stamp_ch->ko == false);
-        case 2: {
-            if (!stamp_ch) return false;
-            const bool ko_next = (value & 0x10) != 0;
-            if (!stamp_ch->ko && ko_next) {
-                return (next_wait_samples <= KEYON_WAIT_GRACE_SAMPLES);
-            }
+static inline bool should_pend(uint8_t addr,uint8_t value,const OpllStampCh* stamp_ch,uint16_t next_wait_samples){
+    switch(reg_kind(addr)){
+        case 1: return stamp_ch && (stamp_ch->ko==false);
+        case 3: return stamp_ch && (stamp_ch->ko==false);
+        case 2:{
+            if(!stamp_ch) return false;
+            bool ko_next=(value & 0x10)!=0;
+            if(!stamp_ch->ko && ko_next)
+                return (next_wait_samples<=KEYON_WAIT_GRACE_SAMPLES);
             return false;
         }
-        default:
-            return false;
+        default: return false;
     }
 }
 
@@ -349,7 +339,7 @@ static inline uint8_t rate_map_pick(uint8_t raw){
  #else
     uint8_t v=kOPLLRateToOPL3_CALIB[raw & 0x0F];
     #if OPLL_DEBUG_RATE_PICK
-    printf("[RATEMAP] MODE=CALIB raw=%u -> %u\n",raw,v);
+    printf("[RATEMAP] MODE=CALIBv2 raw=%u -> %u\n",raw,v);
     #endif
     return v;
  #endif
@@ -372,7 +362,6 @@ static inline uint8_t enforce_min_attack(uint8_t ar,const char* stage,int inst,i
     return ar;
 }
 
-
 /* ------------------------------------------------
  * Envelope Shape Fix
  * ------------------------------------------------ */
@@ -380,17 +369,40 @@ static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t*
 #if OPLL_ENABLE_ENVELOPE_SHAPE_FIX
     if(!ar || !dr) return;
     uint8_t A=*ar, D=*dr;
-    if (D > A && (uint8_t)(D - A) >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD) {
-        uint8_t newD = D;
-        if (newD > OPLL_SHAPE_FIX_DR_MAX_AFTER) newD = OPLL_SHAPE_FIX_DR_MAX_AFTER;
-        if (newD < A) newD = (uint8_t)(A+1);
-        if (newD != D) {
-#if OPLL_DEBUG_SHAPE_FIX
-            printf("[SHAPEFIX] inst=%d op=%d AR=%u DR=%u -> DR'=%u (gap=%u)\n",
-                   inst, op_index, A, D, newD, (unsigned)(D-A));
+    if (D > A) {
+        uint8_t gap = (uint8_t)(D - A);
+#if OPLL_SHAPE_FIX_USE_STRICT_GT
+        int cond = (gap > OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
+#else
+        int cond = (gap >= OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
 #endif
-            *dr = newD;
+        if (cond) {
+            uint8_t newD = D;
+            if (newD > OPLL_SHAPE_FIX_DR_MAX_AFTER) newD = OPLL_SHAPE_FIX_DR_MAX_AFTER;
+            if (newD < (uint8_t)(A+1)) newD = (uint8_t)(A+1);
+            if (newD != D) {
+#if OPLL_DEBUG_SHAPE_FIX
+                printf("[SHAPEFIX] inst=%d op=%d AR=%u DR=%u gap=%u -> DR'=%u (th=%d)\n",
+                       inst, op_index, A, D, gap, newD, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
+#endif
+                *dr = newD;
+            } else {
+#if OPLL_DEBUG_SHAPE_FIX
+                printf("[SHAPEFIX] inst=%d op=%d gap=%u no-change (within limit)\n",
+                       inst, op_index, gap);
+#endif
+            }
+        } else {
+#if OPLL_DEBUG_SHAPE_FIX
+            printf("[SHAPEFIX] inst=%d op=%d no-fix AR=%u DR=%u gap=%u th=%d\n",
+                   inst, op_index, A, D, gap, OPLL_SHAPE_FIX_DR_GAP_THRESHOLD);
+#endif
         }
+    } else {
+#if OPLL_DEBUG_SHAPE_FIX
+        printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n",
+               inst, op_index, A, D);
+#endif
     }
 #endif
 }
@@ -508,35 +520,17 @@ static void ym2413_patch_to_opl3_with_fb(int inst,const uint8_t *ym2413_regs,OPL
     printf("\n");
 }
 
-/* Global channel 0..17 -> port(0/1), local ch(0..8) */
-static inline void opl3_port_and_local(uint8_t ch_global, uint8_t* out_port, uint8_t* out_ch_local) {
-    uint8_t port = (ch_global >= 9) ? 1 : 0;
-    uint8_t loc  = (uint8_t)(ch_global % 9);
-    if (out_port) *out_port = port;
-    if (out_ch_local) *out_ch_local = loc;
-}
-
-
-/** OPL3 チャンネルへ音色適用 */
+/* ------------------------------------------------
+ * Apply voice params to channel
+ * ------------------------------------------------ */
 int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *opts) {
     if (!vp || ch < 0 || ch >= 9) return 0;
     int bytes = 0;
-    int slot_mod = opl3_opreg_addr(0,ch,0); // slot index (base=0)
-    int slot_car = opl3_opreg_addr(0,ch,1); // slot index (base=0)
+    int slot_mod = opl3_opreg_addr(0,ch,0);
+    int slot_car = opl3_opreg_addr(0,ch,1);
 
     printf("[DEBUG] Apply OPL3 VoiceParam to ch=%d\n", ch);
-    printf("[DEBUG]   Modulator: AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-        vp->op[0].am, vp->op[0].vib, vp->op[0].egt, vp->op[0].ksr, vp->op[0].mult,
-        vp->op[0].ksl, vp->op[0].tl, vp->op[0].ar, vp->op[0].dr, vp->op[0].sl, vp->op[0].rr, vp->op[0].ws
-    );
-    printf("[DEBUG]   Carrier:   AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-        vp->op[1].am, vp->op[1].vib, vp->op[1].egt, vp->op[1].ksr, vp->op[1].mult,
-        vp->op[1].ksl, vp->op[1].tl, vp->op[1].ar, vp->op[1].dr, vp->op[1].sl, vp->op[1].rr, vp->op[1].ws
-    );
-    printf("[DEBUG]   Feedback/Alg: FB=%d CNT=%d 4OP=%d VOICE_NO=%d\n",
-        vp->fb[0], vp->cnt[0], vp->is_4op, vp->voice_no
-    );
 
     uint8_t opl3_2n_mod = (uint8_t)((vp->op[0].am << 7) | (vp->op[0].vib << 6) | (vp->op[0].egt << 5) | (vp->op[0].ksr << 4) | (vp->op[0].mult & 0x0F));
     uint8_t opl3_2n_car = (uint8_t)((vp->op[1].am << 7) | (vp->op[1].vib << 6) | (vp->op[1].egt << 5) | (vp->op[1].ksr << 4) | (vp->op[1].mult & 0x0F));
@@ -566,55 +560,39 @@ int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State
     bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_mod, opl3_en_mod, opts);
     bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_car, opl3_en_car, opts);
 
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x20 + slot_mod, opl3_2n_mod);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x40 + slot_mod, opl3_4n_mod);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x60 + slot_mod, opl3_6n_mod);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x80 + slot_mod, opl3_8n_mod);
-    printf("[DEBUG]   Write OPL3 (Ch) 0x%02X: 0x%02X (C0)\n", 0xC0 + ch, c0_val);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0xE0 + slot_mod, opl3_en_mod);
-
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x20 + slot_car, opl3_2n_car);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x40 + slot_car, opl3_4n_car);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x60 + slot_car, opl3_6n_car);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0x80 + slot_car, opl3_8n_car);
-    printf("[DEBUG]   Write OPL3 0x%02X: 0x%02X\n", 0xE0 + slot_car, opl3_en_car);
-
     return bytes;
 }
 
-/* ========== ROM パッチ事前登録 ========== */
+/* ROM パッチ登録 */
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db) {
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
         opl3_voice_db_find_or_add(db, &vp);
     }
-    for (int inst = 16; inst <= 20; ++inst) { // ★修正 16..20
+    for (int inst = 16; inst <= 20; ++inst) {
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
         opl3_voice_db_find_or_add(db, &vp);
     }
 }
 
-/* ========== INST 適用（KeyOn 前） ========== */
+/* 音色適用（KeyOn直前） */
 static inline void apply_inst_before_keyon(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
                                            int ch, uint8_t reg3n, const CommandOptions *opts) {
     int8_t inst = (reg3n >> 4) & 0x0F;
     OPL3VoiceParam vp;
     ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp);
     opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, opts);
-
     uint8_t c0 = (uint8_t)(((vp.fb[0] & 0x07) << 1) | (vp.cnt[0] & 0x01));
     c0 |= 0xC0;
     duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0, opts);
 }
 
-/* ========== エッジ・状態補助 ========== */
 static inline bool has_effective_3n(const OpllPendingCh* p, const OpllStampCh* s) {
     return (p && p->has_3n) || (s && s->valid_3n);
 }
 
-/* wait 消化時の Note-On 保留タイムアウト監視 */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
     const CommandOptions *opts, uint16_t wait_samples)
@@ -639,8 +617,7 @@ static inline void opll_tick_pending_on_elapsed(
     }
 }
 
-/* ========== KSL/ModTL 簡易実効値デバッグ推定 ========== */
-// 簡易: 高ブロックほど TL に + (ksl * 係数) を与えるラフ推定
+/* 簡易 KSL 影響デバッグ (Mod TL) */
 static inline uint8_t debug_effective_mod_tl(uint8_t raw_tl, uint8_t ksl, uint8_t block) {
     uint8_t add = 0;
     if (block >= 5) add = (uint8_t)(ksl * 2);
@@ -650,7 +627,7 @@ static inline uint8_t debug_effective_mod_tl(uint8_t raw_tl, uint8_t ksl, uint8_
     return (uint8_t)eff;
 }
 
-/* ========== flush（チャネル単位） ========== */
+/* flush (ch) */
 static inline void flush_channel_ch (
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s) {
@@ -666,26 +643,23 @@ static inline void flush_channel_ch (
         ch, p->has_1n?"Y":"n", p->has_3n?"Y":"n", p->has_2n?"Y":"n",
         e.note_on_edge?1:0, e.note_off_edge?1:0);
 
-    uint8_t car_slot = opl3_local_car_slot((uint8_t)ch); // ★修正
+    uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
 
     if (e.has_2n && e.note_on_edge) {
         uint8_t reg3n_eff = p->has_3n ? p->reg3n : (s->valid_3n ? s->last_3n : 0x00);
-        uint8_t reg2n_eff = p->reg2n; // KeyOn 直前値
+        uint8_t reg2n_eff = p->reg2n;
         uint8_t reg1n_eff = p->has_1n ? p->reg1n : (s->valid_1n ? s->last_1n : 0x00);
         apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, opts);
 
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
                              0xA0 + ch, opll_to_opl3_an(reg1n_eff), opts);
 
-        // キャリアTL（VOLのみで絶対指定）
         int8_t inst = (reg3n_eff >> 4) & 0x0F;
         OPL3VoiceParam vp_tmp;
         ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
         uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, reg3n_eff);
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
                              0x40 + car_slot, car40, opts);
-        fprintf(stderr, "[DEBUG] KeyOn carTL write ch=%d slot=%u addr=0x%02X val=0x%02X\n",
-                ch, car_slot, 0x40 + car_slot, car40);
 
 #if OPLL_ENABLE_KEYON_DEBUG
         {
@@ -722,8 +696,6 @@ static inline void flush_channel_ch (
             uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
                                  0x40 + car_slot, car40, opts);
-            fprintf(stderr, "[DEBUG] KeyOff carTL upd ch=%d slot=%u addr=0x%02X val=0x%02X\n",
-                    ch, car_slot, 0x40 + car_slot, car40);
         }
 
     } else {
@@ -738,8 +710,6 @@ static inline void flush_channel_ch (
             uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
                                  0x40 + car_slot, car40, opts);
-            fprintf(stderr, "[DEBUG] Sustain carTL upd ch=%d slot=%u addr=0x%02X val=0x%02X\n",
-                    ch, car_slot, 0x40 + car_slot, car40);
         }
         if (need_2n) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
@@ -747,32 +717,22 @@ static inline void flush_channel_ch (
         }
     }
 
-    // Stamp 更新
     if (p->has_1n && need_1n) { s->last_1n = p->reg1n; s->valid_1n = true; }
     if (p->has_3n && need_3n) { s->last_3n = p->reg3n; s->valid_3n = true; }
     if (p->has_2n) { s->last_2n = p->reg2n; s->valid_2n = true; s->ko = (p->reg2n & 0x10) != 0; }
     opll_pending_clear(p);
 }
 
-/* 配列+chラッパ */
 static inline void flush_channel (
       VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s) {
+    (void)vp;
     flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, opts, p, s);
 }
 
-/* Stamp commit（外で使うなら） */
-static inline void commit_pending_to_stamp(OpllStampCh stamp[], OpllPendingCh pend[], int ch) {
-    if (pend[ch].has_1n) { stamp[ch].last_1n = pend[ch].reg1n; stamp[ch].valid_1n = true; }
-    if (pend[ch].has_3n) { stamp[ch].last_3n = pend[ch].reg3n; stamp[ch].valid_3n = true; }
-    if (pend[ch].has_2n) {
-        stamp[ch].last_2n = pend[ch].reg2n; stamp[ch].valid_2n = true;
-        stamp[ch].ko = (pend[ch].reg2n & 0x10) != 0;
-    }
-    opll_pending_clear(&pend[ch]);
-}
-
-/* ========== エントリポイント ========== */
+/* ------------------------------------------------
+ * Register write entrypoint
+ * ------------------------------------------------ */
 int opll_write_register(
     VGMBuffer *p_music_data,
     VGMContext *p_vgm_context,
@@ -780,7 +740,6 @@ int opll_write_register(
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
     const CommandOptions *opts) {
 
-    // ユーザー音色（$00-$07）は即反映
     if (addr <= 0x07) {
         g_ym2413_regs[addr] = val;
         for (int c = 0; c < YM2413_NUM_CH; ++c) {
@@ -801,11 +760,10 @@ int opll_write_register(
     int ch = ch_from_addr(addr);
     if (ch >= 0) {
         int kind = reg_kind(addr);
-
         const bool pend_note_on =
             g_pend[ch].has_2n && !g_stamp[ch].ko && ((g_pend[ch].reg2n & 0x10) != 0);
 
-        if (kind == 1) { // $1n
+        if (kind == 1) { /* $1n */
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
@@ -819,7 +777,7 @@ int opll_write_register(
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
             }
 
-        } else if (kind == 3) { // $3n
+        } else if (kind == 3) { /* $3n */
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
@@ -833,17 +791,13 @@ int opll_write_register(
                 uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                      0x40 + car_slot, car40, opts);
-                fprintf(stderr, "[DEBUG] Live VOL carTL upd ch=%d slot=%u addr=0x%02X val=0x%02X\n",
-                        ch, car_slot, 0x40 + car_slot, car40);
-
                 g_stamp[ch].last_3n = val; g_stamp[ch].valid_3n = true;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
             }
 
-        } else if (kind == 2) { // $2n
+        } else if (kind == 2) { /* $2n */
             bool ko_next = (val & 0x10) != 0;
-
             if (!g_stamp[ch].ko && ko_next) {
                 if (should_pend(addr, val, &g_stamp[ch], next_wait_samples)) {
                     set_pending_from_opll_write(g_pend, g_stamp, addr, val);

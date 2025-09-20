@@ -1,0 +1,8 @@
+{
+  "patch_overrides": {},
+  "meta": {
+    "source": "harmonic_balance.py",
+    "variant_mode": true,
+    "note": "Per variant aggregate TL deltas"
+  }
+}

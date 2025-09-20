@@ -1,0 +1,32 @@
+bases:
+  - 01o4
+  - 02o4
+  - 03o4
+
+variants:
+  - m1s0t0
+  - m1s1t0
+  - m2s0t0
+  - m2s1t0
+
+frequency_default: 261.63
+# もし音程別指定するなら:
+# frequency_map:
+#   02o4: 293.66
+
+analysis:
+  max_attack_ms: 120
+  rel_h2_target_range: [-6.0, 6.0]
+  rms200_500_delta_max_db: 8.0
+
+harmonic_balance:
+  enable: true
+  rel_h2_clip_db: 10.0          # 異常過大判定
+  rel_h2_target_center_db: 0.0  # 目標
+  rel_h2_gain_factor: 0.35      # TL変換係数(経験的)
+  max_mod_tl_delta: 12
+  max_car_tl_delta: 6
+  feedback_adjust:
+    enable: true
+    threshold_db: 12.0
+    reduce_step: 1              # FB を 1 減らす

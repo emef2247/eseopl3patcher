@@ -61,3 +61,19 @@ dkms.conf
 *.exe
 eseopl3patcher
 *.patch
+
+# Calibration generated artifacts
+calibration/reports/report_*_pass*.json
+calibration/reports/warn_pass*.txt
+calibration/logs/
+calibration/p??o4_*_pass*.vgm
+calibration/p??o4_*_pass*.wav
+
+# WAV/VGM general
+*.wav
+*.vgm
+
+# Keep summary & overrides
+!calibration/reports/summarize_pass1.csv
+!calibration/reports/summarize_pass2.csv
+!calibration/overrides/overrides_pass2.json

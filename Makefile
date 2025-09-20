@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm
+CFLAGS=-O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm -Werror=implicit-function-declaration
 SRCS=$(wildcard src/opl3/*.c) $(wildcard src/vgm/*.c)  $(wildcard src/opll/*.c) src/main.c
 OBJS=$(SRCS:.c=.o)
 TARGET=eseopl3patcher

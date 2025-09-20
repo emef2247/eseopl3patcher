@@ -563,9 +563,9 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
 
-    if (source_fmchip == FMCHIP_YM2413) {
-        register_all_ym2413_patches_to_opl3_voice_db(&p_state->voice_db);
-    }
+    //if (source_fmchip == FMCHIP_YM2413) {
+    //    register_all_ym2413_patches_to_opl3_voice_db(&p_state->voice_db);
+    //}
 
     // OPL3 global registers (Port 1 only)
     opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable
