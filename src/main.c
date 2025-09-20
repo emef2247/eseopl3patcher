@@ -1,8 +1,25 @@
+/**
+ * main.c (Refactored)
+ *
+ * Changes:
+ *  - Added call order: opl3_init() -> opll_set_program_args() -> opll_init()
+ *  - Introduced compat_bool.h instead of <stdbool.h> for portability.
+ *  - Removed OPLL registration responsibility from OPL3 init path.
+ *  - Added function comment blocks per style guide.
+ *
+ * Notes:
+ *  - OPLL conversion still lazily triggers opl3_init() inside the YM2413 branch
+ *    if not previously initialized; early initialization here allows consistent
+ *    environment setup (stereo/panning etc.).
+ *  - If the actual source FM chip is unknown at this stage, we initialize with
+ *    FMCHIP_YMF262 (neutral) and later voice DB additions remain valid.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <math.h>
+#include "compat_bool.h"
 #include "vgm/vgm_helpers.h"
 #include "vgm/vgm_header.h"
 #include "opl3/opl3_convert.h"
@@ -10,21 +27,21 @@
 #include "opll/opll_to_opl3_wrapper.h"
 #include "vgm/gd3_util.h"
 
-#define DEFAULT_DETUNE 1.0
-#define DEFAULT_WAIT 0
-#define DEFAULT_CH_PANNING 0
+#define DEFAULT_DETUNE        1.0
+#define DEFAULT_WAIT          0
+#define DEFAULT_CH_PANNING    0
 #define DEFAULT_VOLUME_RATIO0 1.0
 #define DEFAULT_VOLUME_RATIO1 0.8
 
 int verbose = 0;
 
-// Parse command line for OPL chip conversion flags
+/** Parse command line for OPL chip conversion flags. */
 static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlags *chip_flags) {
     chip_flags->opl_group_autodetect = true;
     chip_flags->convert_ym2413 = false;
     chip_flags->convert_ym3812 = false;
     chip_flags->convert_ym3526 = false;
-    chip_flags->convert_y8950 = false;
+    chip_flags->convert_y8950  = false;
 
     for (int i = 3; i < argc; ++i) {
         if (strcmp(argv[i], "--convert-ym2413") == 0) {
@@ -43,12 +60,15 @@ static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlag
     }
 }
 
-// Read a little-endian 32-bit integer from buffer
+/** Read a little-endian 32-bit integer from buffer. */
 static uint32_t read_le_uint32(const unsigned char *p_ptr) {
-    return (uint32_t)p_ptr[0] | ((uint32_t)p_ptr[1] << 8) | ((uint32_t)p_ptr[2] << 16) | ((uint32_t)p_ptr[3] << 24);
+    return (uint32_t)p_ptr[0] |
+           ((uint32_t)p_ptr[1] << 8) |
+           ((uint32_t)p_ptr[2] << 16) |
+           ((uint32_t)p_ptr[3] << 24);
 }
 
-// Check file extension for .vgm or none (for vgz-uncompressed)
+/** Check file extension for .vgm or none (for vgz-uncompressed). */
 static bool has_vgm_extension_or_none(const char *p_filename) {
     size_t len = strlen(p_filename);
     if (len > 4 && strcasecmp(p_filename + len - 4, ".vgm") == 0) return true;
@@ -58,22 +78,26 @@ static bool has_vgm_extension_or_none(const char *p_filename) {
     return false;
 }
 
-// Generate output file name based on input name
+/** Generate output file name based on input name. */
 static void make_default_output_name(const char *p_input, char *p_output, size_t outlen) {
     size_t len = strlen(p_input);
-    if (len > 4 && strcmp(&p_input[len-4], ".vgm") == 0) len -= 4;
+    if (len > 4 && strcmp(&p_input[len - 4], ".vgm") == 0) len -= 4;
     snprintf(p_output, outlen, "%.*sOPL3.vgm", (int)len, p_input);
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] [--convert-ymXXXX ...]\n", argv[0]);
-        fprintf(stderr, "  --convert-ymXXXX : Explicitly select chips for conversion (YM2413, YM3812, YM3526, Y8950)\n");
-        fprintf(stderr, "  (Default: OPL group auto, only first OPL chip in VGM is converted unless explicit)\n");
+        fprintf(stderr,
+            "Usage: %s <input.vgm> <detune> [wait] [creator] "
+            "[-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] "
+            "[--convert-ymXXXX ...] [--override overrides.json]\n",
+            argv[0]);
+        fprintf(stderr,
+            "  --convert-ymXXXX : Explicit chip selection (YM2413, YM3812, YM3526, Y8950)\n"
+            "  (Default: OPL group auto, the first encountered OPL chip is converted unless explicit)\n");
         return 1;
     }
 
-    // Parse arguments
     const char *p_input_vgm = argv[1];
     double detune = atof(argv[2]);
     int opl3_keyon_wait = DEFAULT_WAIT;
@@ -106,12 +130,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Chip conversion flags
     VGMChipClockFlags chip_flags = {0};
     parse_chip_conversion_flags(argc, argv, &chip_flags);
 
-    // Command options
-     CommandOptions cmd_opts = {
+    CommandOptions cmd_opts = {
         .detune = detune,
         .opl3_keyon_wait = opl3_keyon_wait,
         .ch_panning = ch_panning,
@@ -126,11 +148,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (!has_vgm_extension_or_none(p_input_vgm)) {
-        fprintf(stderr, "Input file must have .vgm extension or no extension (for vgz-uncompressed files)\n");
+        fprintf(stderr, "Input file must have .vgm extension or no extension (vgz-uncompressed)\n");
         return 1;
     }
 
-    // File read
     FILE *p_fp = fopen(p_input_vgm, "rb");
     if (!p_fp) {
         fprintf(stderr, "Cannot open input file: %s\n", p_input_vgm);
@@ -141,7 +162,7 @@ int main(int argc, char *argv[]) {
     fseek(p_fp, 0, SEEK_SET);
 
     unsigned char *p_vgm_data = (unsigned char*)malloc(filesize);
-    if (fread(p_vgm_data, 1, filesize, p_fp) != (size_t)filesize) {
+    if (!p_vgm_data || fread(p_vgm_data, 1, filesize, p_fp) != (size_t)filesize) {
         fprintf(stderr, "Failed to read entire file!\n");
         free(p_vgm_data);
         fclose(p_fp);
@@ -176,70 +197,80 @@ int main(int argc, char *argv[]) {
     vgmctx.gd3.data = NULL;
     vgmctx.gd3.size = 0;
 
-    // Parse header for FM chip clocks
+    // Parse chip clocks
     if (!vgm_parse_chip_clocks(p_vgm_data, filesize, &chip_flags)) {
         fprintf(stderr, "Failed to parse VGM header for chip clocks.\n");
         free(p_vgm_data);
         return 1;
     }
 
-    // --- Set source and target clock for FM conversion ---
-    // Determine which chip is selected for conversion and set the source clock
+    // Decide source FM clock for conversions
     if (chip_flags.convert_ym2413 && chip_flags.has_ym2413) {
         vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
     } else if (chip_flags.convert_ym3812 && chip_flags.has_ym3812) {
-       vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
+        vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
     } else if (chip_flags.convert_ym3526 && chip_flags.has_ym3526) {
         vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
     } else if (chip_flags.convert_y8950 && chip_flags.has_y8950) {
         vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
     } else {
-        vgmctx.source_fm_clock = -1.0; // No conversion
+        vgmctx.source_fm_clock = -1.0;
     }
-    vgmctx.target_fm_clock = OPL3_CLOCK; // Always use OPL3 standard clock as target
+    vgmctx.target_fm_clock = OPL3_CLOCK;
 
     if (verbose) {
         printf("[VGM] FM chip usage in header:\n");
-        printf(" YM2413:   %s (clock=%u)\n",  chip_flags.has_ym2413   ? "YES" : "NO", chip_flags.ym2413_clock);
-        printf(" YM3812:   %s (clock=%u)\n",  chip_flags.has_ym3812   ? "YES" : "NO", chip_flags.ym3812_clock);
-        printf(" YM3526:   %s (clock=%u)\n",  chip_flags.has_ym3526   ? "YES" : "NO", chip_flags.ym3526_clock);
-        printf(" Y8950:    %s (clock=%u)\n",  chip_flags.has_y8950    ? "YES" : "NO", chip_flags.y8950_clock);
-        printf("[VGM] FM conversion source clock: %.0f Hz, target clock: %.0f Hz\n",vgmctx.source_fm_clock, vgmctx.target_fm_clock);
+        printf(" YM2413:   %s (clock=%u)\n", chip_flags.has_ym2413 ? "YES" : "NO", chip_flags.ym2413_clock);
+        printf(" YM3812:   %s (clock=%u)\n", chip_flags.has_ym3812 ? "YES" : "NO", chip_flags.ym3812_clock);
+        printf(" YM3526:   %s (clock=%u)\n", chip_flags.has_ym3526 ? "YES" : "NO", chip_flags.ym3526_clock);
+        printf(" Y8950:    %s (clock=%u)\n", chip_flags.has_y8950 ? "YES" : "NO", chip_flags.y8950_clock);
+        printf("[VGM] FM conversion source clock: %.0f Hz, target clock: %.0f Hz\n",
+               vgmctx.source_fm_clock, vgmctx.target_fm_clock);
     }
 
-    OPL3State state = {0};
+    OPL3State state;
+    memset(&state, 0, sizeof(state));
     state.rhythm_mode = false;
     state.opl3_mode_initialized = false;
+
+    // Early OPL3 global init (neutral source chip). This does not register OPLL patches anymore.
+    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YMF262);
+    // Provide argc/argv to OPLL wrapper and perform OPLL-specific setup (voice DB registration etc.)
+    opll_set_program_args(argc, argv);
+    opll_init(&state);
 
     long read_done_byte = data_start;
     uint32_t additional_bytes = 0;
     long loop_start_in_buffer = -1;
 
-    // Main VGM parse loop
     while (read_done_byte < filesize) {
         if (orig_loop_offset != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
             loop_start_in_buffer = vgmctx.buffer.size;
         }
         unsigned char cmd = p_vgm_data[read_done_byte];
 
-        // OPL auto-detect (first encountered chip)
+        // Auto-detect first OPL-family chip if needed
         if (chip_flags.opl_group_autodetect) {
-            if (cmd == 0x51 && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+            if (cmd == 0x51 && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
+                !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym2413 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x51;
                 vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
-            } else if (cmd == 0x5A && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+            } else if (cmd == 0x5A && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
+                       !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3812 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5A;
                 vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
-            } else if (cmd == 0x5B && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+            } else if (cmd == 0x5B && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
+                       !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3526 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5B;
                 vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
-            } else if (cmd == 0x5C && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 && !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
+            } else if (cmd == 0x5C && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
+                       !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_y8950 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5C;
@@ -247,45 +278,48 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // YM2413 register write
+        // YM2413 write
         if (cmd == 0x51) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
-            printf("YM2413 write:  cmd=0x%02X reg=0x%02X val=0x%02X (read_done_byte=%ld/filesize=%ld)\n", cmd, reg, val, read_done_byte, filesize);
+            printf("YM2413 write:  cmd=0x%02X reg=0x%02X val=0x%02X (read_done_byte=%ld/filesize=%ld)\n",
+                   cmd, reg, val, read_done_byte, filesize);
 
             if (chip_flags.convert_ym2413) {
-                // Directly emit converted OPL3 sequence (1:1 immediate conversion)
                 if (!state.opl3_mode_initialized) {
                     printf("Initializing OPL3 mode for YM2413...\n");
+                    // Re-init with specific fmchip tag if needed:
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
                     state.opl3_mode_initialized = true;
                 }
                 uint8_t next_cmd = p_vgm_data[read_done_byte];
                 read_done_byte++;
-                // Wait commands
                 uint16_t wait_samples = 0;
                 if (next_cmd >= 0x70 && next_cmd <= 0x7F) {
                     wait_samples = (next_cmd & 0x0F) + 1;
                 } else if (next_cmd == 0x61 && read_done_byte + 2 < filesize) {
-                    uint8_t lo = p_vgm_data[read_done_byte ];
+                    uint8_t lo = p_vgm_data[read_done_byte];
                     uint8_t hi = p_vgm_data[read_done_byte + 1];
                     read_done_byte += 2;
                     wait_samples = lo | (hi << 8);
-                } else if (next_cmd == 0x62) {                       
+                } else if (next_cmd == 0x62) {
                     wait_samples = 735;
                 } else if (next_cmd == 0x63) {
                     wait_samples = 882;
                 }
-                printf("---> YM2413 write: reg 0x%02x val:0x%02X with next_cmd=0x%02X next_wait_samples=%d (read_done_byte=%ld/filesize=%ld)\n", reg, val, next_cmd, wait_samples, read_done_byte, filesize );
+                printf("---> YM2413 write: reg 0x%02x val:0x%02X with next_cmd=0x%02X next_wait_samples=%d "
+                       "(read_done_byte=%ld/filesize=%ld)\n",
+                       reg, val, next_cmd, wait_samples, read_done_byte, filesize);
+
                 opll_write_register(&vgmctx.buffer, &vgmctx, &state, reg, val, wait_samples, &cmd_opts);
             } else {
-                // Just write through if not converting
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
             continue;
         }
-        // YM3812 register write
+
+        // YM3812
         if (cmd == 0x5A) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
@@ -301,7 +335,8 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-        // YM3526 register write
+
+        // YM3526
         if (cmd == 0x5B) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
@@ -317,7 +352,8 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-        // Y8950 register write
+
+        // Y8950
         if (cmd == 0x5C) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
@@ -333,7 +369,8 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-        // Pass-through for non-OPL FM chips
+
+        // Passthrough other FM writes (OPN, etc.)
         if (cmd == 0x52 || cmd == 0x54 || cmd == 0x55 || cmd == 0x56 || cmd == 0x57) {
             forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
             read_done_byte += 3;
@@ -352,11 +389,9 @@ int main(int argc, char *argv[]) {
             uint8_t hi = p_vgm_data[read_done_byte + 2];
             wait_samples = lo | (hi << 8);
         } else if (cmd == 0x62) {
-            is_wait_cmd = true;
-            wait_samples = 735;
+            is_wait_cmd = true; wait_samples = 735;
         } else if (cmd == 0x63) {
-            is_wait_cmd = true;
-            wait_samples = 882;
+            is_wait_cmd = true; wait_samples = 882;
         }
 
         if (is_wait_cmd) {
@@ -376,20 +411,19 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // End of sound data
         if (cmd == 0x66) {
             vgm_append_byte(&vgmctx.buffer, cmd);
             read_done_byte++;
             continue;
         }
 
-        // Other commands: copy as-is
+        // Copy unhandled commands
         vgm_append_byte(&vgmctx.buffer, cmd);
         read_done_byte++;
     }
 
-    // GD3 chunk and header construction
-    char *p_gd3_fields[GD3_FIELDS] = {NULL};
+    // Build GD3
+    char *p_gd3_fields[GD3_FIELDS] = {0};
     uint32_t orig_gd3_ver = 0, orig_gd3_len = 0;
     if (extract_gd3_fields(p_vgm_data, filesize, p_gd3_fields, &orig_gd3_ver, &orig_gd3_len) != 0) {
         for (int i = 0; i < GD3_FIELDS; ++i) p_gd3_fields[i] = strdup("");
@@ -399,8 +433,10 @@ int main(int argc, char *argv[]) {
     snprintf(creator_append, sizeof(creator_append), ",%s", p_creator);
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
-        ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
-        get_converted_opl_chip_name(&chip_flags),detune,opl3_keyon_wait, ch_panning, v_ratio0 * 100, v_ratio1 * 100);
+             ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d "
+             "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
+             get_converted_opl_chip_name(&chip_flags), detune, opl3_keyon_wait,
+             ch_panning, v_ratio0 * 100, v_ratio1 * 100);
 
     VGMBuffer gd3;
     vgm_buffer_init(&gd3);
@@ -414,7 +450,9 @@ int main(int argc, char *argv[]) {
     uint32_t vgm_eof_offset_field = new_eof_offset - 0x04;
     uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
     uint32_t data_offset = header_size - 0x34;
-    uint32_t new_loop_offset = (loop_start_in_buffer >= 0) ? (header_size + (uint32_t)loop_start_in_buffer) : 0xFFFFFFFF;
+    uint32_t new_loop_offset = (loop_start_in_buffer >= 0)
+                               ? (header_size + (uint32_t)loop_start_in_buffer)
+                               : 0xFFFFFFFF;
 
     uint8_t *p_header_buf = (uint8_t*)calloc(1, header_size);
 
@@ -440,9 +478,8 @@ int main(int argc, char *argv[]) {
     if (chip_flags.has_ym2413) set_ym2413_clock(p_header_buf, 0);
     if (chip_flags.has_ym3812) set_ym3812_clock(p_header_buf, 0);
     if (chip_flags.has_ym3526) set_ym3526_clock(p_header_buf, 0);
-    if (chip_flags.has_y8950) set_y8950_clock(p_header_buf, 0);
+    if (chip_flags.has_y8950)  set_y8950_clock(p_header_buf, 0);
 
-    // Write output file
     FILE *p_wf = fopen(p_output_path, "wb");
     if (!p_wf) {
         fprintf(stderr, "Failed to open output file for writing: %s\n", p_output_path);
@@ -464,20 +501,14 @@ int main(int argc, char *argv[]) {
     printf("[OPL3] Channel Panning Mode: %d\n", ch_panning);
     printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
-
-    printf("\n");
     if (verbose) {
         printf("[OPL3] Total number of detected voices: %d\n", state.voice_db.count);
-
-        //for (int i = 0; i < state.voice_db.count; ++i) {
-        //    print_opl3_voice_param(&state.voice_db.p_voices[i]);
-        //}
+        // Optionally dump voices here
     }
-    printf("\n");
+
     vgm_buffer_free(&vgmctx.buffer);
     vgm_buffer_free(&gd3);
     free(p_vgm_data);
     free(p_header_buf);
-
     return 0;
 }
