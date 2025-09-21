@@ -1,43 +1,60 @@
-CC=gcc
-CFLAGS=-O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm
-SRCS=$(wildcard src/opl3/*.c) $(wildcard src/vgm/*.c)  $(wildcard src/opll/*.c) $(wildcard src/*.c)
-OBJS=$(SRCS:.c=.o)
-TARGET=eseopl3patcher
+CC       = gcc
+CC_WIN   = x86_64-w64-mingw32-gcc
+CFLAGS   = -O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm -Isrc/opll
 
-# Windows cross-compile settings
-CC_WIN=x86_64-w64-mingw32-gcc
-TARGET_WIN=eseopl3patcher.exe
+BUILD_DIR = build
 
-# Default: build for Linux
+TEST_DETUNE ?= 0
+TEST_EXTRA_ARGS ?= --convert-ym2413
+
+# Source files
+SRCS = $(wildcard src/opl3/*.c) \
+       $(wildcard src/vgm/*.c)  \
+       $(wildcard src/opll/*.c) \
+       $(wildcard src/*.c)
+
+# Targets
+TARGET      = $(BUILD_DIR)/eseopl3patcher
+TARGET_WIN  = $(BUILD_DIR)/eseopl3patcher.exe
+
+# Default build
 all: $(TARGET)
 
-$(TARGET): $(SRCS)
+# Ensure build directory exists
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
+
+# Linux build
+$(TARGET): $(SRCS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
-# Windows build
-win: $(SRCS)
+# Windows (cross) build
+win: $(SRCS) | $(BUILD_DIR)
 	$(CC_WIN) $(CFLAGS) -o $(TARGET_WIN) $^ -lm
 
-# Clean build artifacts
-clean:
-	rm -f $(TARGET) $(TARGET_WIN) src/opl3/*.o src/vgm/*.o src/*.o
-
-release: eseopl3patcher eseopl3patcher.exe
+# Release: move built binaries into release_temp/
+release: $(TARGET)
 	@mkdir -p release_temp
-	@if [ -f eseopl3patcher ]; then mv -f eseopl3patcher release_temp/; fi
-	@if [ -f eseopl3patcher.exe ]; then mv -f eseopl3patcher.exe release_temp/; fi
-	@echo "Moved eseopl3patcher(.exe) to release_temp/"
+	@if [ -f $(TARGET) ]; then cp -f $(TARGET) release_temp/; fi
+	@if [ -f $(TARGET_WIN) ]; then cp -f $(TARGET_WIN) release_temp/; fi
+	@echo "Copied binaries to release_temp/"
 
-CONVERTER_BIN ?= build/eseopl3patcher
+# Clean
+clean:
+	rm -rf $(BUILD_DIR) release_temp
 
+# ---- Equivalence / Baseline Tests ----
+# scripts/test_vgm_equiv.sh は $(TARGET) を引数に取る想定
 .PHONY: test-equivalence baseline-update baseline-init
-test-equivalence: $(CONVERTER_BIN)
-	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN)
 
-baseline-update: $(CONVERTER_BIN)
-	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN) --update-baseline
+test-equivalence: $(TARGET)
+	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET)
 
-baseline-init: $(CONVERTER_BIN)
-	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN) --init-baseline
+baseline-update: $(TARGET)
+	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET) --update-baseline
 
-.PHONY: all release win clean
+baseline-init: $(TARGET)
+	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET) --init-baseline
+
+
+.PHONY: all win release clean
