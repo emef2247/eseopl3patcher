@@ -124,6 +124,19 @@ make win
 # or
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
+### Equivalence Tests (YM2413 → OPL3)
+
+We include a regression suite under `tests/equiv/`:
+- Run: `make test-equivalence`
+- Initialize (first time): `make baseline-init`
+- Update after intentional converter changes: `make baseline-update`
+- Default detune: `0` (can override via `TEST_DETUNE=...`)
+- Extra converter args: `TEST_EXTRA_ARGS="--convert-ym2413"`
+
+Transient dirs: `out_new/`, `logs/`, `txt/` (gitignored).
+Baseline outputs are committed to allow immediate verification after clone.
+
+To enable textual diffs, install `vgm2txt` and ensure it is in `$PATH`.
 
 ## Author
 
