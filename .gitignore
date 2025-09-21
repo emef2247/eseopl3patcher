@@ -82,3 +82,13 @@ calibration/p??o4_*_pass*.wav
 tests/equiv/out_new/
 tests/equiv/logs/
 tests/equiv/txt/
+
+# Added (external tool binaries)
+tools/bin/
+tools/vgm2txt
+tools/VGMPlay
+
+# Ignore built sources and binaries
+_src/
+bin/
+version/

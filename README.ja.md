@@ -120,6 +120,99 @@ make win
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
 
+# VGM ツール取得・ビルド手順
+
+このディレクトリはテスト・解析用に外部ツール (vgm2txt, VGMPlay) をローカル取得・ビルドするための補助スクリプトを提供します。  
+バイナリを直接リポジトリにコミットしないことで、サイズとライセンス管理の負担を下げつつ再現性を確保します。
+
+## 取得対象
+
+| ツール | リポジトリ | 用途 | 生成バイナリ例 |
+|--------|-----------|------|----------------|
+| vgm2txt | https://github.com/vgmrips/vgmtools | VGM → テキスト（レジスタ列解析） | tools/bin/vgm2txt |
+| VGMPlay | https://github.com/vgmrips/vgmplay  | 変換後 VGM の実再生確認 | tools/bin/VGMPlay (または vgmplay) |
+
+## 使い方
+
+```bash
+# 初回または更新
+bash tools/fetch_vgm_tools.sh
+# 既存 clone を更新せずに再コピーだけしたい場合は --no-update などを参照
+```
+
+完了後:
+```
+tools/
+  bin/
+    vgm2txt
+    VGMPlay         (環境により vgmplay になる場合あり)
+  version/
+    vgm2txt_commit.txt
+    vgmplay_commit.txt
+    vgm_tools_meta.json
+  _src/
+    vgmtools/       (git clone ソース)
+    vgmplay/        (git clone ソース)
+```
+
+`version/*.txt` には使用したコミットハッシュが記録され、再現ビルドに利用できます。
+
+## 任意コミットを固定したい場合
+
+環境変数でコミット（またはタグ）を指定:
+
+```bash
+VGMTOOLS_COMMIT=3f1ab2c VGMPLAY_COMMIT=v0.40 bash tools/fetch_vgm_tools.sh
+```
+
+指定が無い場合は各リポジトリのデフォルトブランチ (main / master) の最新を取得します。
+
+## オプション
+
+| オプション | 説明 |
+|-----------|------|
+| `--force` | 既存ビルドを無条件で再ビルド |
+| `--no-update` | 既存 clone があれば `git fetch` を行わずそのまま再ビルド |
+| `--skip-vgmplay` | VGMPlay をスキップ（vgm2txt のみ） |
+| `--skip-vgm2txt` | vgm2txt をスキップ（VGMPlay のみ） |
+| `--quiet` | 最小限のログ |
+
+## CI 組み込み例 (GitHub Actions)
+
+```yaml
+- name: Fetch VGM tools
+  run: |
+    bash tools/fetch_vgm_tools.sh --quiet
+- name: Verify vgm2txt
+  run: tools/bin/vgm2txt --help | head -n 1
+```
+
+## PATH 追加 (ローカル)
+
+```bash
+export PATH="$PWD/tools/bin:$PATH"
+```
+
+## ライセンス
+
+各プロジェクトのライセンス (vgmtools / vgmplay) はそれぞれのリポジトリに従います。  
+再配布する場合はオリジナルの README / LICENSE への参照を保ってください。
+
+## トラブルシュート
+
+| 症状 | 対処 |
+|------|------|
+| `make: g++: command not found` | `sudo apt install build-essential` |
+| `fatal: unable to access` | ネットワーク / Proxy / GitHub 一時障害 |
+| VGMPlay バイナリが見つからない | `make` ログを確認。OS 毎に生成ファイル名差異 (大文字/小文字) |
+| 既存バイナリを更新したくない | スクリプト未実行、または判定部を書き換え |
+
+## 将来拡張予定
+
+- 特定コミットの SHA256 検証キャッシュ
+- vgm_cmp 等の追加ビルド
+- Windows (MSYS2) / macOS 自動分岐
+
 ## 作者
 
 [@emef2247](https://github.com/emef2247) 作
