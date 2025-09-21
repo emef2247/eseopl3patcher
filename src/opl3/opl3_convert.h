@@ -37,6 +37,9 @@ double calc_fmchip_frequency(
     unsigned char block,
     unsigned short fnum);
 
+// Carrier TL calculation (used during conversion)
+uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n);
+
 #ifdef __cplusplus
 }
 #endif

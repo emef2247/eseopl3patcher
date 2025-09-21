@@ -589,3 +589,56 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
 }
+
+
+/* 
+ * YM2413 音量 nibble -> OPL3 TL 加算値マッピング
+ *   0..15 (0=最大, 15=最小)
+ *   MODE 1: TL_add = vol * 4        (シンプル 4dB 近似)
+ *   MODE 2: TL_add = vol * 3        (やや細かく 3dB 近似)
+ *   MODE 3: 手動テーブル (例示: 実測/参考差し替え用)
+ */
+#ifndef Y2413_VOL_MAP_MODE
+#define Y2413_VOL_MAP_MODE 1
+#endif
+
+#if Y2413_VOL_MAP_MODE == 1
+static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
+    return (uint8_t)((vol & 0x0F) * 4);
+}
+#elif Y2413_VOL_MAP_MODE == 2
+static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
+    return (uint8_t)((vol & 0x0F) * 3);
+}
+#else
+/* カスタムテーブル: 必要なら実測値に差し替え */
+static const uint8_t kYM2413VolToTLAdd[16] = {
+    0, 3, 6, 9, 12, 15, 18, 21,
+    24,27,30,33,36,39,42,45
+};
+static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
+    return kYM2413VolToTLAdd[vol & 0x0F];
+}
+#endif
+
+/*
+ * make_carrier_40_from_vol
+ * YM2413 の $3n レジスタ (reg3n) 下位 4bit (VOL) を OPL3 Carrier TL に反映して
+ * 0x40 + slotCar へ書く値 (KSL/TL) を返す。
+ *  - vp->op[1].ksl: 上位 2bit (KSL)
+ *  - vp->op[1].tl : 基本 TL
+ *  - VOL nibble   : TL に加算 (0=加算0, 15=最大加算)
+ * クリップ: 63 を超えたら 63。
+ */
+uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n) {
+    if (!vp) return 0;  /* 防御 */
+    uint8_t base_tl   = vp->op[1].tl & 0x3F;
+    uint8_t ksl_bits  = (vp->op[1].ksl & 0x03) << 6;
+    uint8_t vol_nib   = reg3n & 0x0F;
+
+    uint8_t add = ym2413_vol_to_tl_add(vol_nib);
+    uint16_t tl_calc = (uint16_t)base_tl + add;
+    if (tl_calc > 63) tl_calc = 63;
+
+    return (uint8_t)(ksl_bits | (tl_calc & 0x3F));
+}

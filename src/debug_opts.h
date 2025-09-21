@@ -2,7 +2,7 @@
 #define ESEOPL3PATCHER_DEBUG_OPTS_H
 
 #include "../compat_bool.h"
-
+#include "../opl3/opl3_state.h"
 /** Global debug / diagnostic options */
 typedef struct {
     bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
@@ -14,5 +14,5 @@ typedef struct {
 
 /* Global instance (defined in main.c) */
 extern DebugOpts g_dbg;
-
+void apply_debug_overrides(OPL3VoiceParam *vp);
 #endif /* ESEOPL3PATCHER_DEBUG_OPTS_H */

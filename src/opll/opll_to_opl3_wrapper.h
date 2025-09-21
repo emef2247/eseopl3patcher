@@ -3,8 +3,9 @@
 
 #include "../opl3/opl3_convert.h"
 #include "../vgm/vgm_helpers.h"
+#include <string.h>
 
-/* Pending / stamp structs (抜粋 or 既存定義に合わせる) */
+/** Pending / stamp structs */
 typedef struct {
     uint8_t has_1n, has_2n, has_3n;
     uint8_t reg1n, reg2n, reg3n;
@@ -16,6 +17,10 @@ typedef struct {
     uint8_t ko;
 } OpllStampCh;
 
+/** Utility clear functions */
+static inline void opll_pending_clear(OpllPendingCh *p) { memset(p, 0, sizeof(*p)); }
+static inline void stamp_clear(OpllStampCh *s) { memset(s, 0, sizeof(*s)); }
+
 typedef struct {
     uint8_t has_2n;
     uint8_t ko_next;
@@ -23,17 +28,17 @@ typedef struct {
     uint8_t note_off_edge;
 } PendingEdgeInfo;
 
-/* Public wrapper API */
+/** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
 void opll_init(OPL3State *p_state);
 
-int opll_write_register(VGMBuffer *p_music_data,
-                        VGMContext *p_vgm_context,
-                        OPL3State *p_state,
-                        uint8_t addr, uint8_t val, uint16_t next_wait_samples,
-                        const CommandOptions *opts);
+int opll_write_register(
+    VGMBuffer *p_music_data,
+    VGMContext *p_vgm_context,
+    OPL3State *p_state,
+    uint8_t addr, uint8_t val, uint16_t next_wait_samples,
+    const CommandOptions *opts);
 
-/* Optional (if used elsewhere) */
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db);
 
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */

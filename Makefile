@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm
-SRCS=$(wildcard src/opl3/*.c) $(wildcard src/vgm/*.c)  $(wildcard src/opll/*.c) src/main.c
+SRCS=$(wildcard src/opl3/*.c) $(wildcard src/vgm/*.c)  $(wildcard src/opll/*.c) $(wildcard src/*.c)
 OBJS=$(SRCS:.c=.o)
 TARGET=eseopl3patcher
 

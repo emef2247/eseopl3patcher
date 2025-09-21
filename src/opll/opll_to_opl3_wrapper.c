@@ -1,8 +1,10 @@
 #include "../vgm/vgm_helpers.h"
 #include "../opl3/opl3_voice.h"
 #include "../opl3/opl3_convert.h"
-#include "ym2413_voice_rom.h"
-#include "nukedopll_voice_rom.h"
+#include "../opl3/opl3_voice_registry.h"
+#include "../opl3/opl3_hooks.h"
+#include "../opl3/opl3_metrics.h"
+#include "ym2413_patch_convert.h"
 #include "opll_to_opl3_wrapper.h"
 #include "../debug_opts.h"
 #include <math.h>
@@ -12,6 +14,11 @@
 #include "../override_loader.h"
 #include "../compat_bool.h"
 #include "../compat_string.h"
+
+static inline void flush_channel_ch(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts,
+    OpllPendingCh* p, OpllStampCh* s);
 
 // ---------- Global OPLL state ----------
 #define YM2413_NUM_CH 9
@@ -32,35 +39,10 @@ void opll_set_program_args(int argc, char **argv) {
     g_saved_argv = argv;
 }
 
-/** Initialize converter and load overrides if specified */
-static void converter_init(int argc, char **argv) {
-    override_init();
-    const char *override_path = NULL;
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--override") == 0 && i + 1 < argc) {
-            override_path = argv[++i];
-        }
-    }
-    if (override_path) {
-        if (override_loader_load_json(override_path) == 0) {
-            override_dump_table();
-        }
-    }
-}
-
 /** Initialize OPLL/OPL3 voice DB and state */
 void opll_init(OPL3State *p_state) {
     if (!p_state) return;
-    for (int inst = 1; inst <= 15; ++inst) {
-        OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
-        opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
-    }
-    for (int inst = 16; inst <= 20; ++inst) {
-        OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
-        opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
-    }
+    opl3_register_all_ym2413(&p_state->voice_db);
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
     for (int i = 0; i < YM2413_NUM_CH; ++i) {
         opll_pending_clear(&g_pend[i]);
@@ -119,6 +101,7 @@ void opll_init(OPL3State *p_state) {
 static const uint8_t kOPLLRateToOPL3_SIMPLE[16] = {
     0,1,2,3,5,6,7,8,9,10,11,12,13,14,15,15
 };
+#if 0 /* unused tables (kept for documentation / future switch) */
 static const uint8_t kOPLLRateToOPL3_CALIB[16] = {
     1,2,3,4,6,7,8,9,10,11,12,13,14,15,15,15
 };
@@ -128,24 +111,11 @@ static const uint8_t kOPLLRateToOPL3_ID[16] = {
 static const int8_t kModTLAddTable[16] = {
     0,0,4,2,0,2,2,0,0,2,2,3,0,3,3,4
 };
+#endif
+
 
 // ---------- Utility functions ----------
 
-/** Apply debug overrides (fast attack / additive / mute modulator, etc.) */
-static inline void apply_debug_overrides(OPL3VoiceParam *vp) {
-    if (g_dbg.fast_attack) {
-        for (int i = 0; i < 2; i++) {
-            vp->op[i].ar = 15;
-            if (vp->op[i].dr < 4) vp->op[i].dr = 4;
-            vp->op[i].rr = (vp->op[i].rr < 2) ? 2 : vp->op[i].rr;
-        }
-        vp->op[1].tl = 0;
-    }
-    if (g_dbg.test_tone) {
-        vp->cnt[0] = 1;  // Use additive (algorithm bit) if engine uses cnt
-        vp->op[0].tl = 63; // Mute modulator for clarity
-    }
-}
 
 /** Suppress duplicate B0 writes if key state is unchanged */
 static bool key_state_already(OPL3State *p_state, int ch, bool key_on) {
@@ -154,11 +124,7 @@ static bool key_state_already(OPL3State *p_state, int ch, bool key_on) {
     return false;
 }
 
-/** Clear stamp structure */
-static inline void stamp_clear(OpllStampCh *s) { memset(s, 0, sizeof(*s)); }
-/** Clear pending structure */
-static inline void opll_pending_clear(OpllPendingCh *p) { memset(p, 0, sizeof(*p)); }
-/** Get channel index from register address */
+
 static inline int ch_from_addr(uint8_t addr) {
     if (addr >= 0x10 && addr <= 0x18) return addr - 0x10;
     if (addr >= 0x20 && addr <= 0x28) return addr - 0x20;
@@ -337,117 +303,6 @@ static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t*
 }
 #endif
 
-/** Convert YM2413 patch to OPL3VoiceParam (with debug/override) */
-static void ym2413_patch_to_opl3_with_fb(int inst, const uint8_t *ym2413_regs, OPL3VoiceParam *vp) {
-    memset(vp, 0, sizeof(*vp));
-    const uint8_t *src;
-    if (inst == 0 && ym2413_regs) src = ym2413_regs;
-    else if (inst >= 1 && inst <= 15) src = YM2413_VOICES[inst - 1];
-    else if (inst >= 16 && inst <= 20) src = YM2413_RHYTHM_VOICES[inst - 16];
-    else src = YM2413_VOICES[0];
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Source: %02X %02X %02X %02X\n",
-           inst, src[0], src[1], src[2], src[3]);
-
-    uint8_t raw_mod_ar = (src[2] >> 4) & 0x0F;
-    uint8_t raw_mod_dr = src[2] & 0x0F;
-    int ofs = 4;
-    uint8_t raw_car_ar = (src[ofs + 2] >> 4) & 0x0F;
-    uint8_t raw_car_dr = src[ofs + 2] & 0x0F;
-
-    // Modulator
-    vp->op[0].am   = (src[0] >> 7) & 1;
-    vp->op[0].vib  = (src[0] >> 6) & 1;
-    vp->op[0].egt  = (src[0] >> 5) & 1;
-    vp->op[0].ksr  = (src[0] >> 4) & 1;
-    vp->op[0].mult = src[0] & 0x0F;
-    vp->op[0].ksl  = (src[1] >> 6) & 3;
-    vp->op[0].tl   = src[1] & 0x3F;
-    vp->op[0].ar   = rate_map_pick(raw_mod_ar);
-    vp->op[0].dr   = rate_map_pick(raw_mod_dr);
-    vp->op[0].sl   = (src[3] >> 4) & 0x0F;
-    vp->op[0].rr   = src[3] & 0x0F;
-    vp->op[0].ws   = 1;
-    vp->op[0].ar   = enforce_min_attack(vp->op[0].ar, "Mod", inst, 0);
-
-    printf("[DEBUG] YM2413 patch %d -> RateMap(Mod): rawAR=%u->%u rawDR=%u->%u\n",
-           inst, raw_mod_ar, vp->op[0].ar, raw_mod_dr, vp->op[0].dr);
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Modulator: AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-           inst, vp->op[0].am, vp->op[0].vib, vp->op[0].egt, vp->op[0].ksr, vp->op[0].mult,
-           vp->op[0].ksl, vp->op[0].tl, vp->op[0].ar, vp->op[0].dr, vp->op[0].sl, vp->op[0].rr, vp->op[0].ws);
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Source: %02X %02X %02X %02X\n",
-           inst, src[ofs + 0], src[ofs + 1], src[ofs + 2], src[ofs + 3]);
-
-    // Carrier
-    vp->op[1].am   = (src[ofs + 0] >> 7) & 1;
-    vp->op[1].vib  = (src[ofs + 0] >> 6) & 1;
-    vp->op[1].egt  = (src[ofs + 0] >> 5) & 1;
-    vp->op[1].ksr  = (src[ofs + 0] >> 4) & 1;
-    vp->op[1].mult = src[ofs + 0] & 0x0F;
-    vp->op[1].ksl  = (src[ofs + 1] >> 6) & 3;
-    vp->op[1].tl   = src[ofs + 1] & 0x3F;
-    vp->op[1].ar   = rate_map_pick(raw_car_ar);
-    vp->op[1].dr   = rate_map_pick(raw_car_dr);
-    vp->op[1].sl   = (src[ofs + 3] >> 4) & 0x0F;
-    vp->op[1].rr   = src[ofs + 3] & 0x0F;
-    vp->op[1].ws   = 0;
-    vp->op[1].ar   = enforce_min_attack(vp->op[1].ar, "Car", inst, 1);
-
-    printf("[DEBUG] YM2413 patch %d -> RateMap(Car): rawAR=%u->%u rawDR=%u->%u\n",
-           inst, raw_car_ar, vp->op[1].ar, raw_car_dr, vp->op[1].dr);
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Carrier: AM=%d VIB=%d EGT=%d KSR=%d MULT=%d KSL=%d TL=%d AR=%d DR=%d SL=%d RR=%d WS=%d\n",
-           inst, vp->op[1].am, vp->op[1].vib, vp->op[1].egt, vp->op[1].ksr, vp->op[1].mult,
-           vp->op[1].ksl, vp->op[1].tl, vp->op[1].ar, vp->op[1].dr, vp->op[1].sl, vp->op[1].rr, vp->op[1].ws);
-
-    vp->fb[0] = (src[0] & 0x07);
-    vp->cnt[0] = 0;
-    vp->is_4op = 0;
-    vp->voice_no = inst;
-    vp->source_fmchip = FMCHIP_YM2413;
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Feedback/Alg: FB=%d CNT=%d 4OP=%d VOICE_NO=%d\n",
-           inst, vp->fb[0], vp->cnt[0], vp->is_4op, inst);
-
-#if OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-    maybe_shape_fix(inst, 0, &vp->op[0].ar, &vp->op[0].dr);
-    maybe_shape_fix(inst, 1, &vp->op[1].ar, &vp->op[1].dr);
-#endif
-
-#if OPLL_ENABLE_ARDR_MIN_CLAMP
-    if (vp->op[0].ar < 2) vp->op[0].ar = 2;
-    if (vp->op[1].ar < 2) vp->op[1].ar = 2;
-    if (vp->op[0].dr < 2) vp->op[0].dr = 2;
-    if (vp->op[1].dr < 2) vp->op[1].dr = 2;
-#endif
-
-#if OPLL_ENABLE_MOD_TL_ADJ
-    {
-        int idx = inst; if (idx < 0) idx = 0; if (idx > 15) idx = 15;
-        uint8_t raw_tl = vp->op[0].tl;
-        int add = kModTLAddTable[idx];
-        int new_tl = raw_tl + add;
-        if (new_tl < 0) new_tl = 0;
-        if (new_tl > 63) new_tl = 63;
-        if (add != 0) {
-            printf("[DEBUG] YM2413 patch %d -> ModTL adjust: raw=%u add=%d final=%d\n",
-                   inst, raw_tl, add, new_tl);
-            vp->op[0].tl = (uint8_t)new_tl;
-        }
-    }
-#endif
-
-    apply_debug_overrides(vp);
-
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Adjusted: Modulator AR=%d DR=%d, Carrier AR=%d DR=%d\n",
-           inst, vp->op[0].ar, vp->op[0].dr, vp->op[1].ar, vp->op[1].dr);
-    printf("[DEBUG] YM2413 patch %d -> OPL3 Final: Modulator TL=%d, Carrier TL=%d\n",
-           inst, vp->op[0].tl, vp->op[1].tl);
-    printf("\n");
-}
-
 /** Apply OPL3VoiceParam to channel */
 int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *opts) {
@@ -520,6 +375,15 @@ static inline bool has_effective_3n(const OpllPendingCh* p, const OpllStampCh* s
     return (p && p->has_3n) || (s && s->valid_3n);
 }
 
+/** Flush channel wrapper (calls flush_channel_ch) */
+static inline void flush_channel(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s)
+{
+    (void)vp;
+    flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, opts, p, s);
+}
+
 /** Update pending on elapsed for KeyOn timeout */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
@@ -588,6 +452,7 @@ static inline void flush_channel_ch(
         int8_t inst = (reg3n_eff >> 4) & 0x0F;
         OPL3VoiceParam vp_tmp;
         ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
+        if (g_opl3_hooks.on_pre_keyon) g_opl3_hooks.on_pre_keyon(ch, &vp_tmp);
         uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, reg3n_eff);
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
                              0x40 + car_slot, car40, opts);
@@ -611,6 +476,15 @@ static inline void flush_channel_ch(
         // B0 only if key state not already on
         if (!key_state_already(p_state, ch, true)) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), opts);
+            if (g_opl3_hooks.on_post_keyon) g_opl3_hooks.on_post_keyon(ch);
+            #if OPLL_ENABLE_KEYON_DEBUG
+            /* 簡易メトリクス（例）*/
+            uint16_t fnum = (uint16_t)reg1n_eff | ((reg2n_eff & 0x01) << 8);
+            uint8_t block = (reg2n_eff >> 1) & 0x07;
+            #else
+            (void)reg1n_eff; (void)reg2n_eff;
+            #endif
+            opl3_metrics_note_on(ch, fnum, block);
         }
     }
     else if (e.has_2n && e.note_off_edge) {
@@ -630,6 +504,8 @@ static inline void flush_channel_ch(
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
                                  0x40 + car_slot, car40, opts);
         }
+        opl3_metrics_note_off(ch);
+        if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
     }
     else {
         // No edge; just flush any changed params
@@ -656,15 +532,6 @@ static inline void flush_channel_ch(
     if (p->has_3n && need_3n) { s->last_3n = p->reg3n; s->valid_3n = 1; }
     if (p->has_2n) { s->last_2n = p->reg2n; s->valid_2n = 1; s->ko = (p->reg2n & 0x10) != 0; }
     opll_pending_clear(p);
-}
-
-/** Flush channel wrapper (calls flush_channel_ch) */
-static inline void flush_channel(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s)
-{
-    (void)vp;
-    flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, opts, p, s);
 }
 
 /** Main register write entrypoint for OPLL emulation */
