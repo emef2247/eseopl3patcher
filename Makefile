@@ -28,4 +28,16 @@ release: eseopl3patcher eseopl3patcher.exe
 	@if [ -f eseopl3patcher.exe ]; then mv -f eseopl3patcher.exe release_temp/; fi
 	@echo "Moved eseopl3patcher(.exe) to release_temp/"
 
+CONVERTER_BIN ?= build/eseopl3patcher
+
+.PHONY: test-equivalence baseline-update baseline-init
+test-equivalence: $(CONVERTER_BIN)
+	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN)
+
+baseline-update: $(CONVERTER_BIN)
+	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN) --update-baseline
+
+baseline-init: $(CONVERTER_BIN)
+	@scripts/test_vgm_equiv.sh $(CONVERTER_BIN) --init-baseline
+
 .PHONY: all release win clean
