@@ -93,3 +93,12 @@ _src/
 bin/
 version/*.log
 out_no_post.txt
+
+*.log
+out_no_post.log
+tools/ssh_check.log
+
+# General logs
+*.log
+out_no_post.log
+tools/ssh_check.log
