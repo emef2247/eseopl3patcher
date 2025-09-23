@@ -18,6 +18,14 @@
 // Global verbose flag (used for debug print control)
 int verbose = 0;
 
+// Command options structure with debug settings
+typedef struct {
+    struct {
+        bool verbose;
+        bool audible_sanity;
+    } debug;
+} CommandOptions;
+
 // Helper: parse command line to set chip conversion flags
 static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlags *chip_flags) {
     // Default: auto-detect OPL group (YM3812/YM3526/Y8950)
@@ -65,10 +73,13 @@ static void make_default_output_name(const char *p_input, char *p_output, size_t
 }
 
 int main(int argc, char *argv[]) {
-    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] [--convert-ymXXXX ...]
+    // Usage: <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-v|-verbose] [--audible-sanity|--debug-audible] [--convert-ymXXXX ...]
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose] [--convert-ymXXXX ...]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.vgm> <detune> [wait] [creator] [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-v|-verbose] [--audible-sanity|--debug-audible] [--convert-ymXXXX ...]\n", argv[0]);
         fprintf(stderr, "  --convert-ymXXXX : Explicitly select chips for conversion (YM3812, YM3526, Y8950)\n");
+        fprintf(stderr, "  -v|-verbose      : Enable verbose output\n");
+        fprintf(stderr, "  --audible-sanity : Enable audible sanity check (also enables debug verbose)\n");
+        fprintf(stderr, "  --debug-audible  : Alias for --audible-sanity\n");
         fprintf(stderr, "  (Default: OPL group auto, only first OPL chip in VGM is converted unless explicit)\n");
         return 1;
     }
@@ -86,6 +97,11 @@ int main(int argc, char *argv[]) {
     int ch_panning = DEFAULT_CH_PANNING;
     double v_ratio0 = DEFAULT_VOLUME_RATIO0;
     double v_ratio1 = DEFAULT_VOLUME_RATIO1;
+
+    // Initialize command options
+    CommandOptions cmd_opts = {0};
+    cmd_opts.debug.verbose = false;
+    cmd_opts.debug.audible_sanity = false;
 
     // Parse optional arguments
     for (int i = 3; i < argc; ++i) {
@@ -109,8 +125,13 @@ int main(int argc, char *argv[]) {
             i++;
             continue;
         }
-        if (strcmp(argv[i], "-verbose") == 0) {
+        if (strcmp(argv[i], "-verbose") == 0 || strcmp(argv[i], "-v") == 0) {
             verbose = 1;
+            continue;
+        }
+        if (strcmp(argv[i], "--audible-sanity") == 0 || strcmp(argv[i], "--debug-audible") == 0) {
+            cmd_opts.debug.audible_sanity = true;
+            cmd_opts.debug.verbose = true;
             continue;
         }
         if (argv[i][0] == '-') continue;
