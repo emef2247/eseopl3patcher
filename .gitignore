@@ -91,4 +91,5 @@ tools/VGMPlay
 # Ignore built sources and binaries
 _src/
 bin/
-version/
+version/*.log
+out_no_post.txt
