@@ -6,7 +6,6 @@
 #include "../opl3/opl3_metrics.h"
 #include "ym2413_patch_convert.h"
 #include "opll_to_opl3_wrapper.h"
-#include "../debug_opts.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -17,7 +16,7 @@
 
 static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts,
+    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
     OpllPendingCh* p, OpllStampCh* s);
 
 // ---------- Global OPLL state ----------
@@ -40,9 +39,9 @@ void opll_set_program_args(int argc, char **argv) {
 }
 
 /** Initialize OPLL/OPL3 voice DB and state */
-void opll_init(OPL3State *p_state) {
+void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     if (!p_state) return;
-    opl3_register_all_ym2413(&p_state->voice_db);
+    opl3_register_all_ym2413(&p_state->voice_db, p_opts);
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
     for (int i = 0; i < YM2413_NUM_CH; ++i) {
         opll_pending_clear(&g_pend[i]);
@@ -116,15 +115,6 @@ static const int8_t kModTLAddTable[16] = {
 
 // ---------- Utility functions ----------
 
-
-/** Suppress duplicate B0 writes if key state is unchanged */
-static bool key_state_already(OPL3State *p_state, int ch, bool key_on) {
-    if (p_state->last_key[ch] == (key_on ? 1 : 0)) return true;
-    p_state->last_key[ch] = key_on ? 1 : 0;
-    return false;
-}
-
-
 static inline int ch_from_addr(uint8_t addr) {
     if (addr >= 0x10 && addr <= 0x18) return addr - 0x10;
     if (addr >= 0x20 && addr <= 0x28) return addr - 0x20;
@@ -166,26 +156,26 @@ static inline void set_pending_from_opll_write(OpllPendingCh pend[], const OpllS
 }
 
 /** Analyze pending edge state (note on/off detection) */
-static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p, const OpllStampCh* s) {
+static inline PendingEdgeInfo analyze_pending_edge_ch(const OpllPendingCh* p_p, const OpllStampCh* p_s) {
     PendingEdgeInfo info = {0};
-    if (!p || !s || !p->has_2n) return info;
-    bool ko_next = (p->reg2n & 0x10) != 0;
+    if (!p_p || !p_s || !p_p->has_2n) return info;
+    bool ko_next = (p_p->reg2n & 0x10) != 0;
     info.has_2n = 1;
     info.ko_next = ko_next;
-    info.note_on_edge  = (!s->ko && ko_next);
-    info.note_off_edge = ( s->ko && !ko_next);
+    info.note_on_edge  = (!p_s->ko && ko_next);
+    info.note_off_edge = ( p_s->ko && !ko_next);
     return info;
 }
 
 /** Check if pending is needed for next write */
-static inline bool should_pend(uint8_t addr, uint8_t value, const OpllStampCh* stamp_ch, uint16_t next_wait_samples) {
+static inline bool should_pend(uint8_t addr, uint8_t value, const OpllStampCh* p_stamp_ch, uint16_t next_wait_samples) {
     switch (reg_kind(addr)) {
-        case 1: return stamp_ch && (stamp_ch->ko == 0);
-        case 3: return stamp_ch && (stamp_ch->ko == 0);
+        case 1: return p_stamp_ch && (p_stamp_ch->ko == 0);
+        case 3: return p_stamp_ch && (p_stamp_ch->ko == 0);
         case 2: {
-            if (!stamp_ch) return 0;
+            if (!p_stamp_ch) return 0;
             bool ko_next = (value & 0x10) != 0;
-            if (!stamp_ch->ko && ko_next)
+            if (!p_stamp_ch->ko && ko_next)
                 return (next_wait_samples <= KEYON_WAIT_GRACE_SAMPLES);
             return 0;
         }
@@ -257,14 +247,14 @@ static inline uint8_t enforce_min_attack(uint8_t ar, const char* stage, int inst
 
 /** Envelope shape fix for steep AR/DR gaps */
 #if !OPLL_ENABLE_ENVELOPE_SHAPE_FIX
-static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr) {
-    (void)inst; (void)op_index; (void)ar; (void)dr;
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* p_ar, uint8_t* p_dr) {
+    (void)inst; (void)op_index; (void)p_ar; (void)p_dr;
 }
 #else
-static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t* dr) {
-    if (!ar || !dr) return;
-    uint8_t A = (uint8_t)(*ar & 0x0F);
-    uint8_t D = (uint8_t)(*dr & 0x0F);
+static inline void maybe_shape_fix(int inst, int op_index, uint8_t* p_ar, uint8_t* p_dr) {
+    if (!p_ar || !dr) return;
+    uint8_t A = (uint8_t)(*p_ar & 0x0F);
+    uint8_t D = (uint8_t)(*p_dr & 0x0F);
     if (D <= A) {
 #if OPLL_DEBUG_SHAPE_FIX
         printf("[SHAPEFIX] inst=%d op=%d no-fix (DR<=AR) AR=%u DR=%u\n", inst, op_index, A, D);
@@ -305,7 +295,7 @@ static inline void maybe_shape_fix(int inst, int op_index, uint8_t* ar, uint8_t*
 
 /** Apply OPL3VoiceParam to channel */
 int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts) {
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *p_opts) {
     if (!vp || ch < 0 || ch >= 9) return 0;
     int bytes = 0;
     int slot_mod = opl3_opreg_addr(0, ch, 0);
@@ -315,79 +305,79 @@ int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State
 
     uint8_t opl3_2n_mod = (uint8_t)((vp->op[0].am << 7) | (vp->op[0].vib << 6) | (vp->op[0].egt << 5) | (vp->op[0].ksr << 4) | (vp->op[0].mult & 0x0F));
     uint8_t opl3_2n_car = (uint8_t)((vp->op[1].am << 7) | (vp->op[1].vib << 6) | (vp->op[1].egt << 5) | (vp->op[1].ksr << 4) | (vp->op[1].mult & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_mod, opl3_2n_mod, opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_car, opl3_2n_car, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_mod, opl3_2n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_car, opl3_2n_car, p_opts);
 
     uint8_t opl3_4n_mod = (uint8_t)(((vp->op[0].ksl & 0x03) << 6) | (vp->op[0].tl & 0x3F));
     uint8_t opl3_4n_car = (uint8_t)(((vp->op[1].ksl & 0x03) << 6) | (vp->op[1].tl & 0x3F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_mod, opl3_4n_mod, opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_car, opl3_4n_car, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_mod, opl3_4n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_car, opl3_4n_car, p_opts);
 
     uint8_t opl3_6n_mod = (uint8_t)((vp->op[0].ar << 4) | (vp->op[0].dr & 0x0F));
     uint8_t opl3_6n_car = (uint8_t)((vp->op[1].ar << 4) | (vp->op[1].dr & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_mod, opl3_6n_mod, opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_car, opl3_6n_car, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_mod, opl3_6n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_car, opl3_6n_car, p_opts);
 
     uint8_t opl3_8n_mod = (uint8_t)((vp->op[0].sl << 4) | (vp->op[0].rr & 0x0F));
     uint8_t opl3_8n_car = (uint8_t)((vp->op[1].sl << 4) | (vp->op[1].rr & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_mod, opl3_8n_mod, opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_car, opl3_8n_car, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_mod, opl3_8n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_car, opl3_8n_car, p_opts);
 
     uint8_t c0_val = (uint8_t)(0xC0 | ((vp->fb[0] & 0x07) << 1) | (vp->cnt[0] & 0x01));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0_val, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0_val, p_opts);
 
     uint8_t opl3_en_mod = (uint8_t)((vp->op[0].ws & 0x07));
     uint8_t opl3_en_car = (uint8_t)((vp->op[1].ws & 0x07));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_mod, opl3_en_mod, opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_car, opl3_en_car, opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_mod, opl3_en_mod, p_opts);
+    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_car, opl3_en_car, p_opts);
 
     return bytes;
 }
 
 /** Register all YM2413 patches to OPL3 voice DB */
-void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db) {
+void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *p_db, CommandOptions *p_opts) {
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
-        opl3_voice_db_find_or_add(db, &vp);
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp, p_opts);
+        opl3_voice_db_find_or_add(p_db, &vp);
     }
     for (int inst = 16; inst <= 20; ++inst) {
         OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
-        opl3_voice_db_find_or_add(db, &vp);
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp, p_opts);
+        opl3_voice_db_find_or_add(p_db, &vp);
     }
 }
 
 /** Apply voice params to channel before KeyOn */
 static inline void apply_inst_before_keyon(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-                                           int ch, uint8_t reg3n, const CommandOptions *opts) {
+                                           int ch, uint8_t reg3n, const CommandOptions *p_opts) {
     int8_t inst = (reg3n >> 4) & 0x0F;
     OPL3VoiceParam vp;
-    ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp);
-    opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, opts);
+    ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp, p_opts);
+    opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, p_opts);
     uint8_t c0 = (uint8_t)(((vp.fb[0] & 0x07) << 1) | (vp.cnt[0] & 0x01));
     c0 |= 0xC0;
-    duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0, opts);
+    duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0, p_opts);
 }
 
 /** Check if channel has effective 3n value */
-static inline bool has_effective_3n(const OpllPendingCh* p, const OpllStampCh* s) {
-    return (p && p->has_3n) || (s && s->valid_3n);
+static inline bool has_effective_3n(const OpllPendingCh* p_p, const OpllStampCh* p_s) {
+    return (p_p && p_p->has_3n) || (p_s && p_s->valid_3n);
 }
 
 /** Flush channel wrapper (calls flush_channel_ch) */
 static inline void flush_channel(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp, const CommandOptions *opts, OpllPendingCh* p, OpllStampCh* s)
+    int ch, const OPL3VoiceParam *vp, const CommandOptions *p_opts, OpllPendingCh* p, OpllStampCh* s)
 {
     (void)vp;
-    flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, opts, p, s);
+    flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, p_opts, p, s);
 }
 
 /** Update pending on elapsed for KeyOn timeout */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
-    const CommandOptions *opts, uint16_t wait_samples)
+    const CommandOptions *p_opts, uint16_t wait_samples)
 {
     if (wait_samples == 0) return;
     for (int ch = 0; ch < YM2413_NUM_CH; ++ch) {
@@ -398,7 +388,7 @@ static inline void opll_tick_pending_on_elapsed(
                     uint32_t elapsed = (uint32_t)g_pending_on_elapsed[ch] + wait_samples;
                     if (elapsed >= KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES) {
                         flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                      ch, NULL, opts, &g_pend[ch], &g_stamp[ch]);
+                                      ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                         g_pending_on_elapsed[ch] = 0;
                     } else {
                         g_pending_on_elapsed[ch] = (uint16_t)elapsed;
@@ -419,10 +409,17 @@ static inline uint8_t debug_effective_mod_tl(uint8_t raw_tl, uint8_t ksl, uint8_
     return (uint8_t)eff;
 }
 
+/** Suppress duplicate B0 writes when unchanged key state */
+static bool key_state_already(OPL3State *p_state, int ch, bool key_on) {
+    // (Add small array in state to remember last key bit)
+    if (p_state->last_key[ch] == (key_on?1:0)) return true;
+    p_state->last_key[ch] = key_on?1:0;
+    return false;
+}
 /** Flush pending channel state (KeyOn/KeyOff/param writes) */
 static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
-    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *opts,
+    int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
     OpllPendingCh* p, OpllStampCh* s)
 {
     // Determine which pending registers need update
@@ -444,18 +441,22 @@ static inline void flush_channel_ch(
         uint8_t reg3n_eff = p->has_3n ? p->reg3n : (s->valid_3n ? s->last_3n : 0x00);
         uint8_t reg2n_eff = p->reg2n;
         uint8_t reg1n_eff = p->has_1n ? p->reg1n : (s->valid_1n ? s->last_1n : 0x00);
-        apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, opts);
+        apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, p_opts);
         // A0 first
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                             0xA0 + ch, opll_to_opl3_an(reg1n_eff), opts);
+                             0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
 
         int8_t inst = (reg3n_eff >> 4) & 0x0F;
         OPL3VoiceParam vp_tmp;
-        ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
+        ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
+        // audible 適用
+        apply_debug_overrides(&vp_tmp, p_opts);
+        debug_apply_audible(&vp_tmp, p_opts);
+
         if (g_opl3_hooks.on_pre_keyon) g_opl3_hooks.on_pre_keyon(ch, &vp_tmp);
         uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, reg3n_eff);
         duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                             0x40 + car_slot, car40, opts);
+                             0x40 + car_slot, car40, p_opts);
 
 #if OPLL_ENABLE_KEYON_DEBUG
         {
@@ -475,7 +476,7 @@ static inline void flush_channel_ch(
 #endif
         // B0 only if key state not already on
         if (!key_state_already(p_state, ch, true)) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), opts);
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
             if (g_opl3_hooks.on_post_keyon) g_opl3_hooks.on_post_keyon(ch);
             #if OPLL_ENABLE_KEYON_DEBUG
             /* 簡易メトリクス（例）*/
@@ -490,19 +491,22 @@ static inline void flush_channel_ch(
     else if (e.has_2n && e.note_off_edge) {
         // KeyOff edge detected
         uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, opts);
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
 
         if (need_1n) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0xA0 + ch, opll_to_opl3_an(p->reg1n), opts);
+                                 0xA0 + ch, opll_to_opl3_an(p->reg1n), p_opts);
         }
         if (need_3n) {
             int8_t inst = (p->reg3n >> 4) & 0x0F;
             OPL3VoiceParam vp_tmp;
-            ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
+            ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp,p_opts);
+            // audible 適用: デバッグ補助 (診断/一時的に“鳴る” 状態を強制)
+            apply_debug_overrides(&vp_tmp, p_opts);
+            debug_apply_audible(&vp_tmp, p_opts); 
             uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0x40 + car_slot, car40, opts);
+                                 0x40 + car_slot, car40, p_opts);
         }
         opl3_metrics_note_off(ch);
         if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
@@ -511,19 +515,19 @@ static inline void flush_channel_ch(
         // No edge; just flush any changed params
         if (need_1n) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0xA0 + ch, opll_to_opl3_an(p->reg1n), opts);
+                                 0xA0 + ch, opll_to_opl3_an(p->reg1n), p_opts);
         }
         if (need_3n) {
             int8_t inst = (p->reg3n >> 4) & 0x0F;
             OPL3VoiceParam vp_tmp;
-            ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
+            ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
             uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0x40 + car_slot, car40, opts);
+                                 0x40 + car_slot, car40, p_opts);
         }
         if (need_2n) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0xB0 + ch, opll_to_opl3_bn(p->reg2n), opts);
+                                 0xB0 + ch, opll_to_opl3_bn(p->reg2n), p_opts);
         }
     }
 
@@ -540,7 +544,7 @@ int opll_write_register(
     VGMContext *p_vgm_context,
     OPL3State *p_state,
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
-    const CommandOptions *opts)
+    const CommandOptions *p_opts)
 {
     // Handle global registers (0x00 - 0x07)
     if (addr <= 0x07) {
@@ -548,7 +552,7 @@ int opll_write_register(
         for (int c = 0; c < YM2413_NUM_CH; ++c) {
             if (g_pend[c].has_2n && !g_stamp[c].ko && (g_pend[c].reg2n & 0x10)) {
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                              c, NULL, opts, &g_pend[c], &g_stamp[c]);
+                              c, NULL, p_opts, &g_pend[c], &g_stamp[c]);
                 g_pending_on_elapsed[c] = 0;
             }
         }
@@ -570,11 +574,11 @@ int opll_write_register(
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                              ch, NULL, opts, &g_pend[ch], &g_stamp[ch]);
+                              ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                 g_pending_on_elapsed[ch] = 0;
             } else if (g_stamp[ch].ko) {
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                     0xA0 + ch, opll_to_opl3_an(val), opts);
+                                     0xA0 + ch, opll_to_opl3_an(val), p_opts);
                 g_stamp[ch].last_1n = val; g_stamp[ch].valid_1n = 1;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
@@ -583,16 +587,16 @@ int opll_write_register(
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                              ch, NULL, opts, &g_pend[ch], &g_stamp[ch]);
+                              ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                 g_pending_on_elapsed[ch] = 0;
             } else if (g_stamp[ch].ko) {
                 int8_t inst = (val >> 4) & 0x0F;
                 OPL3VoiceParam vp_tmp;
-                ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp);
+                ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
                 uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, val);
                 uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                     0x40 + car_slot, car40, opts);
+                                     0x40 + car_slot, car40, p_opts);
                 g_stamp[ch].last_3n = val; g_stamp[ch].valid_3n = 1;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
@@ -606,13 +610,13 @@ int opll_write_register(
                     set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                     if (has_effective_3n(&g_pend[ch], &g_stamp[ch])) {
                         flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                      ch, NULL, opts, &g_pend[ch], &g_stamp[ch]);
+                                      ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                         g_pending_on_elapsed[ch] = 0;
                     }
                 }
             } else {
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                     0xB0 + ch, opll_to_opl3_bn(val), opts);
+                                     0xB0 + ch, opll_to_opl3_bn(val), p_opts);
                 g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = ko_next;
             }
         }
@@ -620,7 +624,7 @@ int opll_write_register(
 
     // Handle waits
     if (is_wait_samples_done == 0 && next_wait_samples > 0) {
-        opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, opts, next_wait_samples);
+        opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, p_opts, next_wait_samples);
         vgm_wait_samples(p_music_data, &p_vgm_context->status, next_wait_samples);
         is_wait_samples_done = 1;
     }

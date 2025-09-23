@@ -11,17 +11,17 @@
  *   1..15 : melodic presets
  *   16..20: rhythm voices (BD, SD, TOM, CYM, HH)
  */
-void opl3_register_all_ym2413(OPL3VoiceDB *db) {
+void opl3_register_all_ym2413(OPL3VoiceDB *db, const CommandOptions *opts) {
     if (!db) return;
 
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp, opts);
         opl3_voice_db_find_or_add(db, &vp);
     }
     for (int inst = 16; inst <= 20; ++inst) {
         OPL3VoiceParam vp;
-        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp);
+        ym2413_patch_to_opl3_with_fb(inst, NULL, &vp, opts);
         opl3_voice_db_find_or_add(db, &vp);
     }
 }

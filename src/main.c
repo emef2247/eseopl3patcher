@@ -9,7 +9,6 @@
 #include "opl3/opl3_convert.h"
 #include "opl3/opl3_debug_util.h"
 #include "opll/opll_to_opl3_wrapper.h"
-#include "debug_opts.h"
 #include "vgm/gd3_util.h"
 
 // Default values for command options
@@ -21,8 +20,7 @@
 
 int verbose = 0;
 
-// Global debug options instance
-DebugOpts g_dbg = {0};
+// DebugOpts g_dbg = {0}; ← 削除
 
 /** Fixed command lengths for multi-byte VGM commands (for safe copying) */
 typedef struct {
@@ -45,7 +43,7 @@ static const VGMFixedCmdLen* find_fixed_cmd(uint8_t code) {
 }
 
 /** Parse command line for OPL chip conversion flags and debug options */
-static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlags *chip_flags) {
+static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlags *chip_flags, DebugOpts *debug) {
     chip_flags->opl_group_autodetect = true;
     chip_flags->convert_ym2413 = false;
     chip_flags->convert_ym3812 = false;
@@ -67,11 +65,11 @@ static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlag
             chip_flags->opl_group_autodetect = false;
         }
         // Debug/diagnostic options
-        else if (strcmp(argv[i], "--strip-non-opl") == 0) g_dbg.strip_non_opl = true;
-        else if (strcmp(argv[i], "--test-tone") == 0) g_dbg.test_tone = true;
-        else if (strcmp(argv[i], "--fast-attack") == 0) g_dbg.fast_attack = true;
-        else if (strcmp(argv[i], "--no-post-keyon-tl") == 0) g_dbg.no_post_keyon_tl = true;
-        else if (strcmp(argv[i], "--single-port") == 0) g_dbg.single_port = true;
+        else if (strcmp(argv[i], "--strip-non-opl") == 0) debug->strip_non_opl = true;
+        else if (strcmp(argv[i], "--test-tone") == 0) debug->test_tone = true;
+        else if (strcmp(argv[i], "--fast-attack") == 0) debug->fast_attack = true;
+        else if (strcmp(argv[i], "--no-post-keyon-tl") == 0) debug->no_post_keyon_tl = true;
+        else if (strcmp(argv[i], "--single-port") == 0) debug->single_port = true;
     }
 }
 
@@ -159,6 +157,8 @@ int main(int argc, char *argv[]) {
     double v_ratio0 = DEFAULT_VOLUME_RATIO0;
     double v_ratio1 = DEFAULT_VOLUME_RATIO1;
 
+    DebugOpts debug_opts = {0};
+
     // Parse optional args
     for (int i = 3; i < argc; ++i) {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
@@ -171,6 +171,16 @@ int main(int argc, char *argv[]) {
             v_ratio1 = atof(argv[++i]);
         } else if (strcmp(argv[i], "-verbose") == 0) {
             verbose = 1;
+        } else if (strcmp(argv[i], "--strip-non-opl") == 0) {
+            debug_opts.strip_non_opl = true;
+        } else if (strcmp(argv[i], "--test-tone") == 0) {
+            debug_opts.test_tone = true;
+        } else if (strcmp(argv[i], "--fast-attack") == 0) {
+            debug_opts.fast_attack = true;
+        } else if (strcmp(argv[i], "--no-post-keyon-tl") == 0) {
+            debug_opts.no_post_keyon_tl = true;
+        } else if (strcmp(argv[i], "--single-port") == 0) {
+            debug_opts.single_port = true;
         } else if (argv[i][0] != '-') {
             char *endptr;
             int val = (int)strtol(argv[i], &endptr, 10);
@@ -184,14 +194,15 @@ int main(int argc, char *argv[]) {
 
     // Parse chip flags and debug options
     VGMChipClockFlags chip_flags = {0};
-    parse_chip_conversion_flags(argc, argv, &chip_flags);
+    parse_chip_conversion_flags(argc, argv, &chip_flags, &debug_opts);
 
     CommandOptions cmd_opts = {
         .detune = detune,
         .opl3_keyon_wait = opl3_keyon_wait,
         .ch_panning = ch_panning,
         .v_ratio0 = v_ratio0,
-        .v_ratio1 = v_ratio1
+        .v_ratio1 = v_ratio1,
+        .debug = debug_opts
     };
 
     // Output file name
@@ -290,7 +301,7 @@ int main(int argc, char *argv[]) {
 
     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YMF262);
     opll_set_program_args(argc, argv);
-    opll_init(&state);
+    opll_init(&state, &cmd_opts);
 
     long read_done_byte = data_start;
     long loop_start_in_buffer = -1;
@@ -426,7 +437,7 @@ int main(int argc, char *argv[]) {
                 if (!state.opl3_mode_initialized) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
                     state.opl3_mode_initialized = true;
-                    if (g_dbg.test_tone) {
+                    if (cmd_opts.debug.test_tone) {
                         // Simple additive test tone: mod muted, carrier AR=15 etc.
                         // Port0 only
                         duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
@@ -486,7 +497,7 @@ int main(int argc, char *argv[]) {
         /* --- 新規: 他チップ (AY8910 / K051649) の安全コピー --- */
         const VGMFixedCmdLen *spec = find_fixed_cmd(cmd);
         if (spec) {
-            if (g_dbg.strip_non_opl) {
+            if (cmd_opts.debug.strip_non_opl) {
                 // Skip this command entirely
                 read_done_byte += spec->length;
                 continue;

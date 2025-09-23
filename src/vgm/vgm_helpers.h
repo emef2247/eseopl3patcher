@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h> // for size_t
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,12 +42,26 @@ typedef enum {
     FMCHIP_MAX
 } FMChipType;
 
+/** Global debug / diagnostic options */
+typedef struct {
+    bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
+    bool test_tone;           /* Inject a simple test tone sequence */
+    bool fast_attack;         /* Force fast envelope (AR=15 etc.) */
+    bool no_post_keyon_tl;    /* Suppress TL changes right after KeyOn */
+    bool single_port;         /* Emit only port0 writes (suppress port1) */
+    bool audible_sanity; // (0..63, -1なら未指定)
+    bool verbose;
+} DebugOpts;
+
 typedef struct {
     double detune;
     int    opl3_keyon_wait;
     int    ch_panning;
     double v_ratio0;
     double v_ratio1;
+    int carrier_tl_clamp_enabled;
+    uint8_t carrier_tl_clamp; /* 0..63 */
+    DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
 
@@ -158,7 +171,6 @@ typedef struct {
 } VGMChipClockFlags;
 
 // --- Function documentation comments ---
-
 /**
  * Initialize a VGMBuffer structure.
  * @param p_buf Pointer to VGMBuffer to initialize.

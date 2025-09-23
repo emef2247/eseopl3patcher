@@ -1,5 +1,6 @@
 #ifndef NUKEDOPLL_VOICE_ROM_H
 #define NUKEDOPLL_VOICE_ROM_H
+#include <stdint.h>
 
 /**
  * Nuked-OPLL Built-in Instrument ROM - Real Chip Dump Table

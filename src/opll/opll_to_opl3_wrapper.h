@@ -30,7 +30,7 @@ typedef struct {
 
 /** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
-void opll_init(OPL3State *p_state);
+void opll_init(OPL3State *p_state, const CommandOptions* opts) ;
 
 int opll_write_register(
     VGMBuffer *p_music_data,
@@ -39,6 +39,6 @@ int opll_write_register(
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
     const CommandOptions *opts);
 
-void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db);
+void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db, CommandOptions* opts);
 
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */

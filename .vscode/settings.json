@@ -11,6 +11,7 @@
         "override_loader.h": "c",
         "opl3_voice_registry.h": "c",
         "opl3_hooks.h": "c",
-        "opl3_metrics.h": "c"
+        "opl3_metrics.h": "c",
+        "debug_opts.h": "c"
     }
 }
