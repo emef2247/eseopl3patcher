@@ -49,7 +49,7 @@ typedef struct {
     bool fast_attack;         /* Force fast envelope (AR=15 etc.) */
     bool no_post_keyon_tl;    /* Suppress TL changes right after KeyOn */
     bool single_port;         /* Emit only port0 writes (suppress port1) */
-    bool audible_sanity; // (0..63, -1なら未指定)
+    bool audible_sanity;   /* “鳴らすため” の安全調整 */
     bool verbose;
 } DebugOpts;
 
@@ -59,8 +59,10 @@ typedef struct {
     int    ch_panning;
     double v_ratio0;
     double v_ratio1;
-    int carrier_tl_clamp_enabled;
-    uint8_t carrier_tl_clamp; /* 0..63 */
+    int      carrier_tl_clamp_enabled;
+    uint8_t  carrier_tl_clamp;      /* 0..63: clamp (小さいほど音量大) */
+    int      emergency_boost_steps; /* >0 なら最終キャリアTLを更に減算 */
+    bool force_retrigger_each_note;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */

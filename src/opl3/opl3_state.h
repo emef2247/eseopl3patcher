@@ -39,6 +39,8 @@ typedef struct {
     uint8_t  reg[0x200];
     uint8_t  reg_stamp[0x200];
     uint8_t     last_key[OPL3_NUM_CHANNELS];     // true=KeyOn, false=KeyOff
+    uint32_t post_keyon_sample[OPL3_NUM_CHANNELS];
+    uint32_t post_keyon_valid[OPL3_NUM_CHANNELS];
     int      rhythm_mode;
     int      opl3_mode_initialized;
     int      source_fmchip;

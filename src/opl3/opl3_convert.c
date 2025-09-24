@@ -546,10 +546,6 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
 
-    //if (source_fmchip == FMCHIP_YM2413) {
-    //    register_all_ym2413_patches_to_opl3_voice_db(&p_state->voice_db);
-    //}
-
     // OPL3 global registers (Port 1 only)
     opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable
     opl3_write_reg(p_state, p_music_data, 1, 0x04, 0x00);  // Waveform select
@@ -588,6 +584,9 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
+
+    /* last_key は memset で 0 済み。念のためフラグ */
+    p_state->opl3_mode_initialized = 1;
 }
 
 
@@ -621,6 +620,9 @@ static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
 }
 #endif
 
+#ifndef YM2413_VOL_MAP_STEP
+#define YM2413_VOL_MAP_STEP 2
+#endif
 /*
  * make_carrier_40_from_vol
  * YM2413 の $3n レジスタ (reg3n) 下位 4bit (VOL) を OPL3 Carrier TL に反映して
@@ -630,15 +632,30 @@ static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
  *  - VOL nibble   : TL に加算 (0=加算0, 15=最大加算)
  * クリップ: 63 を超えたら 63。
  */
-uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n) {
-    if (!vp) return 0;  /* 防御 */
-    uint8_t base_tl   = vp->op[1].tl & 0x3F;
-    uint8_t ksl_bits  = (vp->op[1].ksl & 0x03) << 6;
-    uint8_t vol_nib   = reg3n & 0x0F;
+/* 旧 make_carrier_40_from_vol を完全に置換 */
+uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n)
+{
+    /* YM2413 volume nibble: 0=loudest .. 15=softest */
+    uint8_t vol = reg3n & 0x0F;          // 0..15
+    uint8_t base_tl = (uint8_t)(vp->op[1].tl & 0x3F);
 
-    uint8_t add = ym2413_vol_to_tl_add(vol_nib);
-    uint16_t tl_calc = (uint16_t)base_tl + add;
-    if (tl_calc > 63) tl_calc = 63;
+    /* STEP: 2 => 3dB弱/段 (0.75dB * 2 ≈1.5dB)。必要ならオプション化 */
+    const uint8_t STEP = YM2413_VOL_MAP_STEP;
 
-    return (uint8_t)(ksl_bits | (tl_calc & 0x3F));
+    uint16_t tl = (uint16_t)base_tl + (uint16_t)vol * STEP;
+    if (tl > 63) tl = 63;
+
+    /* KSL bits preserved */
+    uint8_t ksl_bits = (vp->op[1].ksl & 0x03) << 6;
+
+    /* デバッグ用 (最初数回だけ) */
+    static int dbg_cnt = 0;
+    if (dbg_cnt < 8) {
+        fprintf(stderr,
+            "[VOLMAP] reg3n=%02X vol=%u baseTL=%u => newTL=%u (STEP=%u)\n",
+            reg3n, vol, base_tl, (unsigned)tl, STEP);
+        dbg_cnt++;
+    }
+
+    return (uint8_t)(ksl_bits | (uint8_t)tl);
 }

@@ -17,6 +17,8 @@
 #define DEFAULT_CH_PANNING    0
 #define DEFAULT_VOLUME_RATIO0 1.0
 #define DEFAULT_VOLUME_RATIO1 0.8
+#define DEFAULT_CARRIER_TL_CLAMP_ENABLED 0
+#define DEFAULT_CARRIER_TL_CLAMP 63
 
 int verbose = 0;
 
@@ -70,6 +72,9 @@ static void parse_chip_conversion_flags(int argc, char *argv[], VGMChipClockFlag
         else if (strcmp(argv[i], "--fast-attack") == 0) debug->fast_attack = true;
         else if (strcmp(argv[i], "--no-post-keyon-tl") == 0) debug->no_post_keyon_tl = true;
         else if (strcmp(argv[i], "--single-port") == 0) debug->single_port = true;
+        else if (strcmp(argv[i], "--audible-sanity") == 0) debug->audible_sanity = true;
+        else if (strcmp(argv[i], "--debug-verbose") == 0) debug->verbose = true;
+        else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-verbose") == 0) debug->verbose = true;
     }
 }
 
@@ -116,10 +121,11 @@ static int copy_bytes_checked(VGMBuffer *dst, const unsigned char *src, long fil
 static void print_usage(const char *progname) {
     printf(
         "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
-        "          [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-verbose]\n"
+        "          [-o output.vgm] [-ch_panning n] [-vr0 f] [-vr1 f] [-v/-verbose]\n"
         "          [--convert-ymXXXX ...] [--override overrides.json]\n"
         "          [--strip-non-opl] [--test-tone] [--fast-attack]\n"
         "          [--no-post-keyon-tl] [--single-port]\n"
+        "          [--carrier-tl-clamp <val>] [--emergency_boost  <val>] [-force-retrigger-each-note] [--audible-sanity] [--debug-verbose]\n"
         "\n"
         "Options:\n"
         "  --convert-ymXXXX      Explicit chip selection (YM2413, YM3812, YM3526, Y8950)\n"
@@ -129,14 +135,20 @@ static void print_usage(const char *progname) {
         "  --fast-attack        Force fast envelope (AR=15, DR>=4, Carrier TL=0)\n"
         "  --no-post-keyon-tl   Suppress TL changes right after KeyOn\n"
         "  --single-port        Emit only port0 writes (suppress port1 duplicates)\n"
+        "  --carrier-tl-clamp <val>  Clamp final Carrier TL (0..63 / 0x00..0x3F)\n"
+        "  --emergency_boost  <val>  キャリア最終 TL を強制的にさらに下げて（=音量を上げて）テストしやすくする\n"
+        "  --force-retrigger-each-note 1 音ごとにアタックさせたい\n"
+        "  --audible-sanity     Force fast envelope & audible TL (DEBUG)\n"
+        "  --debug-verbose      Print verbose information for debug\n"
         "  -o output.vgm        Output file name (otherwise auto)\n"
         "  -ch_panning n        Channel panning mode\n"
         "  -vr0 f, -vr1 f       Port0/Port1 volume ratios\n"
-        "  -verbose             Print verbose conversion/debug info\n"
+        "  -v, -verbose         Print verbose information\n"
         "  --override           Apply override from overrides.json\n"
+        "  -h, --help           Show this help\n"
         "\n"
         "Example:\n"
-        "  %s music.vgm 1.0 --convert-ym2413 --strip-non-opl --fast-attack -o out.vgm\n",
+        "  %s music.vgm 1.0 --convert-ym2413 --strip-non-opl --fast-attack --carrier-tl-clamp 58 --audible-sanity --debug-verbose -o out.vgm\n",
         progname, progname
     );
 }
@@ -156,6 +168,10 @@ int main(int argc, char *argv[]) {
     int ch_panning = DEFAULT_CH_PANNING;
     double v_ratio0 = DEFAULT_VOLUME_RATIO0;
     double v_ratio1 = DEFAULT_VOLUME_RATIO1;
+    int carrier_tl_clamp_enabled = DEFAULT_CARRIER_TL_CLAMP_ENABLED;
+    uint8_t carrier_tl_clamp = DEFAULT_CARRIER_TL_CLAMP;
+    int emergency_boost_steps= 0; /* 無効がデフォルト */
+    bool force_retrigger_each_note = false;
 
     DebugOpts debug_opts = {0};
 
@@ -169,8 +185,15 @@ int main(int argc, char *argv[]) {
             v_ratio0 = atof(argv[++i]);
         } else if (strcmp(argv[i], "-vr1") == 0 && i + 1 < argc) {
             v_ratio1 = atof(argv[++i]);
-        } else if (strcmp(argv[i], "-verbose") == 0) {
-            verbose = 1;
+        } else if (strcmp(argv[i], "--carrier-tl-clamp") == 0 && i + 1 < argc) {
+            carrier_tl_clamp_enabled = 1;
+            carrier_tl_clamp = (uint8_t)atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--audible-sanity") == 0) {
+            debug_opts.audible_sanity = true;
+        } else if (strcmp(argv[i], "--debug-verbose") == 0) {
+            debug_opts.verbose = true;
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-verbose") == 0) {
+            verbose = true;
         } else if (strcmp(argv[i], "--strip-non-opl") == 0) {
             debug_opts.strip_non_opl = true;
         } else if (strcmp(argv[i], "--test-tone") == 0) {
@@ -181,6 +204,13 @@ int main(int argc, char *argv[]) {
             debug_opts.no_post_keyon_tl = true;
         } else if (strcmp(argv[i], "--single-port") == 0) {
             debug_opts.single_port = true;
+        } else if (strcmp(argv[i], "--emergency-boost") == 0 && i + 1 < argc) {
+            emergency_boost_steps = (uint8_t)atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--force-retrigger-each-note") == 0) {
+            force_retrigger_each_note = true;
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
         } else if (argv[i][0] != '-') {
             char *endptr;
             int val = (int)strtol(argv[i], &endptr, 10);
@@ -202,6 +232,10 @@ int main(int argc, char *argv[]) {
         .ch_panning = ch_panning,
         .v_ratio0 = v_ratio0,
         .v_ratio1 = v_ratio1,
+        .carrier_tl_clamp_enabled = carrier_tl_clamp_enabled,
+        .carrier_tl_clamp = carrier_tl_clamp,
+        .emergency_boost_steps = emergency_boost_steps,
+        .force_retrigger_each_note = force_retrigger_each_note,
         .debug = debug_opts
     };
 
@@ -286,7 +320,7 @@ int main(int argc, char *argv[]) {
     }
     vgmctx.target_fm_clock = OPL3_CLOCK;
     
-    if (verbose) {
+    if (cmd_opts.debug.verbose) {
         printf("[VGM] FM chip usage:\n");
         printf(" YM2413:%s clock=%u\n", chip_flags.has_ym2413?"Y":"N", chip_flags.ym2413_clock);
         printf(" YM3812:%s clock=%u\n", chip_flags.has_ym3812?"Y":"N", chip_flags.ym3812_clock);
@@ -352,7 +386,7 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
-            if (verbose)
+            if (cmd_opts.debug.verbose)
                 printf("YM2413 write: reg=0x%02X val=0x%02X (pos=%ld/%ld)\n",
                        reg, val, read_done_byte, filesize);
 
@@ -376,7 +410,7 @@ int main(int argc, char *argv[]) {
 
             if (chip_flags.convert_ym2413) {
                 if (!state.opl3_mode_initialized) {
-                    if (verbose) printf("Initializing OPL3 mode for YM2413...\n");
+                    if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
                     state.opl3_mode_initialized = true;
                 }
@@ -511,7 +545,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* 不明コマンド: 解析容易化のため 1 バイトだけコピーするが警告 */
-        if (verbose) {
+        if (cmd_opts.debug.verbose) {
             fprintf(stderr, "[WARN] Unknown VGM command 0x%02X at offset 0x%lX (forward as raw)\n",
                     cmd, read_done_byte);
         }
@@ -531,9 +565,13 @@ int main(int argc, char *argv[]) {
     char note_append[512];
     snprintf(note_append, sizeof(note_append),
              ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d "
-             "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%%",
+             "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%% carrier_tl_clamp:%s(%u) audible_sanity:%s debug_verbose:%s",
              get_converted_opl_chip_name(&chip_flags), detune, opl3_keyon_wait,
-             ch_panning, v_ratio0 * 100, v_ratio1 * 100);
+             ch_panning, v_ratio0 * 100, v_ratio1 * 100,
+             carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp,
+             debug_opts.audible_sanity ? "ON" : "OFF",
+             debug_opts.verbose ? "ON" : "OFF"
+    );
 
     VGMBuffer gd3;
     vgm_buffer_init(&gd3);
@@ -598,7 +636,12 @@ int main(int argc, char *argv[]) {
     printf("[OPL3] Channel Panning Mode: %d\n", ch_panning);
     printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
-    if (verbose) {
+    printf("[OPL3] Carrier TL Clamp: %s (%u)\n", carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp);
+    printf("[OPL3] Emergency Boost: %d \n",  emergency_boost_steps);
+    printf("[OPL3] Force retrigger each note: %s \n",  force_retrigger_each_note? "ON" : "OFF" );
+    printf("[OPL3] Audible Sanity: %s\n", debug_opts.audible_sanity ? "ON" : "OFF");
+    printf("[OPL3] Debug Verbose: %s\n", debug_opts.verbose ? "ON" : "OFF");
+    if (cmd_opts.debug.verbose) {
         printf("[OPL3] Total voices in DB: %d\n", state.voice_db.count);
     }
 

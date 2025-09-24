@@ -62,9 +62,16 @@ clone_or_update () {
   if [[ -n "${commit_env}" ]]; then
     (cd "$dest_dir" && git checkout -q "${commit_env}")
   else
-    # stay on current branch; fast-forward
-    (cd "$dest_dir" && git rev-parse --abbrev-ref HEAD >/dev/null 2>&1 || git checkout -q "$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||')" )
-    (cd "$dest_dir" && git pull --ff-only >/dev/null 2>&1 || true)
+    # Try to stay on current default branch (origin/HEAD)
+    (
+      cd "$dest_dir"
+      # If on detached HEAD, switch to default branch
+      if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+        default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+        [[ -n "$default_branch" ]] && git checkout -q "$default_branch"
+      fi
+      git pull --ff-only >/dev/null 2>&1 || true
+    )
   fi
   (cd "$dest_dir" && git rev-parse HEAD)
 }
@@ -84,11 +91,17 @@ build_vgm2txt () {
     return
   fi
   log "Building vgm2txt"
-  (cd "$src_dir" && make vgm2txt >/dev/null 2>&1 || make >/dev/null 2>&1 || { echo "vgm2txt build failed"; exit 1; })
+  if ! (cd "$src_dir" && make vgm2txt >/dev/null 2>&1); then
+    if ! (cd "$src_dir" && make >/dev/null 2>&1); then
+      echo "vgm2txt build failed" >&2
+      exit 1
+    fi
+  fi
+  # Pick executable named vgm2txt*
   local cand
-  cand="$(cd "$src_dir" && ls -1 vgm2txt* 2>/dev/null | head -n1 || true)"
+  cand="$(cd "$src_dir" && find . -maxdepth 1 -type f -name 'vgm2txt*' -perm -u+x | head -n1 || true)"
   [[ -n "$cand" ]] || { echo "vgm2txt binary not found" >&2; exit 1; }
-  cp "$src_dir/$cand" "$out"
+  cp "$src_dir/${cand#./}" "$out"
   chmod +x "$out"
 }
 
@@ -97,10 +110,13 @@ build_vgmplay () {
   if [[ $FORCE -eq 0 && ( -x "${BIN_DIR}/VGMPlay" || -x "${BIN_DIR}/vgmplay" ) ]]; then
     log "VGMPlay exists (use --force to rebuild)."
     return
-  end
+  fi
   log "Building VGMPlay"
-  (cd "$src_dir" && make >/dev/null 2>&1 || { echo "VGMPlay build failed"; exit 1; })
-  local found
+  if ! (cd "$src_dir" && make >/dev/null 2>&1); then
+    echo "VGMPlay build failed" >&2
+    exit 1
+  fi
+  local found=""
   while IFS= read -r f; do
     if file "$f" | grep -qi 'executable'; then found="$f"; break; fi
   done < <(find "$src_dir" -maxdepth 2 -type f \( -name 'VGMPlay' -o -name 'vgmplay' \))
@@ -128,7 +144,7 @@ update_meta () {
 EOF
 }
 
-[[ $SKIP_VGMTXT -eq 1 && $SKIP_VGMPLAY -eq 1 ]] && { echo "Nothing to do"; exit 1; }
+[[ $SKIP_VGMTXT -eq 1 && $SKIP_VGMPLAY -eq 1 ]] && { echo "Nothing to do"; exit 0; }
 
 vgmtools_commit=""
 vgmplay_commit=""
