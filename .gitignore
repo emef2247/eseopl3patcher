@@ -36,6 +36,12 @@
 *.x86_64
 *.hex
 
+# Batch files
+*.sh
+
+# Misc
+*.txt
+
 # Debug files
 *.dSYM/
 *.su
@@ -72,6 +78,13 @@ calibration/p??o4_*_pass*.wav
 # WAV/VGM general
 *.wav
 *.vgm
+
+# PNG
+*.png
+
+# tar 
+*.tgz
+*.tar.gz
 
 # Keep summary & overrides
 !calibration/reports/summarize_pass1.csv

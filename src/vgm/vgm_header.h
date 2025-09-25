@@ -5,7 +5,7 @@
 #include "vgm_helpers.h" // For VGMHeaderInfo, VGMGD3Tag, etc.
 
 #define VGM_HEADER_SIZE 0x100
-#define OPL3_CLOCK 14318182
+#define DEFAULT_OPL3_CLOCK 14318182
 
 /**
  * Builds a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.
@@ -144,5 +144,16 @@ const char* fmchip_type_name(FMChipType type);
  * @return FMChipType value indicating detected chip, or FMCHIP_NONE if unknown.
  */
 FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize);
+
+/**
+ * Post-process the VGM header buffer to update clock fields for various chips.
+ * This function sets clock values to zero for unused chips, and applies
+ * overrides (such as OPL3 clock) if specified in cmd_opts.
+ *
+ * @param p_header_buf   Pointer to the VGM header buffer.
+ * @param stats          Pointer to chip write statistics.
+ * @param cmd_opts       Pointer to command options (for clock overrides).
+ */
+void vgm_header_postprocess(uint8_t *p_header_buf, const VGMStats *stats, const CommandOptions *cmd_opts);
 
 #endif // VGM_HEADER_H

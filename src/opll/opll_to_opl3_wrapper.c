@@ -16,7 +16,6 @@
 
 static VGMContext *g_last_ctx = NULL;
 
-
 static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
@@ -35,22 +34,45 @@ static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
 static int    g_saved_argc = 0;
 static char **g_saved_argv = NULL;
 
+// 追加: fresh 1n を待つフラグ
+static uint8_t g_need_fresh_1n[YM2413_NUM_CH] = {0};
+
+// タイムアウト（必要に応じて調整）
+#ifndef KEYON_WAIT_FOR_FNUM_TIMEOUT_SAMPLES
+#define KEYON_WAIT_FOR_FNUM_TIMEOUT_SAMPLES 128
+#endif
+
+// 追加: 最小ゲート保持用
+static uint16_t g_gate_elapsed[YM2413_NUM_CH] = {0};
+static uint8_t  g_has_pending_keyoff[YM2413_NUM_CH] = {0};
+static uint8_t  g_pending_keyoff_val2n[YM2413_NUM_CH] = {0};
+
+// 追加: 最小ゲート（KeyOn→KeyOff の最小間隔）
+#ifndef OPLL_MIN_GATE_SAMPLES
+#define OPLL_MIN_GATE_SAMPLES 128   // 約 2.9ms @ 44.1kHz
+#endif
+
 /** Store program arguments for later use */
 void opll_set_program_args(int argc, char **argv) {
     g_saved_argc = argc;
     g_saved_argv = argv;
 }
 
-/* 新ヘルパ: 有効な 3n があるか */
-static inline bool opll_have_inst_ready(int ch) {
-    return g_pend[ch].has_3n || g_stamp[ch].valid_3n;
+/* 判定ヘルパ: 引数の pending/stamp を使って readiness をみる */
+static inline bool have_inst_ready_policy(const OpllPendingCh* p, const OpllStampCh* s) {
+    return (p && p->has_3n) || (s && s->valid_3n);
 }
-static inline bool opll_have_fnum_ready(int ch) {
-    return g_pend[ch].has_1n || g_stamp[ch].valid_1n;
+static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const OpllStampCh* s) {
+    (void)ch; // g_need_fresh_1n を尊重する場合は ch を使う
+    if (g_need_fresh_1n[ch]) {
+        return (p && p->has_1n);
+    }
+    // 診断フェーズ: stamp 1n も許容（順不同でも鳴ることを優先）
+    return (p && p->has_1n) || (s && s->valid_1n);
 }
-
 
 /** Initialize OPLL/OPL3 voice DB and state */
+/* 初期化: last_key[] を明示クリア */
 void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     if (!p_state) return;
     opl3_register_all_ym2413(&p_state->voice_db, p_opts);
@@ -59,6 +81,14 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
         opll_pending_clear(&g_pend[i]);
         stamp_clear(&g_stamp[i]);
         g_pending_on_elapsed[i] = 0;
+        g_need_fresh_1n[i] = 0;
+        // 追加
+        g_gate_elapsed[i] = 0;
+        g_has_pending_keyoff[i] = 0;
+        g_pending_keyoff_val2n[i] = 0;
+    }
+    for (int ch = 0; ch < 9; ++ch) {
+        p_state->last_key[ch] = 0;
     }
 }
 
@@ -107,6 +137,31 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
 #endif
 #ifndef OPLL_DEBUG_RATE_PICK
 #define OPLL_DEBUG_RATE_PICK 1
+#endif
+
+// acc_maybe_flush_triple から ko=1 時の早期 return を削除し、3点揃い次第「即時 KeyOff（遅延を無視）」→「新規 KeyOn」を必ず行う（デフォルトはOFF）
+#ifndef OPLL_DEBUG_FORCE_CAR_TL_ZERO
+#define OPLL_DEBUG_FORCE_CAR_TL_ZERO 0
+#endif
+
+// audible-sanity時にKeyOff前にwait注入(デフォルトON）
+#ifndef OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
+#define OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF 1
+#endif
+
+// KeyOn前にwait注入(デフォルトON）
+#ifndef OPLL_ENABLE_WAIT_BEFORE_KEYON
+#define OPLL_ENABLE_WAIT_BEFORE_KEYON 1
+#endif
+
+#ifndef OPLL_PRE_KEYON_WAIT_SAMPLES
+// A0/TL適用後、B0=ONの前に入れる待ち（audible-sanity時のみ）
+#define OPLL_PRE_KEYON_WAIT_SAMPLES 2
+#endif
+
+#ifndef OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
+// KeyOff→KeyOnの縁の間に最低限入れる待ち（audible-sanity時のみ）
+#define OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 4
 #endif
 
 static const uint8_t kOPLLRateToOPL3_SIMPLE[16] = {
@@ -266,6 +321,28 @@ static inline uint8_t enforce_min_attack(uint8_t ar, const char* stage, int inst
     return ar;
 }
 
+/** 
+ * Get min_gate_samples (OPLL_MIN_GATE_SAMPLES)
+ *  Minimum duration (in samples) that the gate (key-on state) must be held to ensure proper note triggering in OPLL emulation.
+ */
+static inline uint16_t get_min_gate(const CommandOptions* o) {
+    return (o && o->min_gate_samples) ? o->min_gate_samples : (uint16_t)OPLL_MIN_GATE_SAMPLES;
+}
+
+/** Get pre_keyon_wait_samples (OPLL_PRE_KEYON_WAIT_SAMPLES)
+ * Number of samples to wait before issuing a key-on event, allowing internal state stabilization in the OPLL chip
+ */
+static inline uint16_t get_pre_keyon_wait(const CommandOptions* o) {
+    return (o && o->pre_keyon_wait_samples) ? o->pre_keyon_wait_samples : (uint16_t)OPLL_PRE_KEYON_WAIT_SAMPLES;
+}
+
+/** Get min_off_on_wait_samples (OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES)
+ * Minimum number of samples to wait between a key-off and key-on event, ensuring reliable note retriggering in OPLL emulation.
+*/
+static inline uint16_t get_min_off_on_wait(const CommandOptions* o) {
+    return (o && o->min_off_on_wait_samples) ? o->min_off_on_wait_samples : (uint16_t)OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES;
+}
+
 /** Envelope shape fix for steep AR/DR gaps */
 #if !OPLL_ENABLE_ENVELOPE_SHAPE_FIX
 static inline void maybe_shape_fix(int inst, int op_index, uint8_t* p_ar, uint8_t* p_dr) {
@@ -368,24 +445,22 @@ void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *p_db, CommandOpti
         opl3_voice_db_find_or_add(p_db, &vp);
     }
 }
-
-/** Apply voice params to channel before KeyOn */
+/* 置換: apply_inst_before_keyon を “鳴る前提”の一括適用に */
 static inline void apply_inst_before_keyon(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, uint8_t reg3n, const CommandOptions *p_opts,
-    OPL3VoiceParam *out_cached_vp /* ← 追加: 後段で再利用 */
+    OPL3VoiceParam *out_cached_vp /* 後段でTL算出に再利用 */
 ) {
     int8_t inst = (reg3n >> 4) & 0x0F;
     OPL3VoiceParam vp;
     ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp, p_opts);
 
-    /* ここでデバッグ/鳴る調整を適用してから一括書き込み */
+    /* ここで audible-sanity / clamp / boost 等を先に適用 */
     opll_apply_all_debug(&vp, p_opts);
 
-    /* （初期書き込み）全スロット/フィードバック/エンベロープ */
+    /* フルレジスタ一括書き込み */
     opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, p_opts);
 
-    /* 呼び出し元で volume nibble 反映や clamp/boost を行うため返却 */
     if (out_cached_vp) *out_cached_vp = vp;
 }
 
@@ -403,16 +478,27 @@ static inline void flush_channel(
     flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, p_opts, p, s);
 }
 
-/** Update pending on elapsed for KeyOn timeout */
+/* fresh 1n のタイムアウト待ちを追加（妥協して stamp の 1n で鳴らす） */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
     const CommandOptions *p_opts, uint16_t wait_samples)
 {
     if (wait_samples == 0) return;
+
     for (int ch = 0; ch < YM2413_NUM_CH; ++ch) {
+        // 1) 鳴いている間のゲート経過を加算
+        if (g_stamp[ch].ko) {
+            uint32_t el = (uint32_t)g_gate_elapsed[ch] + wait_samples;
+            g_gate_elapsed[ch] = (el > 0xFFFF) ? 0xFFFF : (uint16_t)el;
+        } else {
+            g_gate_elapsed[ch] = 0;
+        }
+
+        // 2) KeyOn 待ち（従来ロジック）
         if (g_pend[ch].has_2n) {
             bool ko_next = (g_pend[ch].reg2n & 0x10) != 0;
             if (ko_next && !g_stamp[ch].ko) {
+                // まず 3n を待つ
                 if (!has_effective_3n(&g_pend[ch], &g_stamp[ch])) {
                     uint32_t elapsed = (uint32_t)g_pending_on_elapsed[ch] + wait_samples;
                     if (elapsed >= KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES) {
@@ -422,10 +508,52 @@ static inline void opll_tick_pending_on_elapsed(
                     } else {
                         g_pending_on_elapsed[ch] = (uint16_t)elapsed;
                     }
+                    continue;
+                }
+
+                // fresh 1n を待つ（必要なら）
+                if (g_need_fresh_1n[ch] && !g_pend[ch].has_1n) {
+                    uint32_t elapsed = (uint32_t)g_pending_on_elapsed[ch] + wait_samples;
+                    if (elapsed >= KEYON_WAIT_FOR_FNUM_TIMEOUT_SAMPLES) {
+                        OpllPendingCh temp = g_pend[ch];
+                        if (!temp.has_1n && g_stamp[ch].valid_1n) {
+                            temp.has_1n = 1;
+                            temp.reg1n = g_stamp[ch].last_1n;
+                        }
+                        if (p_opts && p_opts->debug.verbose)
+                            fprintf(stderr,"[KEYON_FNUM_TIMEOUT_FLUSH] ch=%d use_stamp_1n=%d val=%02X\n",
+                                    ch, (int)g_stamp[ch].valid_1n, g_stamp[ch].last_1n);
+                        flush_channel(p_music_data, &p_vgm_context->status, p_state,
+                                      ch, NULL, p_opts, &temp, &g_stamp[ch]);
+                        g_pending_on_elapsed[ch] = 0;
+                    } else {
+                        g_pending_on_elapsed[ch] = (uint16_t)elapsed;
+                    }
                 }
             }
         }
+
+        // 3) 遅延 KeyOff の放流（最小ゲートを満たしたら B0 を吐く）
+        if (g_has_pending_keyoff[ch] && g_gate_elapsed[ch] >= get_min_gate(p_opts)) {
+            uint8_t v2n = g_pending_keyoff_val2n[ch];
+            uint8_t opl3_bn = opll_to_opl3_bn(v2n); // v2n は KO=0 にクリア済みを想定
+            duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
+                                 0xB0 + ch, opl3_bn, p_opts);
+
+            // stamp と状態更新
+            g_stamp[ch].last_2n = v2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
+            p_state->last_key[ch] = 0;
+            g_has_pending_keyoff[ch] = 0;
+
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr,"[DELAY_KEYOFF_FLUSH] ch=%d elapsed=%u/%u reg2n=%02X\n",
+                        ch, g_gate_elapsed[ch], get_min_gate(p_opts), v2n);
+            }
+            opl3_metrics_note_off(ch);
+            if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
+        }
     }
+    // 注意: 待ち（vgm_wait_samples）は呼び出し元で出力する現状の構成を維持
 }
 
 /** Debug: calculate effective modulator TL from KSL and block */
@@ -463,6 +591,100 @@ static inline uint8_t emergency_boost_carrier_tl(uint8_t car40,
     return (uint8_t)(ksl | (uint8_t)new_tl);
 }
 
+/* ===================== ここから順不同アキュムレータ経路 ===================== */
+/* Accumulator: 順不同の 1n/2n/3n を保持（値変化は不問、3つ揃いでKeyOn） */
+static uint8_t g_acc_has_1n[YM2413_NUM_CH] = {0};
+static uint8_t g_acc_has_2n[YM2413_NUM_CH] = {0};
+static uint8_t g_acc_has_3n[YM2413_NUM_CH] = {0};
+static uint8_t g_acc_1n[YM2413_NUM_CH]      = {0};
+static uint8_t g_acc_2n[YM2413_NUM_CH]      = {0};
+static uint8_t g_acc_3n[YM2413_NUM_CH]      = {0};
+
+static inline void acc_reset_ch(int ch) {
+    g_acc_has_1n[ch] = g_acc_has_2n[ch] = g_acc_has_3n[ch] = 0;
+}
+
+/* 3つ揃ったら即フラッシュ（順不同対応）
+   - 2n(KO=1)でなければ保留
+   - 既に鳴っている場合は先に即時 KeyOff を出してリトリガを保証
+   - flush 後は g_pend[ch] もクリアして二重フラッシュを防止
+*/
+static inline void acc_maybe_flush_triple(
+    VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
+    const CommandOptions *p_opts, int ch)
+{
+    if (!g_acc_has_1n[ch] || !g_acc_has_2n[ch] || !g_acc_has_3n[ch]) return;
+
+    uint8_t reg1n = g_acc_1n[ch];
+    uint8_t reg2n = g_acc_2n[ch];
+    uint8_t reg3n = g_acc_3n[ch];
+
+    // KeyOnでなければまだ待つ
+    if ((reg2n & 0x10) == 0) return;
+
+    // 既に鳴っている場合でも、ここで必ず即時 KeyOff を吐いてリトリガを保証（遅延を無視）
+    if (g_stamp[ch].ko) {
+#if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
+        if (p_opts && p_opts->debug.audible_sanity) {
+            if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
+                uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                if (p_opts->debug.verbose) {
+                    fprintf(stderr,"[KEYOFF_INJECT_WAIT][TRIPLE] ch=%d need=%u (elapsed=%u, min=%u)\n",
+                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                }
+                vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
+                g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
+            }
+        }
+#endif
+        // 即時 KeyOff
+        uint8_t ko_val2n = g_has_pending_keyoff[ch] ? g_pending_keyoff_val2n[ch]
+                                                    : opll_make_keyoff(g_stamp[ch].last_2n);
+        uint8_t opl3_bn = opll_to_opl3_bn(ko_val2n);
+        duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
+                             0xB0 + ch, opl3_bn, p_opts);
+        g_stamp[ch].last_2n = ko_val2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
+        p_state->last_key[ch] = 0;
+        g_has_pending_keyoff[ch] = 0;
+        if (p_opts && p_opts->debug.verbose)
+            fprintf(stderr,"[TRIPLE_PRE_KEYOFF] ch=%d reg2n=%02X\n", ch, ko_val2n);
+
+#if OPLL_ENABLE_WAIT_BEFORE_KEYON
+    // KeyOff→KeyOnの縁が同時刻で重ならないよう、少量の待ちを入れる
+    if (p_opts && p_opts->debug.audible_sanity && get_min_off_on_wait(p_opts) > 0) {
+        vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)get_min_off_on_wait(p_opts));
+        if (p_opts->debug.verbose) {
+            fprintf(stderr,"[OFF_TO_ON_WAIT][TRIPLE] ch=%d samples=%u\n",
+                    ch, (unsigned)get_min_off_on_wait(p_opts));
+        }
+    }
+#endif
+    }
+
+    // temp pending で KeyOn
+    OpllPendingCh temp = (OpllPendingCh){0};
+    temp.has_1n = 1; temp.reg1n = reg1n;
+    temp.has_2n = 1; temp.reg2n = reg2n;
+    temp.has_3n = 1; temp.reg3n = reg3n;
+
+    if (p_opts && p_opts->debug.verbose)
+        fprintf(stderr,"[TRIPLE_FLUSH] ch=%d 1n=%02X 2n=%02X 3n=%02X\n", ch, reg1n, reg2n, reg3n);
+
+    flush_channel(p_music_data, &p_vgm_context->status, p_state,
+                  ch, NULL, p_opts, &temp, &g_stamp[ch]);
+
+    // 後処理: 重複フラッシュ防止
+    acc_reset_ch(ch);
+    opll_pending_clear(&g_pend[ch]);
+    g_pending_on_elapsed[ch] = 0;
+    g_need_fresh_1n[ch] = 0;
+    g_has_pending_keyoff[ch] = 0;
+    g_gate_elapsed[ch] = 0;
+}
+/* ===================== 順不同アキュムレータ経路 ここまで ===================== */
+
+
 /** Flush pending channel state (KeyOn/KeyOff/param writes) */
 static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
@@ -474,140 +696,117 @@ static inline void flush_channel_ch(
     bool need_3n = p->has_3n && (!s->valid_3n || p->reg3n != s->last_3n);
     bool need_2n = p->has_2n && (!s->valid_2n || p->reg2n != s->last_2n);
 
-    //PendingEdgeInfo e = analyze_pending_edge_ch(p_music_data, p_vstat, p_state, ch, vp_unused, p_opts, p, s);
     PendingEdgeInfo e = analyze_pending_edge_ch(p, s, p_opts);
     fprintf(stderr,
-    "[FLUSH] ch=%d pend{1:%c 3:%c 2:%c} edge{on:%d off:%d} ko(stamp)=%d next2n=%02X last2n=%02X\n",
-    ch, p->has_1n?'Y':'n', p->has_3n?'Y':'n', p->has_2n?'Y':'n',
-    e.note_on_edge, e.note_off_edge, s->ko,
-    p->has_2n ? p->reg2n : 0xFF,
-    s->valid_2n ? s->last_2n : 0xFF);
-
+        "[FLUSH] ch=%d pend{1:%c 3:%c 2:%c} edge{on:%d off:%d} ko(stamp)=%d next2n=%02X last2n=%02X\n",
+        ch, p->has_1n?'Y':'n', p->has_3n?'Y':'n', p->has_2n?'Y':'n',
+        e.note_on_edge, e.note_off_edge, s->ko,
+        p->has_2n ? p->reg2n : 0xFF,
+        s->valid_2n ? s->last_2n : 0xFF);
 
     uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
+    bool delayed_keyoff = false;  // 追加: 今回の呼び出しで KeyOff を保留したか
 
     if (e.has_2n && e.note_on_edge) {
-        /* guard: inst 未確定なら flush 中断 (二重防御) */
-        if (!opll_have_inst_ready(ch)) {
-            if (p_opts->debug.verbose)
-                fprintf(stderr,"[ABORT_KEYON_NO_INST] ch=%d (reg2n=%02X)\n",
-                    ch, p->reg2n);
-            /* pending 状態を維持: return せず but B0 書かない */
-            // stamp は更新しないで戻す
+        if (!have_inst_ready_policy(p, s)) {
+            if (p_opts && p_opts->debug.verbose) fprintf(stderr,"[ABORT_KEYON_NO_INST] ch=%d\n", ch);
             return;
         }
-        if (!opll_have_fnum_ready(ch)) {
-            if (p_opts->debug.verbose)
-                fprintf(stderr,"[ABORT_KEYON_NO_FNUM] ch=%d\n", ch);
+        if (!have_fnum_ready_policy(ch, p, s)) {
+            if (p_opts && p_opts->debug.verbose) fprintf(stderr,"[ABORT_KEYON_NO_FNUM] ch=%d\n", ch);
             return;
         }
-        uint8_t reg3n_eff = p->has_3n ? p->reg3n : (s->valid_3n ? s->last_3n : 0x00);
+        uint8_t reg3n_eff = p->has_3n ? p->reg3n : s->last_3n;
         uint8_t reg2n_eff = p->reg2n;
-        uint8_t reg1n_eff = p->has_1n ? p->reg1n : (s->valid_1n ? s->last_1n : 0x00);
-
-        if (((reg3n_eff >> 4) & 0x0F)==0 && p_opts->debug.verbose) {
-            fprintf(stderr,"[WARN] ch=%d KeyOn with inst=0 (zero patch) -- likely premature flush\n", ch);
-        }
+        uint8_t reg1n_eff = p->has_1n ? p->reg1n : s->last_1n;
 
         OPL3VoiceParam vp_cached;
         apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, p_opts, &vp_cached);
 
-        /* A0 (FNUM LSB) */
-        duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                             0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
+        // A0（バッファ対象）、TL、B0（KeyOn）を呼び出し順で投入
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
 
-        /* Carrier volume 反映 */
         uint8_t car40 = make_carrier_40_from_vol(&vp_cached, reg3n_eff);
-
-       /* boost first */
-        car40 = emergency_boost_carrier_tl(car40,p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
-        /* clamp AFTER boost so clamp is a true ceiling */
+        car40 = emergency_boost_carrier_tl(car40, p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
         if (p_opts && p_opts->carrier_tl_clamp_enabled) {
             uint8_t tl = car40 & 0x3F;
-            if (tl > p_opts->carrier_tl_clamp) {
-                if (p_opts->debug.verbose)
-                    fprintf(stderr,"[CLAMP] carrier TL %u -> %u (post-boost)\n",
-                        tl, p_opts->carrier_tl_clamp);
-                car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
-            }
+            if (tl > p_opts->carrier_tl_clamp) car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
         }
-
-
-        uint8_t car_slot = opl3_local_car_slot((uint8_t)ch);
-        duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                             0x40 + car_slot, car40, p_opts);
-        #if OPLL_ENABLE_KEYON_DEBUG
-        {
-            uint16_t fnum = (uint16_t)reg1n_eff | ((reg2n_eff & 0x01) << 8);
-            uint8_t  block = (reg2n_eff >> 1) & 0x07;
-            uint8_t  mod_raw_tl = vp_cached.op[0].tl;
-            uint8_t  eff_mod_tl = debug_effective_mod_tl(mod_raw_tl, vp_cached.op[0].ksl, block);
-            uint8_t  car_final_tl = car40 & 0x3F;
-            /* サンプル位置は p_vstat -> total_samples を優先し、無ければ g_last_ctx->status.total_samples を使う */
-            uint32_t ksamp =
-                (p_vstat ? p_vstat->total_samples :
-                (g_last_ctx ? g_last_ctx->status.total_samples : 0));
-
-            fprintf(stderr,
-                "[DEBUG] KeyOnDbg ch=%d inst=%d fnum=%u block=%u sample=%u "
-                "modTL=%u effModTL=%u carTLraw=%u carTLfinal=%u FB=%u CNT=%u\n",
-                ch, (reg3n_eff >> 4) & 0x0F, fnum, block, ksamp,
-                mod_raw_tl, eff_mod_tl, vp_cached.op[1].tl, car_final_tl,
-                vp_cached.fb[0], vp_cached.cnt[0]);
+#if OPLL_DEBUG_FORCE_CAR_TL_ZERO
+        car40 = (uint8_t)((car40 & 0xC0) | 0x00);
+        if (p_opts && p_opts->debug.verbose)
+            fprintf(stderr,"[FORCE_TL0][KEYON] ch=%d\n", ch);
+#endif
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + car_slot, car40, p_opts);
+#if OPLL_ENABLE_WAIT_BEFORE_KEYON
+    // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
+    if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
+        vgm_wait_samples(p_music_data, p_vstat, (uint16_t)get_pre_keyon_wait(p_opts));
+        if (p_opts->debug.verbose) {
+            fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n",
+                    ch, (unsigned)get_pre_keyon_wait(p_opts));
         }
-        #endif
-
-        p_state->post_keyon_sample[ch] =
-            (p_vstat ? p_vstat->total_samples :
-            (g_last_ctx ? g_last_ctx->status.total_samples : 0));
-        p_state->post_keyon_valid[ch] = 1;
+    }
+#endif
+        // ここで B0=ON
         if (!key_state_already(p_state, ch, true)) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
             opl3_metrics_note_on(ch,
                 (uint16_t)reg1n_eff | ((reg2n_eff & 0x01) << 8),
                 (reg2n_eff >> 1) & 0x07);
         }
+        g_need_fresh_1n[ch] = 0;
+        g_gate_elapsed[ch] = 0;
+        g_has_pending_keyoff[ch] = 0;
     }
     else if (e.has_2n && e.note_off_edge) {
-        // KeyOff edge detected
-        uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
-
-        if (need_1n) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0xA0 + ch, opll_to_opl3_an(p->reg1n), p_opts);
-        }
-        if (need_3n) {
-            int8_t inst = (p->reg3n >> 4) & 0x0F;
-            OPL3VoiceParam vp_tmp;
-            ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp,p_opts);
-            opll_apply_all_debug(&vp_tmp, p_opts);
-            uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
-            /* carrier TL clamp (audible_sanity 内の基礎調整後 + VOL 反映後) */
+        // 変更: 最小ゲート未満なら KeyOff を保留
+        if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
+#if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
+            // audible-sanity 有効時はここで待ちを注入してから即時 KeyOff
             if (p_opts && p_opts->debug.audible_sanity) {
-                uint8_t tl = car40 & 0x3F;
-                if (tl > 0x10) {
-                    if (p_opts->debug.verbose)
-                        fprintf(stderr,"[AUDIBLE] final carrier TL clamp %u -> 16\n", tl);
-                    car40 = (uint8_t)((car40 & 0xC0) | 0x10);
+                uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                if (p_opts->debug.verbose) {
+                    fprintf(stderr,"[KEYOFF_INJECT_WAIT] ch=%d need=%u (elapsed=%u, min=%u)\n",
+                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                 }
+                // VGMに待ちを注入してからゲート経過を進める
+                vgm_wait_samples(p_music_data, p_vstat, need);
+                // saturate
+                uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
+                g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
+
+                // 直後に即時 KeyOff を発行
+                uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
+                duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
+                p_state->last_key[ch] = 0;
+                if (p_opts && p_opts->debug.verbose)
+                    fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (after inject wait)\n", ch, p->reg2n);
+
+                opl3_metrics_note_off(ch);
+                if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
+            } else
+#endif
+            {   
+                // 従来: 遅延KeyOff保留（待ちが進む環境向け）
+                g_has_pending_keyoff[ch]   = 1;
+                g_pending_keyoff_val2n[ch] = p->reg2n;
+                delayed_keyoff = true;
+                if (p_opts && p_opts->debug.verbose)
+                    fprintf(stderr,"[DELAY_KEYOFF_ARM] ch=%d elapsed=%u/%u val=%02X\n",
+                            ch, g_gate_elapsed[ch], get_min_gate(p_opts), p->reg2n);
             }
-            if (p_opts && p_opts->carrier_tl_clamp_enabled) {
-                uint8_t tl = car40 & 0x3F;
-                if (tl > p_opts->carrier_tl_clamp) {
-                    if (p_opts->debug.verbose)
-                        fprintf(stderr,"[CLAMP] carrier TL %u -> %u\n", tl, p_opts->carrier_tl_clamp);
-                    car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
-                }
-            }
-            /* 緊急ブースト */
-            car40 = emergency_boost_carrier_tl(car40,p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
-                                 0x40 + car_slot, car40, p_opts);
+        } else {
+            // 閾値以上なら即時 KeyOff
+            uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
+            p_state->last_key[ch] = 0;
+            if (p_opts && p_opts->debug.verbose)
+                fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (elapsed=%u)\n", ch, p->reg2n, g_gate_elapsed[ch]);
+
+            opl3_metrics_note_off(ch);
+            if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
         }
-        opl3_metrics_note_off(ch);
-        if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
     }
     else {
         // No edge; just flush any changed params
@@ -621,7 +820,6 @@ static inline void flush_channel_ch(
             ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
             opll_apply_all_debug(&vp_tmp, p_opts);
             uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
-            /* clamp AFTER boost so clamp is a true ceiling */
             if (p_opts && p_opts->carrier_tl_clamp_enabled) {
                 uint8_t tl = car40 & 0x3F;
                 if (tl > p_opts->carrier_tl_clamp) {
@@ -640,13 +838,19 @@ static inline void flush_channel_ch(
         }
     }
 
-    // Update stamp state
+    // 重要: Update stamp state
     if (p->has_1n && need_1n) { s->last_1n = p->reg1n; s->valid_1n = 1; }
     if (p->has_3n && need_3n) { s->last_3n = p->reg3n; s->valid_3n = 1; }
-    if (p->has_2n) { s->last_2n = p->reg2n; s->valid_2n = 1; s->ko = (p->reg2n & 0x10) != 0; }
+
+    // “今回 KeyOff を保留した”場合は 2n のスタンプ更新をスキップして ko を維持する
+    if (p->has_2n && !delayed_keyoff) {
+        s->last_2n = p->reg2n; s->valid_2n = 1; s->ko = (p->reg2n & 0x10) != 0;
+    } else if (delayed_keyoff) {
+        p->has_2n = 0;
+    }
+
     opll_pending_clear(p);
 }
-
 
 
 
@@ -660,13 +864,20 @@ int opll_write_register(
 {
     g_last_ctx = p_vgm_context;
     // Handle global registers (0x00 - 0x07)
+    // グローバルレジスタ(<=0x07)での保留フラッシュを厳格化（inst+fresh fnum が必須）
     if (addr <= 0x07) {
         g_ym2413_regs[addr] = val;
         for (int c = 0; c < YM2413_NUM_CH; ++c) {
             if (g_pend[c].has_2n && !g_stamp[c].ko && (g_pend[c].reg2n & 0x10)) {
-                flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                              c, NULL, p_opts, &g_pend[c], &g_stamp[c]);
-                g_pending_on_elapsed[c] = 0;
+                if (have_inst_ready_policy(&g_pend[c], &g_stamp[c]) && have_fnum_ready_policy(c, &g_pend[c], &g_stamp[c])) {
+                    flush_channel(p_music_data, &p_vgm_context->status, p_state,
+                                c, NULL, p_opts, &g_pend[c], &g_stamp[c]);
+                    g_pending_on_elapsed[c] = 0;
+                } else if (p_opts && p_opts->debug.verbose) {
+                    fprintf(stderr,"[GLOBAL_SKIP_FLUSH] ch=%d instReady=%d fnumReady=%d\n",
+                            c, (int)have_inst_ready_policy(&g_pend[c], &g_stamp[c]),
+                            (int)have_fnum_ready_policy(c, &g_pend[c], &g_stamp[c]));
+                }
             }
         }
         return 0;
@@ -683,6 +894,11 @@ int opll_write_register(
         const bool pend_note_on =
             g_pend[ch].has_2n && !g_stamp[ch].ko && ((g_pend[ch].reg2n & 0x10) != 0);
 
+        /* 順不同アキュムレータ：常に取り込む（値変化の有無は不問） */
+        if (kind == 1) { g_acc_has_1n[ch] = 1; g_acc_1n[ch] = val; }
+        else if (kind == 2) { g_acc_has_2n[ch] = 1; g_acc_2n[ch] = val; }
+        else if (kind == 3) { g_acc_has_3n[ch] = 1; g_acc_3n[ch] = val; }
+
         if (kind == 1) { // $1n
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
@@ -696,22 +912,22 @@ int opll_write_register(
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
             }
+        /* $3n (kind==3) パス: KeyOn保留中に3nが来たときの即時フラッシュ条件 */
         } else if (kind == 3) { // $3n
-           if (pend_note_on) {
+            if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
-                // ここではまだ reg2n が KeyOn だけど 3n が来たので instrument ready
-                // 1n (FNUM) も揃っていれば flush
-                if (opll_have_fnum_ready(ch)) {
+                if (have_fnum_ready_policy(ch, &g_pend[ch], &g_stamp[ch])) {
                     flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                                  ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                     g_pending_on_elapsed[ch] = 0;
-                    if (p_opts->debug.verbose)
-                        fprintf(stderr,"[KEYON_FLUSH_ON_3N] ch=%d 3n=%02X\n", ch, val);
+                    if (p_opts && p_opts->debug.verbose)
+                        fprintf(stderr,"[KEYON_FLUSH_ON_3N] ch=%d 3n=%02X (fnum ready)\n", ch, val);
                 } else {
-                    if (p_opts->debug.verbose)
+                    if (p_opts && p_opts->debug.verbose)
                         fprintf(stderr,"[PEND_3N_WAIT_FNUM] ch=%d 3n=%02X\n", ch, val);
                 }
             } else if (g_stamp[ch].ko) {
+                /* Post-30: 鳴ってる最中の VOL 反映だけ */
                 int8_t inst = (val >> 4) & 0x0F;
                 OPL3VoiceParam vp_tmp;
                 ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
@@ -731,7 +947,11 @@ int opll_write_register(
                         car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
                     }
                 }
-
+#if OPLL_DEBUG_FORCE_CAR_TL_ZERO
+                car40 = (uint8_t)((car40 & 0xC0) | 0x00);
+                if (p_opts && p_opts->debug.verbose)
+                    fprintf(stderr,"[FORCE_TL0][POST30] ch=%d\n", ch);
+#endif
                 uint8_t car_slot2 = opl3_local_car_slot((uint8_t)ch);
                 duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                     0x40 + car_slot2, car40, p_opts);
@@ -746,51 +966,94 @@ int opll_write_register(
                 return 0;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
-                if (p_opts->debug.verbose)
-                    fprintf(stderr,"[PEND_3N_IDLE] ch=%d 3n=%02X (await keyon)\n", ch, val);
+                if (p_opts && p_opts->debug.verbose) fprintf(stderr,"[PEND_3N_IDLE] ch=%d 3n=%02X (await keyon)\n", ch, val);
             }
+        // $2n (kind==2) パス
         } else if (kind == 2) { // $2n
-            bool ko_next = (val & 0x10) != 0;
-            bool ko_prev = g_stamp[ch].ko;
-
+            bool ko_next = (val & 0x10) != 0, ko_prev = g_stamp[ch].ko;
             if (!ko_prev && ko_next) {
-                /* KeyOn 開始: まず pending に積む */
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
 
-                /* instrument(3n) と FNUM(1n) が両方揃っているか? */
-                if (opll_have_inst_ready(ch) && opll_have_fnum_ready(ch)) {
+                // 立ち上がり時に fresh 1n を待つ設定が有効なら has_1n をクリア
+                g_need_fresh_1n[ch] = 1;
+                g_pend[ch].has_1n = 0;
+                g_pending_on_elapsed[ch] = 0;
+
+                if (have_inst_ready_policy(&g_pend[ch], &g_stamp[ch]) && have_fnum_ready_policy(ch, &g_pend[ch], &g_stamp[ch])) {
                     flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                                  ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                     g_pending_on_elapsed[ch] = 0;
-                    if (p_opts->debug.verbose)
+                    if (p_opts && p_opts->debug.verbose)
                         fprintf(stderr,"[KEYON_FLUSH_NOW] ch=%d reg2n=%02X (inst+fnum ready)\n", ch, val);
                 } else {
-                    /* 揃ってないので後続 3n/1n まで待つ */
-                    if (p_opts->debug.verbose)
-                        fprintf(stderr,"[KEYON_PEND] ch=%d reg2n=%02X instReady=%d fnumReady=%d\n",
-                            ch, val, opll_have_inst_ready(ch), opll_have_fnum_ready(ch));
+                    if (p_opts && p_opts->debug.verbose)
+                        fprintf(stderr,"[KEYON_ARM] ch=%d reg2n=%02X (await fresh 1n) instReady=%d fnumReady=%d\n",
+                                ch, val,
+                                (int)have_inst_ready_policy(&g_pend[ch], &g_stamp[ch]),
+                                (int)have_fnum_ready_policy(ch, &g_pend[ch], &g_stamp[ch]));
                 }
-            }
-            else if (ko_prev && !ko_next) {
-                /* KeyOff */
-                duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                    0xB0 + ch, opll_to_opl3_bn(val), p_opts);
-                g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
-                if (p_opts->debug.verbose)
-                    fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X\n", ch, val);
-            }
-            else {
-                /* 継続 (周波数変更のみ) */
-                set_pending_from_opll_write(g_pend, g_stamp, addr, val);
-                /* まだ KeyOn してない or KeyOn 中? */
-                if (g_stamp[ch].ko) {
-                    /* 既に鳴ってる → 即書き換え */
-                    flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+            } else if (ko_prev && !ko_next) {
+                // KeyOff: 最小ゲート保留（従来どおり）
+                set_pending_from_opll_write(g_pend, g_stamp, addr, val); // stamp 用に保持
+
+                if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
+#if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
+                    if (p_opts && p_opts->debug.audible_sanity) {
+                        uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                        if (p_opts->debug.verbose) {
+                            fprintf(stderr,"[KEYOFF_INJECT_WAIT][B0] ch=%d need=%u (elapsed=%u, min=%u)\n",
+                                    ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                        }
+                        vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                        uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
+                        g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
+
+                        // 即時 KeyOff（valはKO=0）
+                        uint8_t opl3_bn = opll_to_opl3_bn(val);
+                        duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
+                                            0xB0 + ch, opl3_bn, p_opts);
+                        g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
+                        p_state->last_key[ch] = 0;
+                        if (p_opts->debug.verbose) {
+                            fprintf(stderr,"[KEYOFF][B0] ch=%d reg2n=%02X (after inject wait)\n",
+                                    ch, val);
+                        }
+                        opl3_metrics_note_off(ch);
+                        if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
+                    } else
+#endif
+                    {
+                        // 従来: 遅延KeyOff保留（待ちが進む環境向け）
+                        g_has_pending_keyoff[ch]   = 1;
+                        g_pending_keyoff_val2n[ch] = val;
+                        if (p_opts && p_opts->debug.verbose) {
+                            fprintf(stderr,
+                                "[DELAY_KEYOFF_ARM][B0] ch=%d elapsed=%u/%u val=%02X\n",
+                                ch, g_gate_elapsed[ch], get_min_gate(p_opts), val);
+                        }
+                        // s->ko は維持
+                    }
                 } else {
-                    /* KeyOn 未完了: flush しない */
-                    if (p_opts->debug.verbose)
-                        fprintf(stderr,"[B0_PEND_FREQ] ch=%d reg2n=%02X (awaiting keyon conditions)\n", ch, val);
+                    // 閾値を満たしていれば即時 KeyOff
+                    uint8_t opl3_bn = opll_to_opl3_bn(val); // val は KO=0
+                    duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
+                                         0xB0 + ch, opl3_bn, p_opts);
+                    g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
+                    p_state->last_key[ch] = 0;
+                    if (p_opts && p_opts->debug.verbose) {
+                        fprintf(stderr,"[KEYOFF][B0] ch=%d reg2n=%02X (elapsed=%u)\n",
+                                ch, val, g_gate_elapsed[ch]);
+                    }
+                    opl3_metrics_note_off(ch);
+                    if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
+                }
+            } else {
+                /* 周波数 MSB 更新など */
+                set_pending_from_opll_write(g_pend, g_stamp, addr, val);
+                if (g_stamp[ch].ko) {
+                    flush_channel(p_music_data, &p_vgm_context->status, p_state, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                } else {
+                    if (p_opts && p_opts->debug.verbose) fprintf(stderr,"[B0_PEND_FREQ] ch=%d reg2n=%02X (awaiting keyon conditions)\n", ch, val);
                 }
             }
         }
@@ -800,6 +1063,11 @@ int opll_write_register(
         opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, p_opts, next_wait_samples);
         vgm_wait_samples(p_music_data, &p_vgm_context->status, next_wait_samples);
         is_wait_samples_done = 1;
+    }
+
+    // 追加: 最後に「3つ揃っていたら即フラッシュ」を試みる（順不同対応）
+    if (ch >= 0) {
+        acc_maybe_flush_triple(p_music_data, p_vgm_context, p_state, p_opts, ch);
     }
 
     return additional_bytes;

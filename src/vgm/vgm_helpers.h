@@ -63,6 +63,13 @@ typedef struct {
     uint8_t  carrier_tl_clamp;      /* 0..63: clamp (小さいほど音量大) */
     int      emergency_boost_steps; /* >0 なら最終キャリアTLを更に減算 */
     bool force_retrigger_each_note;
+    // 追加: audible-sanity ランタイム値（0 なら未指定でビルド時デフォルトを使用）
+    uint16_t min_gate_samples;          // OPLL_MIN_GATE_SAMPLES 相当
+    uint16_t pre_keyon_wait_samples;    // OPLL_PRE_KEYON_WAIT_SAMPLES 相当
+    uint16_t min_off_on_wait_samples;   // OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 相当
+    // 追加: ヘッダ整形
+    bool strip_unused_chip_clocks;      // 未使用チップのクロックを0化
+    uint32_t override_opl3_clock;       // 0 以外なら OPL3 clock を上書き
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -88,6 +95,15 @@ typedef struct {
     double sample_rate;       /**< VGM sample rate (typically 44100.0) */
 } VGMTimeStamp;
 
+typedef struct {
+    uint32_t ym2413_write_count;
+    uint32_t ym3812_write_count;
+    uint32_t ym3526_write_count;
+    uint32_t y8950_write_count;
+    uint32_t ay8910_write_count;
+    uint32_t sn76489_write_count;
+} VGMStats;
+
 /**
  * VGM status (for compatibility or future extension).
  */
@@ -95,7 +111,8 @@ typedef struct {
  * VGM status (for compatibility or future extension).
  */
 typedef struct {
-    uint32_t total_samples;   /**< Total samples written so far */
+    uint32_t  total_samples;   /**< Total samples written so far */
+    VGMStats  stats;
 } VGMStatus;
 
 /**
@@ -156,11 +173,15 @@ typedef struct {
     uint32_t ym3812_clock;
     uint32_t ym3526_clock;
     uint32_t y8950_clock;
+    uint32_t sn76489_clock;
+    uint32_t ay8910_clock;
 
     bool has_ym2413;
     bool has_ym3812;
     bool has_ym3526;
     bool has_y8950;
+    bool has_sn76489;
+    bool has_ay8910;
 
     // Mark which chips are selected for conversion
     bool convert_ym2413;

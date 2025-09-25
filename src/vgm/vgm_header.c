@@ -96,7 +96,7 @@ void build_vgm_header(
  * Set the YM2413 clock value in the VGM header.
  */
 void set_ym2413_clock(uint8_t *p_header, uint32_t value) {
-    write_le32(p_header + 0x40, value);
+    write_le32(p_header + 0x10, value);
 }
 
 /**
@@ -253,4 +253,55 @@ FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long files
     if (*(uint32_t*)(p_vgm_data + 0x64)) return FMCHIP_YMF271;
     if (*(uint32_t*)(p_vgm_data + 0x68)) return FMCHIP_YMZ280B;
     return FMCHIP_NONE;
+}
+
+/**
+ * Post-process the VGM header buffer to update clock fields for various chips.
+ * This function sets clock values to zero for unused chips, and applies
+ * overrides (such as OPL3 clock) if specified in cmd_opts.
+ *
+ * @param p_header_buf   Pointer to the VGM header buffer.
+ * @param stats          Pointer to chip write statistics.
+ * @param cmd_opts       Pointer to command options (for clock overrides).
+ */
+void vgm_header_postprocess(
+    uint8_t *p_header_buf,
+    const VGMStats *stats,
+    const CommandOptions *cmd_opts
+) {
+    // YM2413
+    if (stats->ym2413_write_count == 0) {
+        set_ym2413_clock(p_header_buf, 0);
+    }
+    // YM3812
+    if (stats->ym3812_write_count == 0) {
+        set_ym3812_clock(p_header_buf, 0);
+    }
+    // YM3526
+    if (stats->ym3526_write_count == 0) {
+        set_ym3526_clock(p_header_buf, 0);
+    }
+    // Y8950
+    if (stats->y8950_write_count == 0) {
+        set_y8950_clock(p_header_buf, 0);
+    }
+    // YMF262 (OPL3)
+    uint32_t opl3_clock = (cmd_opts && cmd_opts->override_opl3_clock != 0)
+        ? cmd_opts->override_opl3_clock
+        : DEFAULT_OPL3_CLOCK;
+    set_ymf262_clock(p_header_buf, opl3_clock);
+
+    // PSG/DCSG is not a target
+    #ifdef  UPDATE_PSG_CLOCK_INFO
+    // AY8910
+    if (stats->ay8910_write_count == 0) {
+        set_ay8910_clock(p_header_buf, 0);
+    }
+    // SN76489
+    if (stats->sn76489_write_count == 0) {
+        set_sn76489_clock(p_header_buf, 0);
+    }
+    #endif
+
+    // If needed, add more chip clock handling here.
 }

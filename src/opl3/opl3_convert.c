@@ -8,15 +8,6 @@
 #include <stdio.h>
 #include <float.h>
 
-// --- Global FM conversion environment ---
-static double g_fm_source_clock = 0;
-static double g_fm_target_clock = OPL3_CLOCK;
-
-void set_fm_source_clock(double hz) { g_fm_source_clock = hz; }
-double get_fm_source_clock(void) { return g_fm_source_clock; }
-void set_fm_target_clock(double hz) { g_fm_target_clock = hz; }
-double get_fm_target_clock(void) { return g_fm_target_clock; }
-
 /**
  * Calculate frequency in Hz for given chip, clock, block, fnum.
  * @param chip Chip type (OPLL / OPL3)
