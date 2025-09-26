@@ -356,7 +356,7 @@ void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8
  * @param p_outA Pointer to output detuned LSB.
  * @param p_outB Pointer to output detuned MSB.
  */
-void get_detuned_value(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB) {
+void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB) {
     // Rhythm channels (6,7,8 and 15,16,17) are not detuned in rhythm mode
     if ((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode)) {
         *p_outA = regA;
@@ -436,16 +436,16 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, reg, val0);
         opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
     } else if (reg >= 0xA0 && reg <= 0xA8) {
-        // Only write port0 for A0..A8
+        // Stage A0 (FNUM LSB) - do not immediately forward to VGM
         int ch = reg - 0xA0;
-
-        if ((p_state->reg[0xB0 + ch]) & 0x20) {
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
-        } else {
-            // Only update the register buffer (No dump to vgm)
-            p_state->reg_stamp[reg] = p_state->reg[reg];
-            p_state->reg[reg] = val;
-        }
+        
+        // Update register mirror
+        p_state->reg_stamp[reg] = p_state->reg[reg];
+        p_state->reg[reg] = val;
+        
+        // Stage the value for later atomic write with B0
+        p_state->staged_fnum_lsb[ch] = val;
+        p_state->staged_fnum_valid[ch] = true;
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
         // Get the previous and new KEYON bit values
@@ -465,23 +465,32 @@ int duplicate_write_opl3(
             opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
         }
         
-        // Write B0 (KeyOn/Block/FnumMSB) and handle detune
-        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
+        // B0 write: flush frequency pair to BOTH ports in guaranteed order
         int ch = reg - 0xB0;
+        
+        // Use staged A0 value if available, otherwise use register mirror
+        uint8_t fnum_lsb = p_state->staged_fnum_valid[ch] ? 
+                          p_state->staged_fnum_lsb[ch] : 
+                          p_state->reg[0xA0 + ch];
+        
+        // PORT 0: Write A0 then B0 atomically
+        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, fnum_lsb);
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        // Extra 3 bytes
         addtional_bytes += 3;
         vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
 
+        // PORT 1: Apply detune and write A0 then B0 atomically
         uint8_t detunedA, detunedB;
-        get_detuned_value(p_state, ch, p_state->reg[0xA0 + ch], val, opts->detune, &detunedA, &detunedB);
-        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
+        detune_if_fm(p_state, ch, fnum_lsb, val, opts->detune, &detunedA, &detunedB);
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB);
         }
+        addtional_bytes += 6; // 2 writes to port 1
         vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+        
+        // Clear the staging for this channel
+        p_state->staged_fnum_valid[ch] = false;
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -531,8 +540,9 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     p_state->opl3_mode_initialized = false;
     p_state->source_fmchip = source_fmchip;
 
-     // Initialize OPL3VoiceDB
-    p_state->source_fmchip = source_fmchip;
+    // Initialize frequency staging arrays for atomic A0+B0 writes
+    memset(p_state->staged_fnum_lsb, 0, sizeof(p_state->staged_fnum_lsb));
+    memset(p_state->staged_fnum_valid, 0, sizeof(p_state->staged_fnum_valid));
 
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
