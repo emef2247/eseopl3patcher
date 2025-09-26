@@ -476,17 +476,17 @@ int duplicate_write_opl3(
         // PORT 0: Write A0 then B0 atomically
         opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, fnum_lsb);
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        addtional_bytes += 3;
         vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
 
         // PORT 1: Apply detune and write A0 then B0 atomically
         uint8_t detunedA, detunedB;
         detune_if_fm(p_state, ch, fnum_lsb, val, opts->detune, &detunedA, &detunedB);
         opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
+        addtional_bytes += 3; // Port 1 A0 write
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
             opl3_write_reg(p_state, p_music_data, 1, reg, detunedB);
+            addtional_bytes += 3; // Port 1 B0 write
         }
-        addtional_bytes += 6; // 2 writes to port 1
         vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
         
         // Clear the staging for this channel
