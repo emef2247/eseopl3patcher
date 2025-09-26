@@ -115,3 +115,6 @@ tools/ssh_check.log
 *.log
 out_no_post.log
 tools/ssh_check.log
+
+temp/
+analysis/
