@@ -113,17 +113,21 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, reg, val0);
         opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
     } else if (reg >= 0xA0 && reg <= 0xA8) {
-        // Only write port0 for A0..A8
+        // A0 registers: Stage the FNUM LSB for later use with B0 write
+        // Do not immediately write to VGM - stage for proper pairing with B0
         int ch = reg - 0xA0;
-
-        if ((p_state->reg[0xB0 + ch]) & 0x20) {
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
-        } else {
-            // Only update the register buffer (No dump to vgm)
-            p_state->reg_stamp[reg] = p_state->reg[reg];
-            p_state->reg[reg] = val;
-        }
+        
+        // Update register mirror
+        p_state->reg_stamp[reg] = p_state->reg[reg];
+        p_state->reg[reg] = val;
+        
+        // Stage the LSB value for this channel
+        p_state->staged_fnum_lsb[ch] = val;
+        p_state->staged_fnum_valid[ch] = true;
     } else if (reg >= 0xB0 && reg <= 0xB8) {
+        // B0 registers: Flush frequency pair (A0 then B0) to both ports in guaranteed order
+        int ch = reg - 0xB0;
+        
         // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
         // Get the previous and new KEYON bit values
         uint8_t prev_val = p_state->reg_stamp[reg];
@@ -142,21 +146,33 @@ int duplicate_write_opl3(
             opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
         }
         
-        // Write B0 (KeyOn/Block/FnumMSB) and handle detune
-        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
-        int ch = reg - 0xB0;
+        // Update register mirror for B0
+        p_state->reg_stamp[reg] = p_state->reg[reg];
+        p_state->reg[reg] = val;
+        
+        // Get the LSB value - use staged value if valid, otherwise current mirror
+        uint8_t lsb_val;
+        if (p_state->staged_fnum_valid[ch]) {
+            lsb_val = p_state->staged_fnum_lsb[ch];
+            p_state->staged_fnum_valid[ch] = false; // Clear staging after use
+        } else {
+            lsb_val = p_state->reg[0xA0 + ch];
+        }
+        
+        // Port 0: Write A0 then B0 in guaranteed order
+        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, lsb_val);
         opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        // Extra 3 bytes
         addtional_bytes += 3;
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
-
+        
+        // Port 1: Write detuned A0 then B0 (if not rhythm channel)
         uint8_t detunedA, detunedB;
-        detune_if_fm(p_state, ch, p_state->reg[0xA0 + ch], val, detune, &detunedA, &detunedB);
-        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
+        detune_if_fm(p_state, ch, lsb_val, val, detune, &detunedA, &detunedB);
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
+        addtional_bytes += 3;
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB);
+            addtional_bytes += 3;
         }
         vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
@@ -207,6 +223,10 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     p_state->rhythm_mode = false;
     p_state->opl3_mode_initialized = false;
     p_state->source_fmchip = source_fmchip;
+
+    // Initialize staging arrays for frequency register pairing
+    memset(p_state->staged_fnum_lsb, 0, sizeof(p_state->staged_fnum_lsb));
+    memset(p_state->staged_fnum_valid, false, sizeof(p_state->staged_fnum_valid));
 
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);

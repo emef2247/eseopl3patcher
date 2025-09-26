@@ -23,6 +23,11 @@ typedef struct OPL3State {
     OPL3KeyOnStatus keyon_status[OPL3_NUM_CHANNELS]; // Per-channel KeyOn state
     uint32_t timestamp;              // Current timestamp in samples or ticks
     FMChipType source_fmchip;        // Default FM chip type for the conversion session
+    
+    // Channel-local staging for A0 (FNUM LSB) to ensure proper A0/B0 pairing
+    uint8_t staged_fnum_lsb[18];     // Staged FNUM LSB values for channels 0-17
+    bool staged_fnum_valid[18];      // Whether staged LSB is valid for each channel
+    
     // Add more fields as needed (e.g., other aggregate state)
 } OPL3State;
 
