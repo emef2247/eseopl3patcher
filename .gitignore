@@ -116,5 +116,6 @@ tools/ssh_check.log
 out_no_post.log
 tools/ssh_check.log
 
+tmp/
 temp/
 analysis/
