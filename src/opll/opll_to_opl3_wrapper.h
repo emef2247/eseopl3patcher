@@ -29,6 +29,16 @@ typedef struct {
     uint8_t note_off_edge;
 } PendingEdgeInfo;
 
+/** Gate-length stabilization tracker for OPLL→OPL3 conversion */
+typedef struct {
+    uint16_t min_gate_samples;
+    uint16_t pre_keyon_wait_samples;
+    uint16_t min_off_on_wait_samples;
+    uint32_t last_keyon_sample[9];
+    uint32_t last_keyoff_sample[9];
+    uint8_t  key_is_on[9];
+} OpllNoteGateTracker;
+
 /** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
 void opll_init(OPL3State *p_state, const CommandOptions* opts) ;
