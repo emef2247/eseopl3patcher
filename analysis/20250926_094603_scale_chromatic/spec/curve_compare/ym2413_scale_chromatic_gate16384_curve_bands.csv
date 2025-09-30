@@ -1,9 +1,0 @@
-file,band_low_hz,band_high_hz,level_db_equiv
-ym2413_scale_chromatic.wav,20.0,200.0,16.5627
-ym2413_scale_chromatic.wav,200.0,1000.0,15.2527
-ym2413_scale_chromatic.wav,1000.0,5000.0,6.7478
-ym2413_scale_chromatic.wav,5000.0,20000.0,-8.3842
-ym2413_scale_chromatic_gate16384.wav,20.0,200.0,17.7954
-ym2413_scale_chromatic_gate16384.wav,200.0,1000.0,22.3053
-ym2413_scale_chromatic_gate16384.wav,1000.0,5000.0,6.7995
-ym2413_scale_chromatic_gate16384.wav,5000.0,20000.0,-4.6218
