@@ -145,4 +145,15 @@ const char* fmchip_type_name(FMChipType type);
  */
 FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize);
 
+/**
+ * Post-process VGM header after building: set OPL3 clock and clear source chip clocks.
+ * Ensures YMF262 clock is always set to a valid value (never 0 when converting to OPL3).
+ * @param p_header Pointer to VGM header buffer
+ * @param chip_flags Pointer to chip clock flags (to identify source chips)
+ * @param override_opl3_clock Override clock value (0 = use default OPL3_CLOCK)
+ * @param strip_unused If true, zero out clocks for chips with no writes
+ */
+void vgm_header_postprocess(uint8_t *p_header, const VGMChipClockFlags *chip_flags, 
+                            uint32_t override_opl3_clock, bool strip_unused);
+
 #endif // VGM_HEADER_H

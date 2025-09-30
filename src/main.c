@@ -440,24 +440,9 @@ int main(int argc, char *argv[]) {
         p_header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
     }
 
-    // --- After conversion, set chip clocks to 0 for chips that were used but converted ---
-    // Example: For OPL3 conversion, set converted chip clock (e.g. YM3812) to 0
-    // You may want to generalize this logic if supporting other conversions
-
-    // Set OPL3 clock and clear YM3812 clock in header
-    set_ymf262_clock(p_header_buf, OPL3_CLOCK);
-    if (chip_flags.has_ym3812) {
-        set_ym3812_clock(p_header_buf, 0);
-    }
-    if (chip_flags.has_ym3526) {
-        set_ym3526_clock(p_header_buf, 0);
-    }
-    if (chip_flags.has_y8950) {
-        set_y8950_clock(p_header_buf, 0);
-    }
-
-    // Set OPL3 clock and clear YM3812 clock in header
-    set_ymf262_clock(p_header_buf, OPL3_CLOCK);
+    // Post-process header: set OPL3 clock and clear source chip clocks
+    // This ensures YMF262 clock is never 0 (fixes silent playback on real hardware)
+    vgm_header_postprocess(p_header_buf, &chip_flags, 0, false);
 
     // Write output file
     FILE *p_wf = fopen(p_output_path, "wb");

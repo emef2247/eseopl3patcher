@@ -67,8 +67,13 @@ void vgm_wait_short(VGMBuffer *p_buf, VGMStatus *p_vstat, uint8_t cmd) {
 
 /**
  * Write a wait n samples command (0x61) and update status.
+ * Zero-length waits are skipped (not written to stream) as they are unnecessary.
  */
 void vgm_wait_samples(VGMBuffer *p_buf, VGMStatus *p_vstat, uint16_t samples) {
+    // Skip zero-length waits entirely (verified on real hardware)
+    if (samples == 0) {
+        return;
+    }
     uint8_t bytes[3] = {0x61, samples & 0xFF, samples >> 8};
     vgm_buffer_append(p_buf, bytes, 3);
     if (p_vstat) p_vstat->total_samples += samples;

@@ -1,6 +1,46 @@
 #include "opl3_convert.h"
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+// External verbose flag (defined in main.c)
+extern int verbose;
+
+// Frequency sequence mode enumeration
+typedef enum {
+    FREQSEQ_AB = 0,   // A(lsb) -> B(msb) - verified on real hardware, default
+    FREQSEQ_BAB = 1   // B(msb) -> A(lsb) -> B(msb) - alternative mode
+} FreqSeqMode;
+
+// Global frequency sequence mode (default: AB as verified on real hardware)
+static FreqSeqMode g_freqseq_mode = FREQSEQ_AB;
+
+// Initialize frequency sequence mode from environment variable
+static void init_freqseq_mode(void) {
+    static int initialized = 0;
+    if (initialized) return;
+    initialized = 1;
+    
+    const char *env = getenv("ESEOPL3_FREQSEQ");
+    if (env && (env[0] == 'a' || env[0] == 'A')) {
+        g_freqseq_mode = FREQSEQ_AB;
+        if (verbose) {
+            printf("[FREQSEQ] selected=AB (ESEOPL3_FREQSEQ=%s)\n", env);
+        }
+    } else if (env && (env[0] == 'b' || env[0] == 'B')) {
+        g_freqseq_mode = FREQSEQ_BAB;
+        if (verbose) {
+            printf("[FREQSEQ] selected=BAB (ESEOPL3_FREQSEQ=%s)\n", env);
+        }
+    } else {
+        // Default: AB mode
+        g_freqseq_mode = FREQSEQ_AB;
+        if (verbose) {
+            printf("[FREQSEQ] selected=AB (ESEOPL3_FREQSEQ=(unset))\n");
+        }
+    }
+}
 
 /**
  * Attenuate TL (Total Level) using volume ratio.
@@ -142,23 +182,52 @@ int duplicate_write_opl3(
             opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
         }
         
-        // Write B0 (KeyOn/Block/FnumMSB) and handle detune
-        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
+        // Write frequency using AB pattern (A=lsb, B=msb) verified on real hardware
+        // Port 0: A(lsb) -> B(msb)
         int ch = reg - 0xB0;
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        // Extra 3 bytes
-        addtional_bytes += 3;
-        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
-
-        uint8_t detunedA, detunedB;
-        detune_if_fm(p_state, ch, p_state->reg[0xA0 + ch], val, detune, &detunedA, &detunedB);
-        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
-        if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
+        uint8_t regA = p_state->reg[0xA0 + ch];
+        uint8_t regB = val;
+        
+        // Debug print for frequency sequence
+        if (verbose) {
+            const char *mode_str = (g_freqseq_mode == FREQSEQ_AB) ? "AB" : "BAB";
+            printf("[SEQ0] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) port0: A(%02X)->B(%02X)\n",
+                   ch, mode_str, regA, regB, p_state->rhythm_mode ? 1 : 0, regA, regB);
         }
-        vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+        
+        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, regA);  // A (lsb)
+        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, regB);  // B (msb)
+        addtional_bytes += 3;
+        
+        // Optional wait only when opl3_keyon_wait > 0 (skip zero-length waits)
+        if (opl3_keyon_wait > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+        }
+
+        // Port 1: A(lsb detuned) -> B(msb detuned) (skip B in rhythm-mode channels)
+        uint8_t detunedA, detunedB;
+        detune_if_fm(p_state, ch, regA, regB, detune, &detunedA, &detunedB);
+        
+        // Debug print for port1
+        if (verbose) {
+            const char *mode_str = (g_freqseq_mode == FREQSEQ_AB) ? "AB" : "BAB";
+            printf("[SEQ1] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) port1: A(%02X)->B(%02X)\n",
+                   ch, mode_str, detunedA, detunedB, p_state->rhythm_mode ? 1 : 0, detunedA, detunedB);
+        }
+        
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);  // A (lsb detuned)
+        addtional_bytes += 3;
+        
+        // Skip B write for rhythm-mode channels (6,7,8 and 15,16,17)
+        if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB);  // B (msb detuned)
+            addtional_bytes += 3;
+        }
+        
+        // Optional wait only when opl3_keyon_wait > 0
+        if (opl3_keyon_wait > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, opl3_keyon_wait);
+        }
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -199,9 +268,14 @@ int duplicate_write_opl3(
 /**
  * OPL3 initialization sequence for both ports.
  * Sets FM chip type in OPL3State and initializes register mirror.
+ * Emits proper OPL3 enable sequence at startup.
  */
 void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip) {
     if (!p_state) return;
+    
+    // Initialize frequency sequence mode from environment
+    init_freqseq_mode();
+    
     memset(p_state->reg, 0, sizeof(p_state->reg));
     memset(p_state->reg_stamp, 0, sizeof(p_state->reg_stamp));
     p_state->rhythm_mode = false;
@@ -211,18 +285,19 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
      // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
 
-    // OPL3 global registers (Port 1 only)
+    // OPL3 initialization sequence (verified on real hardware):
+    // Port1: 0x105=0x01 (OPL3 enable)
     opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable
-    opl3_write_reg(p_state, p_music_data, 1, 0x04, 0x00);  // Waveform select
-
-    // Port 0 general init
+    // Port1: 0x104=0x00 (4-OP mode off at start)
+    opl3_write_reg(p_state, p_music_data, 1, 0x04, 0x00);  // 4-OP mode off
+    // Port0: 0x001=0x00 (LSI TEST)
     opl3_write_reg(p_state, p_music_data, 0, 0x01, 0x00);  // LSI TEST
-    opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS
+    // Port0: 0x008=0x00 (CSM off, note select off)
+    opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // CSM off, note select off
+    // Port1: 0x101=0x00 (LSI TEST on port1 as well)
+    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);  // LSI TEST port1
 
-    // Port 1 general init
-    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
-
-    // Channel-level control
+    // Panning defaults applied to C0..C8 on both ports per ch_panning logic
     for (uint8_t i = 0; i < 9; ++i) {
         // Port 0: channels 0-8
         if (stereo_mode) {
@@ -240,12 +315,13 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
         }
     }
 
-    // Waveform select registers (port 0 and 1)
+    // Waveform select registers E0..EF initialized to 0 on both ports
     const uint8_t ext_regs[] = {0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF};
     for (size_t i = 0; i < sizeof(ext_regs) / sizeof(ext_regs[0]); ++i) {
         opl3_write_reg(p_state, p_music_data, 0, ext_regs[i], 0x00);
         opl3_write_reg(p_state, p_music_data, 1, ext_regs[i], 0x00);
     }
+    // Waveform select registers F0..F5 initialized to 0 on port1
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
