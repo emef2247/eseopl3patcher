@@ -1,0 +1,18 @@
+# Core scale / baseline set
+ym2413_scale_chromatic.vgm
+ym2413_scale_rom1.vgm
+ym2413_volume_sweep.vgm
+ym2413_highlow_range.vgm
+ym2413_retrigger.vgm
+ym2413_chords_mix.vgm
+ym2413_3ch_test.vgm
+
+# Extended edge / regression tests
+ym2413_rhythm_mode_basic.vgm
+ym2413_rhythm_mode_toggle.vgm
+ym2413_patch_change_midnote.vgm
+ym2413_short_pulses.vgm
+ym2413_release_retrigger.vgm
+ym2413_legato_patch_mix.vgm
+ym2413_block_boundary.vgm
+ym2413_redundant_fnum_writes.vgm

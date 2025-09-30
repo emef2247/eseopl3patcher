@@ -4,22 +4,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h> // for size_t
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * Enumeration for FM sound chip types supported in VGM.
- */
+/* ---- FMChipType / CommandOptions guard to avoid redefinition ---- */
+#ifndef ESEOPL3PATCHER_FMCHIPTYPE_DEFINED
+#define ESEOPL3PATCHER_FMCHIPTYPE_DEFINED
 typedef enum {
-    FMCHIP_NONE = 0,    /**< Undefined / not set */
+    FMCHIP_NONE = 0,
     FMCHIP_YM2413,
     FMCHIP_YM2612,
     FMCHIP_YM2151,
     FMCHIP_YM2203,
     FMCHIP_YM2608,
-    FMCHIP_YM2610,      /**< YM2610 and YM2610B (treat as same) */
+    FMCHIP_YM2610,
     FMCHIP_YM3812,
     FMCHIP_YM3526,
     FMCHIP_Y8950,
@@ -32,7 +31,7 @@ typedef enum {
     FMCHIP_2xYM2151,
     FMCHIP_2xYM2203,
     FMCHIP_2xYM2608,
-    FMCHIP_2xYM2610,      /**< YM2610 and YM2610B (treat as same) */
+    FMCHIP_2xYM2610,
     FMCHIP_2xYM3812,
     FMCHIP_2xYM3526,
     FMCHIP_2xY8950,
@@ -42,6 +41,38 @@ typedef enum {
     FMCHIP_2xYMZ280B,
     FMCHIP_MAX
 } FMChipType;
+
+/** Global debug / diagnostic options */
+typedef struct {
+    bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
+    bool test_tone;           /* Inject a simple test tone sequence */
+    bool fast_attack;         /* Force fast envelope (AR=15 etc.) */
+    bool no_post_keyon_tl;    /* Suppress TL changes right after KeyOn */
+    bool single_port;         /* Emit only port0 writes (suppress port1) */
+    bool audible_sanity;   /* “鳴らすため” の安全調整 */
+    bool verbose;
+} DebugOpts;
+
+typedef struct {
+    double detune;
+    int    opl3_keyon_wait;
+    int    ch_panning;
+    double v_ratio0;
+    double v_ratio1;
+    int      carrier_tl_clamp_enabled;
+    uint8_t  carrier_tl_clamp;      /* 0..63: clamp (小さいほど音量大) */
+    int      emergency_boost_steps; /* >0 なら最終キャリアTLを更に減算 */
+    bool force_retrigger_each_note;
+    // 追加: audible-sanity ランタイム値（0 なら未指定でビルド時デフォルトを使用）
+    uint16_t min_gate_samples;          // OPLL_MIN_GATE_SAMPLES 相当
+    uint16_t pre_keyon_wait_samples;    // OPLL_PRE_KEYON_WAIT_SAMPLES 相当
+    uint16_t min_off_on_wait_samples;   // OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 相当
+    // 追加: ヘッダ整形
+    bool strip_unused_chip_clocks;      // 未使用チップのクロックを0化
+    uint32_t override_opl3_clock;       // 0 以外なら OPL3 clock を上書き
+    DebugOpts debug;
+} CommandOptions;
+#endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
 
 /**
  * Dynamic buffer for VGM data stream.
@@ -55,17 +86,33 @@ typedef struct {
 /**
  * VGM sample-based timestamp management.
  */
+/**
+ * VGM sample-based timestamp management.
+ */
 typedef struct {
     uint32_t current_sample;  /**< Current VGM sample count (absolute) */
     uint32_t last_sample;     /**< Previous update sample count (for delta calculation) */
     double sample_rate;       /**< VGM sample rate (typically 44100.0) */
 } VGMTimeStamp;
 
+typedef struct {
+    uint32_t ym2413_write_count;
+    uint32_t ym3812_write_count;
+    uint32_t ym3526_write_count;
+    uint32_t y8950_write_count;
+    uint32_t ay8910_write_count;
+    uint32_t sn76489_write_count;
+} VGMStats;
+
+/**
+ * VGM status (for compatibility or future extension).
+ */
 /**
  * VGM status (for compatibility or future extension).
  */
 typedef struct {
-    uint32_t total_samples;   /**< Total samples written so far */
+    uint32_t  total_samples;   /**< Total samples written so far */
+    VGMStats  stats;
 } VGMStatus;
 
 /**
@@ -83,6 +130,9 @@ typedef struct {
     // Additional header fields can be added as needed
 } VGMHeaderInfo;
 
+/**
+ * GD3 tag (Unicode text, for track info, can be parsed further if needed).
+ */
 /**
  * GD3 tag (Unicode text, for track info, can be parsed further if needed).
  */
@@ -104,12 +154,14 @@ typedef struct {
  *   - source_fmchip: The source FM chip type for conversion.
  */
 typedef struct {
-    VGMBuffer buffer;          /**< Data buffer for the VGM stream */
-    VGMTimeStamp timestamp;    /**< Sample clock/timestamp */
-    VGMStatus status;          /**< Status (total samples etc.) */
-    VGMHeaderInfo header;      /**< VGM header (raw + parsed info) */
-    VGMGD3Tag    gd3;          /**< GD3 tag (raw/parsed) */
-    FMChipType source_fmchip;  /**< The source FM chip type for conversion */
+    VGMBuffer buffer;              /**< Data buffer for the VGM stream */
+    VGMTimeStamp timestamp;        /**< Sample clock/timestamp */
+    VGMStatus     status;          /**< Status (total samples etc.) */
+    VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
+    VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */
+    FMChipType    source_fmchip;   /**< The source FM chip type for conversion */
+    double        source_fm_clock; /**< The source FM clock frequency */
+    double        target_fm_clock; /**< The target FM clock frequency */
 } VGMContext;
 
 /**
@@ -117,15 +169,22 @@ typedef struct {
  * This allows checking which chips are present and flagging them.
  */
 typedef struct {
+    uint32_t ym2413_clock;
     uint32_t ym3812_clock;
     uint32_t ym3526_clock;
     uint32_t y8950_clock;
+    uint32_t sn76489_clock;
+    uint32_t ay8910_clock;
 
+    bool has_ym2413;
     bool has_ym3812;
     bool has_ym3526;
     bool has_y8950;
+    bool has_sn76489;
+    bool has_ay8910;
 
     // Mark which chips are selected for conversion
+    bool convert_ym2413;
     bool convert_ym3812;
     bool convert_ym3526;
     bool convert_y8950;
@@ -135,7 +194,6 @@ typedef struct {
 } VGMChipClockFlags;
 
 // --- Function documentation comments ---
-
 /**
  * Initialize a VGMBuffer structure.
  * @param p_buf Pointer to VGMBuffer to initialize.

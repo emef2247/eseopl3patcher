@@ -1,0 +1,16 @@
+# Text files use LF on checkout
+*.sh      text eol=lf
+*.py      text eol=lf
+*.env     text eol=lf
+Makefile  text eol=lf
+*.c       text eol=lf
+*.h       text eol=lf
+*.md      text eol=lf
+
+# Binary files (do not modify line endings)
+*.vgm     binary
+*.wav     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.bin     binary

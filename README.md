@@ -21,6 +21,7 @@ You can now use VGM files targeting any of these chips as input for conversion.
 - Channel panning options for flexible channel panning (see `-ch_panning`)
 - Independent volume ratio control for Port 0 and Port 1 (see `-vr0` and `-vr1`)
 - Verbose mode for detailed debug output (see `-verbose`)
+- Verbose mode for detailed debug output (see `-verbose`)
 - Automatically appends conversion info and operator information to the GD3 tag
 - Simple and flexible command-line usage (argument order is flexible)
 - **Auto-detects which OPL chip to convert if multiple are present, or allows explicit selection via command line**
@@ -63,6 +64,7 @@ If you want to explicitly select which chip(s) to convert, add one or more of th
 
 > **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
 
+### About Channel panning, Volume Ratio, and Verbose Mode
 ### About Channel panning, Volume Ratio, and Verbose Mode
 
 - `-ch_panning 0` (default): Port 0 outputs to Left, Port 1 outputs to Right. Useful for clearly checking the detuned sound (Port 1) isolated in the Right channel.
@@ -122,6 +124,19 @@ make win
 # or
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
+### Equivalence Tests (YM2413 → OPL3)
+
+We include a regression suite under `tests/equiv/`:
+- Run: `make test-equivalence`
+- Initialize (first time): `make baseline-init`
+- Update after intentional converter changes: `make baseline-update`
+- Default detune: `0` (can override via `TEST_DETUNE=...`)
+- Extra converter args: `TEST_EXTRA_ARGS="--convert-ym2413"`
+
+Transient dirs: `out_new/`, `logs/`, `txt/` (gitignored).
+Baseline outputs are committed to allow immediate verification after clone.
+
+To enable textual diffs, install `vgm2txt` and ensure it is in `$PATH`.
 
 ## Author
 
