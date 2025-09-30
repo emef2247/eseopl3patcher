@@ -15,6 +15,58 @@
 #include "../compat_string.h"
 
 static VGMContext *g_last_ctx = NULL;
+static int g_triple_force_retrigger = 0;
+
+/** Calculate OPLL frequency for debugging */
+double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
+    // YM2413 (OPLL) の実聴ベース近似:
+    // f ≈ (clock / 72) / 2^18 * fnum * 2^block
+    // 例: clock=3579545, block=2, fnum=500 -> 約 379.3 Hz
+    const double base = (clock / 72.0) / 262144.0; // 2^18
+    return base * (double)fnum * ldexp(1.0, block);
+}
+// OPLL -> OPL3 の Hz マッピングヘルパ
+// 先頭付近はそのまま。map_opll_to_opl3_freq の先頭に fnum==0 ガードを追加
+
+static void map_opll_to_opl3_freq(uint8_t reg1n, uint8_t reg2n,
+                                  double src_clock, double dst_clock,
+                                  uint8_t *out_A, uint8_t *out_B_noKO)
+{
+    uint8_t  opll_block = (uint8_t)((reg2n >> 1) & 0x07);
+    uint16_t opll_fnum9 = (uint16_t)(((reg2n & 0x01) << 8) | reg1n);
+
+    // 追加: fnum==0 は KeyOn すべきでない。マッピングもスキップして直写（かつKOは付与しない値）を返す
+    if (opll_fnum9 == 0) {
+        if (out_A)      *out_A      = reg1n;
+        if (out_B_noKO) {
+            uint8_t fnum_msb_2b = (reg2n & 0x01);
+            uint8_t block_3b    = (reg2n >> 1) & 0x07;
+            *out_B_noKO = (uint8_t)(fnum_msb_2b | (block_3b << 2)); // KOビットなし
+        }
+        if (getenv("ESEOPL3_FREQMAP_DEBUG")) {
+            fprintf(stderr, "[FREQMAP] (skip: fnum==0) OPLL blk=%u fnum=%u\n",
+                    opll_block, opll_fnum9);
+        }
+        return;
+    }
+
+    double freq = calc_opll_frequency(src_clock, opll_block, opll_fnum9);
+
+    unsigned char best_b = 0;
+    unsigned short best_f = 0;
+    double best_err_cents = 0.0;
+    opl3_find_fnum_block_with_ml_cents(freq, dst_clock, &best_b, &best_f, &best_err_cents,
+                                       (int)opll_block, 0.0, 0.0);
+
+    if (out_A)      *out_A      = (uint8_t)(best_f & 0xFF);
+    if (out_B_noKO) *out_B_noKO = (uint8_t)(((best_f >> 8) & 0x03) | (best_b << 2));
+
+    if (getenv("ESEOPL3_FREQMAP_DEBUG")) {
+        fprintf(stderr,
+            "[FREQMAP] OPLL blk=%u fnum=%u Hz=%.6f -> OPL3 blk=%u fnum=%u (err_cents=%.2f)\n",
+            opll_block, opll_fnum9, freq, (unsigned)best_b, (unsigned)best_f, best_err_cents);
+    }
+}
 
 static inline void flush_channel_ch(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
@@ -52,6 +104,9 @@ static uint8_t  g_pending_keyoff_val2n[YM2413_NUM_CH] = {0};
 #define OPLL_MIN_GATE_SAMPLES 128   // 約 2.9ms @ 44.1kHz
 #endif
 
+static int g_freqmap_opllblock = 0;
+
+
 /** Store program arguments for later use */
 void opll_set_program_args(int argc, char **argv) {
     g_saved_argc = argc;
@@ -75,6 +130,24 @@ static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const 
 /* 初期化: last_key[] を明示クリア */
 void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     if (!p_state) return;
+
+    const char *fm = getenv("ESEOPL3_FREQMAP");
+    if (fm && (strcasecmp(fm, "opllblock") == 0 || strcmp(fm, "1") == 0 || strcasecmp(fm, "true") == 0 || strcasecmp(fm, "on") == 0 || strcasecmp(fm, "yes") == 0)) {
+        g_freqmap_opllblock = 1;
+    } else {
+        g_freqmap_opllblock = 0;
+    }
+    fprintf(stderr, "[FREQMAP] init mode=%s (ESEOPL3_FREQMAP=%s)\n",
+            g_freqmap_opllblock ? "opllblock" : "off",
+            fm ? fm : "(unset)");
+
+    const char *tr = getenv("ESEOPL3_TRIPLE_FORCE_RETRIGGER");
+    g_triple_force_retrigger =
+        (tr && (tr[0]=='1'||tr[0]=='y'||tr[0]=='Y'||tr[0]=='t'||tr[0]=='T')) ? 1 : 0;
+    fprintf(stderr, "[TRIPLE] force_retrigger=%d (ESEOPL3_TRIPLE_FORCE_RETRIGGER=%s)\n",
+            g_triple_force_retrigger, tr ? tr : "(unset)");
+
+
     opl3_register_all_ym2413(&p_state->voice_db, p_opts);
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
     for (int i = 0; i < YM2413_NUM_CH; ++i) {
@@ -194,12 +267,6 @@ static inline int reg_kind(uint8_t addr) {
     if (addr >= 0x20 && addr <= 0x28) return 2;
     if (addr >= 0x30 && addr <= 0x38) return 3;
     return 0;
-}
-
-/** Calculate OPLL frequency for debugging */
-double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
-    printf("[DEBUG] calc_opllfrequency: clock=%.0f block=%u fnum=%u\n", clock, block, fnum);
-    return (clock / 72.0) * ldexp((double)fnum / 512.0, block - 1);
 }
 
 /** Get KeyOff value for reg2n (clear KeyOn bit) */
@@ -622,6 +689,28 @@ static inline void acc_maybe_flush_triple(
     // KeyOnでなければまだ待つ
     if ((reg2n & 0x10) == 0) return;
 
+    // 追加: すでに鳴っているなら（通常は）ここでスキップして重複KeyOnを防ぐ
+    if (g_stamp[ch].ko && !g_triple_force_retrigger) {
+        if (p_opts && p_opts->debug.verbose) {
+            fprintf(stderr, "[TRIPLE_SKIP_ALREADY_ON] ch=%d\n", ch);
+        }
+        return;
+    }
+
+    // 追加: KeyOnエッジ後は「fresh 1n」を必ず待つ
+    if (g_need_fresh_1n[ch]) {
+        uint8_t prev1 = g_stamp[ch].valid_1n ? g_stamp[ch].last_1n : 0xFF;
+        // 1) fnum==0 は不可（0Hz KeyOnを防止）
+        // 2) 直前スタンプと同一の1nなら、まだ“fresh”ではないので待つ
+        if (reg1n == 0x00 || (g_stamp[ch].valid_1n && reg1n == prev1)) {
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr, "[TRIPLE_WAIT_FRESH_1N] ch=%d reg1n=%02X prev=%02X (defer flush)\n",
+                        ch, reg1n, prev1);
+            }
+            return;
+        }
+    }
+
     // 既に鳴っている場合でも、ここで必ず即時 KeyOff を吐いてリトリガを保証（遅延を無視）
     if (g_stamp[ch].ko) {
 #if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
@@ -724,7 +813,7 @@ static inline void flush_channel_ch(
         apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, p_opts, &vp_cached);
 
         // A0（バッファ対象）、TL、B0（KeyOn）を呼び出し順で投入
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
+        // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
 
         uint8_t car40 = make_carrier_40_from_vol(&vp_cached, reg3n_eff);
         car40 = emergency_boost_carrier_tl(car40, p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
@@ -737,7 +826,41 @@ static inline void flush_channel_ch(
         if (p_opts && p_opts->debug.verbose)
             fprintf(stderr,"[FORCE_TL0][KEYON] ch=%d\n", ch);
 #endif
+        // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + car_slot, car40, p_opts);
+        uint8_t a0_val = opll_to_opl3_an(reg1n_eff);
+        uint8_t b0_val = opll_to_opl3_bn(reg2n_eff); // 既存（フォールバック）
+        if (g_freqmap_opllblock) {
+            // OPLL Hz から OPL3 の最適化 block/fnum を選択（KeyOnビットは後で付与）
+            uint8_t a_tmp=0, b_no_ko=0;
+            double src_clk = (g_last_ctx && g_last_ctx->source_fm_clock > 0.0) ? g_last_ctx->source_fm_clock : 3579545.0; // YM2413既定
+            double dst_clk = (g_last_ctx && g_last_ctx->target_fm_clock > 0.0) ? g_last_ctx->target_fm_clock : (double)OPL3_CLOCK;
+            map_opll_to_opl3_freq(reg1n_eff, reg2n_eff, src_clk, dst_clk, &a_tmp, &b_no_ko);
+            a0_val = a_tmp;
+            // KeyOn ビットは reg2n_eff に従う
+            b0_val = (uint8_t)(b_no_ko | (reg2n_eff & 0x10 ? 0x20 : 0x00));
+            if (g_freqmap_opllblock) {
+                uint8_t keyon_bit = (reg2n_eff & 0x10) ? 0x20 : 0x00;
+                fprintf(stderr, "[FREQMAP] USED map: ch=%d src{blk=%u fnum=%u} -> dst{blk=%u fnum=%u} KO=%d\n",
+                        ch,
+                        (unsigned)((reg2n_eff >> 1) & 0x07),
+                        (unsigned)((((reg2n_eff & 0x01) << 8) | reg1n_eff) & 0x1FF),
+                        (unsigned)((b0_val >> 2) & 0x07),
+                        (unsigned)(((b0_val & 0x03) << 8) | a0_val),
+                        keyon_bit ? 1 : 0);
+            } else {
+                fprintf(stderr, "[FREQMAP] BYPASS (bit-copy): ch=%d blk=%u fnum=%u\n",
+                        ch,
+                        (unsigned)((reg2n_eff >> 2) & 0x07), /* 注意: 直写系のblkは (reg2n_eff>>1)&7 だが、ここは見やすさ優先で */
+                        (unsigned)((((reg2n_eff & 0x01) << 8) | reg1n_eff) & 0x1FF));
+            }
+        }
+
+        // A0（周波数 LSB）
+        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, a0_val, p_opts);
+
+        // TL（既存どおり）
         duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + car_slot, car40, p_opts);
+
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
     if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
@@ -749,12 +872,24 @@ static inline void flush_channel_ch(
     }
 #endif
         // ここで B0=ON
+        // if (!key_state_already(p_state, ch, true)) {
+        //     duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, b0_val, p_opts);
+        //     // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
+        //     opl3_metrics_note_on(ch,
+        //         (uint16_t)b0_val | ((b0_val & 0x01) << 8),
+        //         (b0_val >> 1) & 0x07);
+        // }
+        // 修正: flush_channel_ch 内の「ノートON確定」直後にアキュムレータをクリアして二重発火を防止
         if (!key_state_already(p_state, ch, true)) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
-            opl3_metrics_note_on(ch,
-                (uint16_t)reg1n_eff | ((reg2n_eff & 0x01) << 8),
-                (reg2n_eff >> 1) & 0x07);
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, b0_val, p_opts);
+
+            uint16_t fnum10 = (uint16_t)(((b0_val & 0x03) << 8) | a0_val);
+            uint8_t  blk3   = (uint8_t)((b0_val >> 2) & 0x07);
+            opl3_metrics_note_on(ch, fnum10, blk3);
         }
+        // 追加: ここで順不同アキュムレータを必ずリセット（この音符はpend/stamp経路で発火済み）
+        acc_reset_ch(ch);
+
         g_need_fresh_1n[ch] = 0;
         g_gate_elapsed[ch] = 0;
         g_has_pending_keyoff[ch] = 0;

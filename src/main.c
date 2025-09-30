@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
     } else {
         vgmctx.source_fm_clock = -1.0;
     }
-    vgmctx.target_fm_clock = DEFAULT_OPL3_CLOCK;
+    vgmctx.target_fm_clock = OPL3_CLOCK;
     
     if (cmd_opts.debug.verbose) {
         printf("[VGM] FM chip usage:\n");

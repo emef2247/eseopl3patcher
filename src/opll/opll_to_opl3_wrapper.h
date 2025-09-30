@@ -2,6 +2,7 @@
 #define ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H
 
 #include "../opl3/opl3_convert.h"
+#include "../vgm/vgm_header.h"
 #include "../vgm/vgm_helpers.h"
 #include <string.h>
 

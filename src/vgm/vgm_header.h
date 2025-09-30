@@ -5,7 +5,7 @@
 #include "vgm_helpers.h" // For VGMHeaderInfo, VGMGD3Tag, etc.
 
 #define VGM_HEADER_SIZE 0x100
-#define DEFAULT_OPL3_CLOCK 14318182
+#define OPL3_CLOCK 14318182
 
 /**
  * Builds a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.

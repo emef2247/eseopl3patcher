@@ -287,14 +287,14 @@ void vgm_header_postprocess(
     }
     // YMF262 (OPL3)
     uint32_t opl3_clock = (cmd_opts && cmd_opts->override_opl3_clock != 0)
-        ? cmd_opts->override_opl3_clock
-        : DEFAULT_OPL3_CLOCK;
+        ? cmd_opts->override_opl3_clock : OPL3_CLOCK;
     set_ymf262_clock(p_header_buf, opl3_clock);
 
     // PSG/DCSG is not a target
     #ifdef  UPDATE_PSG_CLOCK_INFO
     // AY8910
-    if (stats->ay8910_write_count == 0) {
+    if (stats->:wq
+        ay8910_write_count == 0) {
         set_ay8910_clock(p_header_buf, 0);
     }
     // SN76489

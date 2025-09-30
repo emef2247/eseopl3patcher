@@ -48,6 +48,7 @@ typedef struct {
     // Channel-local staging for A0 (FNUM LSB) to ensure atomic A0+B0 writes
     uint8_t staged_fnum_lsb[OPL3_NUM_CHANNELS];  // Staged A0 values per channel
     bool staged_fnum_valid[OPL3_NUM_CHANNELS];   // Whether staged A0 value is valid
+    int pair_an_bn_enabled; // 1: Pearing enabled, 0: Pearing disabled
 } OPL3State;
 
 #endif /* ESEOPL3PATCHER_OPL3_STATE_H */
