@@ -133,20 +133,20 @@ static uint16_t g_pending_on_elapsed[YM2413_NUM_CH] = {0};
 static int    g_saved_argc = 0;
 static char **g_saved_argv = NULL;
 
-// 追加: fresh 1n を待つフラグ
+// Flag to wait for fresh 1n
 static uint8_t g_need_fresh_1n[YM2413_NUM_CH] = {0};
 
-// タイムアウト（必要に応じて調整）
+// Timeout (adjust as needed)
 #ifndef KEYON_WAIT_FOR_FNUM_TIMEOUT_SAMPLES
 #define KEYON_WAIT_FOR_FNUM_TIMEOUT_SAMPLES 128
 #endif
 
-// 追加: 最小ゲート保持用
+// Minimum gate hold variables
 static uint16_t g_gate_elapsed[YM2413_NUM_CH] = {0};
 static uint8_t  g_has_pending_keyoff[YM2413_NUM_CH] = {0};
 static uint8_t  g_pending_keyoff_val2n[YM2413_NUM_CH] = {0};
 
-// 追加: 最小ゲート（KeyOn→KeyOff の最小間隔）
+// Minimum gate duration (minimum interval between KeyOn→KeyOff)
 #ifndef OPLL_MIN_GATE_SAMPLES
 #define OPLL_MIN_GATE_SAMPLES 0   // Default: no artificial gate delay
 #endif
@@ -160,7 +160,7 @@ void opll_set_program_args(int argc, char **argv) {
     g_saved_argv = argv;
 }
 
-/* 判定ヘルパ: 引数の pending/stamp を使って readiness をみる */
+/** Helper functions to check pending/stamp readiness */
 static inline bool have_inst_ready_policy(const OpllPendingCh* p, const OpllStampCh* s) {
     return (p && p->has_3n) || (s && s->valid_3n);
 }
@@ -211,7 +211,7 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
         stamp_clear(&g_stamp[i]);
         g_pending_on_elapsed[i] = 0;
         g_need_fresh_1n[i] = 0;
-        // 追加
+        // Initialize gate tracking variables
         g_gate_elapsed[i] = 0;
         g_has_pending_keyoff[i] = 0;
         g_pending_keyoff_val2n[i] = 0;
@@ -289,7 +289,7 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
 #endif
 
 #ifndef OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
-// KeyOff→KeyOnの縁の間に最低限入れる待ち（audible-sanity時のみ）
+// Minimum wait between KeyOff→KeyOn edge (audible-sanity only)
 #define OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 0
 #endif
 
@@ -568,7 +568,9 @@ void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *p_db, CommandOpti
         opl3_voice_db_find_or_add(p_db, &vp);
     }
 }
-/* 置換: apply_inst_before_keyon を “鳴る前提”の一括適用に */
+/**
+ * Apply instrument before KeyOn - batch application assuming "ready to play"
+ */
 static inline void apply_inst_before_keyon(
     VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
     int ch, uint8_t reg3n, const CommandOptions *p_opts,
@@ -601,7 +603,9 @@ static inline void flush_channel(
     flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, p_opts, p, s);
 }
 
-/* fresh 1n のタイムアウト待ちを追加（妥協して stamp の 1n で鳴らす） */
+/** 
+ * Add fresh 1n timeout wait (fallback to stamp 1n as compromise)
+ */
 static inline void opll_tick_pending_on_elapsed(
     VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
     const CommandOptions *p_opts, uint16_t wait_samples)
@@ -609,7 +613,7 @@ static inline void opll_tick_pending_on_elapsed(
     if (wait_samples == 0) return;
 
     for (int ch = 0; ch < YM2413_NUM_CH; ++ch) {
-        // 1) 鳴いている間のゲート経過を加算
+        // 1) Update gate elapsed time while playing
         if (g_stamp[ch].ko) {
             uint32_t el = (uint32_t)g_gate_elapsed[ch] + wait_samples;
             g_gate_elapsed[ch] = (el > 0xFFFF) ? 0xFFFF : (uint16_t)el;
@@ -656,7 +660,7 @@ static inline void opll_tick_pending_on_elapsed(
             }
         }
 
-        // 3) 遅延 KeyOff の放流（最小ゲートを満たしたら B0 を吐く）
+        // 3) Delayed KeyOff flush (emit B0 when minimum gate is satisfied)
         if (g_has_pending_keyoff[ch] && g_gate_elapsed[ch] >= get_min_gate(p_opts)) {
             uint8_t v2n = g_pending_keyoff_val2n[ch];
             uint8_t opl3_bn = opll_to_opl3_bn(v2n); // v2n は KO=0 にクリア済みを想定
@@ -796,7 +800,7 @@ static inline void acc_maybe_flush_triple(
             fprintf(stderr,"[TRIPLE_PRE_KEYOFF] ch=%d reg2n=%02X\n", ch, ko_val2n);
 
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
-    // KeyOff→KeyOnの縁が同時刻で重ならないよう、少量の待ちを入れる
+    // Prevent KeyOff→KeyOn edge collision by adding small wait
     if (p_opts && p_opts->debug.audible_sanity && get_min_off_on_wait(p_opts) > 0) {
         vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)get_min_off_on_wait(p_opts));
         if (p_opts->debug.verbose) {
