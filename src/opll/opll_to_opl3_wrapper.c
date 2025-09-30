@@ -19,15 +19,22 @@ static int g_triple_force_retrigger = 0;
 
 /** Calculate OPLL frequency for debugging */
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
-    // YM2413 (OPLL) の実聴ベース近似:
+    // YM2413 (OPLL) frequency calculation based on observed behavior:
     // f ≈ (clock / 72) / 2^18 * fnum * 2^block
-    // 例: clock=3579545, block=2, fnum=500 -> 約 379.3 Hz
+    // Example: clock=3579545, block=2, fnum=500 -> approximately 379.3 Hz
     const double base = (clock / 72.0) / 262144.0; // 2^18
     return base * (double)fnum * ldexp(1.0, block);
 }
-// OPLL -> OPL3 の Hz マッピングヘルパ
-// 先頭付近はそのまま。map_opll_to_opl3_freq の先頭に fnum==0 ガードを追加
+// Global variable for fast-path mode
+static int g_freqmap_fast = 0;
 
+/**
+ * OPLL to OPL3 frequency mapping with optional fast-path
+ * Fast-path rationale:
+ * - For OPLL→OPL3 (dst≈4×src): passthrough (FNUM/BLOCK unchanged)
+ * - For OPLL→OPL2/Y8950 (dst≈src): FNUM×2, BLOCK unchanged, clamp to 1023
+ * - Otherwise: fall back to precise mapping using opl3_find_fnum_block_with_ml_cents
+ */
 static void map_opll_to_opl3_freq(uint8_t reg1n, uint8_t reg2n,
                                   double src_clock, double dst_clock,
                                   uint8_t *out_A, uint8_t *out_B_noKO)
@@ -35,7 +42,7 @@ static void map_opll_to_opl3_freq(uint8_t reg1n, uint8_t reg2n,
     uint8_t  opll_block = (uint8_t)((reg2n >> 1) & 0x07);
     uint16_t opll_fnum9 = (uint16_t)(((reg2n & 0x01) << 8) | reg1n);
 
-    // 追加: fnum==0 は KeyOn すべきでない。マッピングもスキップして直写（かつKOは付与しない値）を返す
+    // Skip fnum==0 (prevents 0Hz KeyOn)
     if (opll_fnum9 == 0) {
         if (out_A)      *out_A      = reg1n;
         if (out_B_noKO) {
@@ -50,6 +57,46 @@ static void map_opll_to_opl3_freq(uint8_t reg1n, uint8_t reg2n,
         return;
     }
 
+    // Fast-path heuristics if enabled
+    if (g_freqmap_fast) {
+        double clock_ratio = dst_clock / src_clock;
+        
+        // Check for OPLL→OPL3 standard clocks (dst≈4×src)
+        if (clock_ratio >= 3.8 && clock_ratio <= 4.2) {
+            // Passthrough: A0/B0 derived directly from OPLL reg1n/reg2n
+            if (out_A)      *out_A      = reg1n;
+            if (out_B_noKO) *out_B_noKO = (uint8_t)(((reg2n & 0x01)) | ((opll_block) << 2));
+            
+            if (getenv("ESEOPL3_FREQMAP_DEBUG")) {
+                fprintf(stderr, "[FREQMAP_FAST] passthrough OPLL->OPL3 (dst≈4×src) blk=%u fnum=%u ratio=%.2f\n",
+                        opll_block, opll_fnum9, clock_ratio);
+            }
+            return;
+        }
+        
+        // Check for OPLL→OPL2/Y8950 standard clocks (dst≈src)
+        if (clock_ratio >= 0.8 && clock_ratio <= 1.2) {
+            // FNUM×2, BLOCK unchanged, clamp to 1023
+            uint16_t doubled_fnum = opll_fnum9 * 2;
+            if (doubled_fnum > 1023) doubled_fnum = 1023;
+            
+            if (out_A)      *out_A      = (uint8_t)(doubled_fnum & 0xFF);
+            if (out_B_noKO) *out_B_noKO = (uint8_t)(((doubled_fnum >> 8) & 0x03) | (opll_block << 2));
+            
+            if (getenv("ESEOPL3_FREQMAP_DEBUG")) {
+                fprintf(stderr, "[FREQMAP_FAST] x2-fnum OPLL->OPL2/Y8950 (dst≈src) blk=%u fnum=%u->%u ratio=%.2f\n",
+                        opll_block, opll_fnum9, doubled_fnum, clock_ratio);
+            }
+            return;
+        }
+        
+        // Fall back to precise mapping if no fast-path applies
+        if (getenv("ESEOPL3_FREQMAP_DEBUG")) {
+            fprintf(stderr, "[FREQMAP_FAST] fallback to precise (ratio=%.2f not matched)\n", clock_ratio);
+        }
+    }
+
+    // Precise mapping (current behavior)
     double freq = calc_opll_frequency(src_clock, opll_block, opll_fnum9);
 
     unsigned char best_b = 0;
@@ -101,7 +148,7 @@ static uint8_t  g_pending_keyoff_val2n[YM2413_NUM_CH] = {0};
 
 // 追加: 最小ゲート（KeyOn→KeyOff の最小間隔）
 #ifndef OPLL_MIN_GATE_SAMPLES
-#define OPLL_MIN_GATE_SAMPLES 128   // 約 2.9ms @ 44.1kHz
+#define OPLL_MIN_GATE_SAMPLES 0   // Default: no artificial gate delay
 #endif
 
 static int g_freqmap_opllblock = 0;
@@ -126,20 +173,29 @@ static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const 
     return (p && p->has_1n) || (s && s->valid_1n);
 }
 
-/** Initialize OPLL/OPL3 voice DB and state */
-/* 初期化: last_key[] を明示クリア */
+/**
+ * Initialize OPLL/OPL3 voice DB and state
+ */
 void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     if (!p_state) return;
 
+    // Read frequency mapping mode
     const char *fm = getenv("ESEOPL3_FREQMAP");
     if (fm && (strcasecmp(fm, "opllblock") == 0 || strcmp(fm, "1") == 0 || strcasecmp(fm, "true") == 0 || strcasecmp(fm, "on") == 0 || strcasecmp(fm, "yes") == 0)) {
         g_freqmap_opllblock = 1;
     } else {
         g_freqmap_opllblock = 0;
     }
-    fprintf(stderr, "[FREQMAP] init mode=%s (ESEOPL3_FREQMAP=%s)\n",
+
+    // Read fast-path mode
+    const char *fast = getenv("ESEOPL3_FREQMAP_FAST");
+    g_freqmap_fast = (fast && (fast[0]=='1' || fast[0]=='y' || fast[0]=='Y' || fast[0]=='t' || fast[0]=='T')) ? 1 : 0;
+
+    fprintf(stderr, "[FREQMAP] init mode=%s fast=%d (ESEOPL3_FREQMAP=%s ESEOPL3_FREQMAP_FAST=%s)\n",
             g_freqmap_opllblock ? "opllblock" : "off",
-            fm ? fm : "(unset)");
+            g_freqmap_fast,
+            fm ? fm : "(unset)",
+            fast ? fast : "(unset)");
 
     const char *tr = getenv("ESEOPL3_TRIPLE_FORCE_RETRIGGER");
     g_triple_force_retrigger =
@@ -229,12 +285,12 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
 
 #ifndef OPLL_PRE_KEYON_WAIT_SAMPLES
 // A0/TL適用後、B0=ONの前に入れる待ち（audible-sanity時のみ）
-#define OPLL_PRE_KEYON_WAIT_SAMPLES 2
+#define OPLL_PRE_KEYON_WAIT_SAMPLES 0
 #endif
 
 #ifndef OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
 // KeyOff→KeyOnの縁の間に最低限入れる待ち（audible-sanity時のみ）
-#define OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 4
+#define OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES 0
 #endif
 
 static const uint8_t kOPLLRateToOPL3_SIMPLE[16] = {

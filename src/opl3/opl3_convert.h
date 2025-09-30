@@ -40,6 +40,23 @@ double calc_fmchip_frequency(
 // Carrier TL calculation (used during conversion)
 uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n);
 
+/**
+ * Find optimal FNUM and BLOCK values for a given frequency with error in cents.
+ * @param freq Target frequency in Hz.
+ * @param clock Chip clock frequency.
+ * @param best_block Output: optimal block value.
+ * @param best_fnum Output: optimal FNUM value.
+ * @param best_err Output: error in cents.
+ * @param pref_block Preferred block value (hint).
+ * @param mult0 Multiplier 0 (reserved).
+ * @param mult1 Multiplier 1 (reserved).
+ */
+void opl3_find_fnum_block_with_ml_cents(double freq, double clock,
+                                        unsigned char *best_block, unsigned short *best_fnum,
+                                        double *best_err,
+                                        int pref_block,
+                                        double mult0, double mult1);
+
 #ifdef __cplusplus
 }
 #endif

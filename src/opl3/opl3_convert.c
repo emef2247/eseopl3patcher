@@ -451,11 +451,13 @@ int duplicate_write_opl3(
             opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
             if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
             opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            if (g_debug_freq) { uint8_t blk0 = (val>>2)&7; uint16_t f0 = merge_fnum_dbg(A_lsb, val); double hz0 = opl3_calc_hz_dbg(blk0,f0); fprintf(stderr,"[FREQ0] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk0, f0, hz0); }
         } else {
             fprintf(stderr, "[SEQ0] port0: A(%02X)->B(%02X)\n", A_lsb, val);
             opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
             if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
             opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            if (g_debug_freq) { uint8_t blk0 = (val>>2)&7; uint16_t f0 = merge_fnum_dbg(A_lsb, val); double hz0 = opl3_calc_hz_dbg(blk0,f0); fprintf(stderr,"[FREQ0] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk0, f0, hz0); }
         }
 
         // 既存の port 間ウェイト + 追加マイクロウェイト
@@ -476,7 +478,7 @@ int duplicate_write_opl3(
                 opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);      addtional_bytes += 3;
                 if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
                 opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB_post); addtional_bytes += 3;\
-                if (g_debug_freq) { uint8_t blk0 = (val>>2)&7; uint16_t f0 = merge_fnum_dbg(A_lsb, val); double hz0 = opl3_calc_hz_dbg(blk0,f0); fprintf(stderr,"[FREQ0] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk0, f0, hz0); }
+                if (g_debug_freq) { uint8_t blk1 = (val>>2)&7; uint16_t f1 = merge_fnum_dbg(A_lsb, val); double hz1 = opl3_calc_hz_dbg(blk1,f1); fprintf(stderr,"[FREQ1] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk1, f1, hz1); }
             } else {
                 fprintf(stderr, "[SEQ1] port1: A(%02X)->B(%02X)\n", detunedA, detunedB_post);
                 opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);      addtional_bytes += 3;
