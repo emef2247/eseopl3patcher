@@ -1,6 +1,7 @@
 #include "vgm_header.h"
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /**
  * Write a 32-bit value as little-endian into the given buffer.
@@ -261,34 +262,70 @@ FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long files
  * overrides (such as OPL3 clock) if specified in cmd_opts.
  *
  * @param p_header_buf   Pointer to the VGM header buffer.
- * @param stats          Pointer to chip write statistics.
- * @param cmd_opts       Pointer to command options (for clock overrides).
+ * @param p_ctx          Pointer to the VGMContext.
+ * @param p_stats        Pointer to chip write statistics.
+ * @param p_cmd_opts     Pointer to command options (for clock overrides).
  */
 void vgm_header_postprocess(
     uint8_t *p_header_buf,
-    const VGMStats *stats,
-    const CommandOptions *cmd_opts
+    const VGMContext *p_ctx, 
+    const CommandOptions *p_cmd_opts
 ) {
+
+    // YMF262 (OPL3)
+    uint32_t opl3_clock = (p_cmd_opts && p_cmd_opts->override_opl3_clock != 0)
+        ? p_cmd_opts->override_opl3_clock : OPL3_CLOCK;
+    set_ymf262_clock(p_header_buf, opl3_clock);
+
+    fprintf(stderr, "[VGM HEADER] Total Write Count YM2413:%d YM3812:%d YM3526:%d Y8950:%d \n", 
+            p_ctx->status.stats.ym2413_write_count,p_ctx->status.stats.ym3812_write_count,p_ctx->status.stats.ym3526_write_count,p_ctx->status.stats.y8950_write_count);
+
+    if (p_cmd_opts->strip_unused_chip_clocks == false) {
+        fprintf(stderr, "[VGM HEADER] strip_unused_chip_clocks == %d: Skip setting unused clocks to zero on OPL-series chips.\n", 
+        p_cmd_opts->strip_unused_chip_clocks );
+    } else {
+        // YM2413
+        if (p_ctx->status.stats.ym2413_write_count == 0) {
+            fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header since this chip is not used.\n" );
+            set_ym2413_clock(p_header_buf, 0);
+        }
+        // YM3812
+        if (p_ctx->status.stats.ym3812_write_count == 0) {
+            fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header since this chip is not used.\n" );
+            set_ym3812_clock(p_header_buf, 0);
+        }
+        // YM3526
+        if (p_ctx->status.stats.ym3526_write_count == 0) {
+            fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header since this chip is not used.\n" );
+            set_ym3526_clock(p_header_buf, 0);
+        }
+        // Y8950
+        if (p_ctx->status.stats.y8950_write_count == 0) {
+            fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header since this chip is not used.\n" );
+            set_y8950_clock(p_header_buf, 0);
+        }
+    }
+
     // YM2413
-    if (stats->ym2413_write_count == 0) {
+    if (p_ctx->source_fmchip == FMCHIP_YM2413) {
+        fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header, as this is the source chip\n" );
         set_ym2413_clock(p_header_buf, 0);
     }
     // YM3812
-    if (stats->ym3812_write_count == 0) {
+   if (p_ctx->source_fmchip == FMCHIP_YM3812) {
+        fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header, as this is the source chip\n" );
         set_ym3812_clock(p_header_buf, 0);
     }
     // YM3526
-    if (stats->ym3526_write_count == 0) {
+    if (p_ctx->source_fmchip == FMCHIP_YM3526) {
+        fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header, as this is the source chip\n" );
         set_ym3526_clock(p_header_buf, 0);
     }
     // Y8950
-    if (stats->y8950_write_count == 0) {
+    if (p_ctx->source_fmchip == FMCHIP_Y8950) {
+        fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header, as this is the source chip\n" );
         set_y8950_clock(p_header_buf, 0);
     }
-    // YMF262 (OPL3)
-    uint32_t opl3_clock = (cmd_opts && cmd_opts->override_opl3_clock != 0)
-        ? cmd_opts->override_opl3_clock : OPL3_CLOCK;
-    set_ymf262_clock(p_header_buf, opl3_clock);
 
     // PSG/DCSG is not a target
     #ifdef  UPDATE_PSG_CLOCK_INFO

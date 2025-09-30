@@ -14,6 +14,7 @@
         "opl3_metrics.h": "c",
         "debug_opts.h": "c",
         "vgm_header.h": "c",
-        "override_apply.h": "c"
+        "override_apply.h": "c",
+        "string.h": "c"
     }
 }

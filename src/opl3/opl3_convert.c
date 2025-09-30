@@ -14,7 +14,7 @@ typedef enum {
     FREQSEQ_AB  = 1  // A -> B(POST)  ※実機可否の実験用
 } FreqSeqMode;
 
-static FreqSeqMode g_freqseq_mode = FREQSEQ_BAB;
+static FreqSeqMode g_freqseq_mode = FREQSEQ_AB;
 static int g_micro_wait_ab   = 0;  // B(pre)->A, A->B(post) の間
 static int g_micro_wait_port = 0;  // port0 と port1 の間に加算（opts->opl3_keyon_waitに加える）
 static int g_debug_freq = 0;
@@ -421,78 +421,70 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, reg, val0);
         opl3_write_reg(p_state, p_music_data, 1, reg, val1); addtional_bytes += 3;
     } else if (reg >= 0xA0 && reg <= 0xA8) {
-         // Update register mirror
-        p_state->reg_stamp[reg] = p_state->reg[reg];
-        p_state->reg[reg]       = val;
-    } else if (reg >= 0xB0 && reg <= 0xB8) {
-        int ch = reg - 0xB0;
+        // Only write port0 for A0..A8
+        int ch = reg - 0xA0;
 
-        // KEYON立ち上がりのボイス登録（現行どおり）
-        uint8_t prev_val   = p_state->reg_stamp[reg];
+        if ((p_state->reg[0xB0 + ch]) & 0x20) {
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
+        } else {
+            // Only update the register buffer (No dump to vgm)
+            p_state->reg_stamp[reg] = p_state->reg[reg];
+            p_state->reg[reg] = val;
+        }
+    } else if (reg >= 0xB0 && reg <= 0xB8) {
+        // Only perform voice registration on KeyOn event (when writing to FREQ_MSB and KEYON bit transitions 0->1)
+        // Get the previous and new KEYON bit values
+        uint8_t prev_val = p_state->reg_stamp[reg];
         uint8_t keyon_prev = prev_val & 0x20;
         uint8_t keyon_new  = val & 0x20;
+        // KeyOn occurs: extract and register voice parameters for this channel
         if (!keyon_prev && keyon_new) {
-            OPL3VoiceParam vp; memset(&vp, 0, sizeof(vp));
+            OPL3VoiceParam vp;
+            // Always zero-initialize the whole structure before extracting parameters
+            memset(&vp, 0, sizeof(OPL3VoiceParam));
+            // Extract voice parameters from the OPL3 state
             extract_voice_param(p_state, &vp);
+            // Set additional fields as needed before DB registration
             vp.source_fmchip = p_state->source_fmchip;
+            // Register or find voice in the database
             opl3_voice_db_find_or_add(&p_state->voice_db, &vp);
         }
-
-        // 最新 LSB はミラーから取得（An は常にミラー更新のみ）
+        
+        // Write B0 (KeyOn/Block/FnumMSB) and handle detune
+        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
+        int ch = reg - 0xB0;
         uint8_t A_lsb = p_state->reg[0xA0 + ch];
-        fprintf(stderr, "[SEQ0] ch=%d mode=%s A=%02X B=%02X (rhythm=%d)\n",
-            ch, g_freqseq_mode==FREQSEQ_BAB?"BAB":"AB", A_lsb, val, p_state->rhythm_mode);
-
+        fprintf(stderr, "[SEQ0] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) ",
+                ch, g_freqseq_mode==FREQSEQ_BAB?"BAB":"AB", A_lsb, val, p_state->rhythm_mode);
         if (g_freqseq_mode == FREQSEQ_BAB) {
-            uint8_t B_pre0 = (uint8_t)(val & ~0x20);
-            fprintf(stderr, "[SEQ0] port0: B(pre=%02X)->A(%02X)->B(%02X)\n", B_pre0, A_lsb, val);
-            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, B_pre0);
-            if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
-            if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
+            fprintf(stderr, "port0: B(%02X)->A(%02X)->B(%02X)\n",val, A_lsb, val);
             opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-            if (g_debug_freq) { uint8_t blk0 = (val>>2)&7; uint16_t f0 = merge_fnum_dbg(A_lsb, val); double hz0 = opl3_calc_hz_dbg(blk0,f0); fprintf(stderr,"[FREQ0] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk0, f0, hz0); }
-        } else {
-            fprintf(stderr, "[SEQ0] port0: A(%02X)->B(%02X)\n", A_lsb, val);
             opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
-            if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
             opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-            if (g_debug_freq) { uint8_t blk0 = (val>>2)&7; uint16_t f0 = merge_fnum_dbg(A_lsb, val); double hz0 = opl3_calc_hz_dbg(blk0,f0); fprintf(stderr,"[FREQ0] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk0, f0, hz0); }
-        }
-
-        // 既存の port 間ウェイト + 追加マイクロウェイト
-        int port_wait = opts->opl3_keyon_wait + (g_micro_wait_port > 0 ? g_micro_wait_port : 0);
-        if (port_wait) vgm_wait_samples(p_music_data, p_vstat, port_wait);
-
-        bool is_rhythm_ch = (p_state->rhythm_mode && ch >= 6 && ch <= 8);
-        if (!is_rhythm_ch) {
-            uint8_t detunedA, detunedB_post;
-            // 修正: port1 用に ch+9 を渡す（リズム判定の整合性）
-            detune_if_fm(p_state, ch+9, A_lsb, val, opts->detune, &detunedA, &detunedB_post);
-
-            if (g_freqseq_mode == FREQSEQ_BAB) {
-                uint8_t detunedB_pre = (uint8_t)(detunedB_post & ~0x20);
-                fprintf(stderr, "[SEQ1] port1: B(pre=%02X)->A(%02X)->B(%02X)\n", detunedB_pre, detunedA, detunedB_post);
-                opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB_pre);  addtional_bytes += 3;
-                if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
-                opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);      addtional_bytes += 3;
-                if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
-                opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB_post); addtional_bytes += 3;\
-                if (g_debug_freq) { uint8_t blk1 = (val>>2)&7; uint16_t f1 = merge_fnum_dbg(A_lsb, val); double hz1 = opl3_calc_hz_dbg(blk1,f1); fprintf(stderr,"[FREQ1] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk1, f1, hz1); }
-            } else {
-                fprintf(stderr, "[SEQ1] port1: A(%02X)->B(%02X)\n", detunedA, detunedB_post);
-                opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);      addtional_bytes += 3;
-                if (g_micro_wait_ab) vgm_wait_samples(p_music_data, p_vstat, g_micro_wait_ab);
-                opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB_post); addtional_bytes += 3;
-                if (g_debug_freq) { uint8_t blk1 = (detunedB_post>>2)&7; uint16_t f1 = merge_fnum_dbg(detunedA, detunedB_post); double hz1 = opl3_calc_hz_dbg(blk1,f1); fprintf(stderr,"[FREQ1] ch=%d block=%u fnum=%u hz=%.6f\n", ch, blk1, f1, hz1); }
-            }
+             // Extra 3 bytes
+            addtional_bytes += 3;
         } else {
-            // rhythm ch6–8 on port1: skipped (現状維持)
+            fprintf(stderr, "port0: A(%02X)->B(%02X)\n", A_lsb, val);
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
+            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            // Extra 2 bytes
+            addtional_bytes += 2;
         }
+       
+        if ( opts->opl3_keyon_wait > 0)
+            vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
 
-        if (opts->opl3_keyon_wait) vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
-
-
+        uint8_t detunedA, detunedB;
+        detune_if_fm(p_state, ch, A_lsb, val, opts->detune, &detunedA, &detunedB);
+        fprintf(stderr, "[SEQ1] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) ",
+                ch, g_freqseq_mode==FREQSEQ_BAB?"BAB":"AB", detunedA, detunedB, p_state->rhythm_mode);
+        fprintf(stderr, "port1: A(%02X)->B(%02X)\n", detunedA, detunedB);
+        opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
+        if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
+            opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
+        }
+        if ( opts->opl3_keyon_wait > 0)
+            vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -534,42 +526,26 @@ int duplicate_write_opl3(
  * OPL3 initialization sequence for both ports.
  * Sets FM chip type in OPL3State and initializes register mirror.
  */
+/**
+ * OPL3 initialization sequence for both ports.
+ * Sets FM chip type in OPL3State and initializes register mirror.
+ */
 void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMChipType source_fmchip) {
-
-    const char *seq = getenv("ESEOPL3_FREQSEQ");
-    const char *dbgF = getenv("ESEOPL3_DEBUG_FREQ");
-    
-    if (seq && (seq[0]=='a' || seq[0]=='A')) g_freqseq_mode = FREQSEQ_AB;
-    // マイクロウェイト（未設定は0）
-    const char *mwab  = getenv("ESEOPL3_MICROWAIT_AB");
-    const char *mwpor = getenv("ESEOPL3_MICROWAIT_PORT");
-    g_micro_wait_ab   = mwab  ? atoi(mwab)  : 0;
-    g_micro_wait_port = mwpor ? atoi(mwpor) : 0;
-    g_debug_freq = (dbgF && (dbgF[0]=='1'||dbgF[0]=='y'||dbgF[0]=='Y'||dbgF[0]=='t'||dbgF[0]=='T')) ? 1 : 0;
-
-    fprintf(stderr, "[FREQSEQ] selected=%s (ESEOPL3_FREQSEQ=%s) micro_ab=%d micro_port=%d debug_freq=%d \n",
-        g_freqseq_mode==FREQSEQ_BAB ? "BAB" : "AB",
-        seq ? seq : "(unset)", g_micro_wait_ab, g_micro_wait_port, g_debug_freq);
-
     if (!p_state) return;
-    
     memset(p_state->reg, 0, sizeof(p_state->reg));
     memset(p_state->reg_stamp, 0, sizeof(p_state->reg_stamp));
     p_state->rhythm_mode = false;
     p_state->opl3_mode_initialized = false;
     p_state->source_fmchip = source_fmchip;
 
-    // Initialize frequency staging arrays for atomic A0+B0 writes
-    memset(p_state->staged_fnum_lsb, 0, sizeof(p_state->staged_fnum_lsb));
-    memset(p_state->staged_fnum_valid, 0, sizeof(p_state->staged_fnum_valid));
+    const char *seq = getenv("ESEOPL3_FREQSEQ");
+    if (seq && (seq[0]=='a' || seq[0]=='A')) g_freqseq_mode = FREQSEQ_AB;
+    fprintf(stderr, "[FREQSEQ] selected=%s (ESEOPL3_FREQSEQ=%s)\n",
+            g_freqseq_mode==FREQSEQ_BAB ? "BAB" : "AB",
+            seq ? seq : "(unset)");
 
-     // Initialize OPL3VoiceDB
+    // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
-
-    for (int i=0;i<OPL3_NUM_CHANNELS;i++){
-        p_state->staged_fnum_lsb[i]=0; p_state->staged_fnum_valid[i]=false;
-    }
-    p_state->pair_an_bn_enabled = 0; // Pearing disabled (Default)
 
     // OPL3 global registers (Port 1 only)
     opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable
@@ -580,7 +556,7 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS
 
     // Port 1 general init
-    // opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
+    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
 
     // Channel-level control
     for (uint8_t i = 0; i < 9; ++i) {
@@ -609,11 +585,7 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
-
-    /* last_key は memset で 0 済み。念のためフラグ */
-    p_state->opl3_mode_initialized = 1;
 }
-
 
 /* 
  * YM2413 音量 nibble -> OPL3 TL 加算値マッピング

@@ -346,12 +346,16 @@ int main(int argc, char *argv[]) {
 
     // FM clock setup (source chip selection)
     if (chip_flags.convert_ym2413 && chip_flags.has_ym2413) {
+        vgmctx.source_fmchip = FMCHIP_YM2413;
         vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
     } else if (chip_flags.convert_ym3812 && chip_flags.has_ym3812) {
+        vgmctx.source_fmchip = FMCHIP_YM3812;
         vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
     } else if (chip_flags.convert_ym3526 && chip_flags.has_ym3526) {
+        vgmctx.source_fmchip = FMCHIP_YM3526;
         vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
     } else if (chip_flags.convert_y8950 && chip_flags.has_y8950) {
+        vgmctx.source_fmchip = FMCHIP_Y8950;
         vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
     } else {
         vgmctx.source_fm_clock = -1.0;
@@ -392,24 +396,28 @@ int main(int argc, char *argv[]) {
                 chip_flags.convert_ym2413 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x51;
+                vgmctx.source_fmchip = FMCHIP_YM2413;
                 vgmctx.source_fm_clock = (double)chip_flags.ym2413_clock;
             } else if (cmd == 0x5A && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
                        !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3812 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5A;
+                vgmctx.source_fmchip = FMCHIP_YM3812;
                 vgmctx.source_fm_clock = (double)chip_flags.ym3812_clock;
             } else if (cmd == 0x5B && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
                        !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_ym3526 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5B;
+                vgmctx.source_fmchip = FMCHIP_YM3526;
                 vgmctx.source_fm_clock = (double)chip_flags.ym3526_clock;
             } else if (cmd == 0x5C && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
                        !chip_flags.convert_ym3526 && !chip_flags.convert_y8950) {
                 chip_flags.convert_y8950 = true;
                 chip_flags.opl_group_autodetect = false;
                 chip_flags.opl_group_first_cmd = 0x5C;
+                vgmctx.source_fmchip = FMCHIP_Y8950;
                 vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
             }
         }
@@ -614,7 +622,7 @@ int main(int argc, char *argv[]) {
     snprintf(creator_append, sizeof(creator_append), ",%s", p_creator);
     char note_append[512];
     
-    if (chip_flags.convert_ym2413) {
+    if (vgmctx.source_fmchip == FMCHIP_YM2413) {
         snprintf(note_append, sizeof(note_append),
             "Converted from YM2413 to OPL3. "
             "Detune:%.2f%% "
@@ -683,7 +691,7 @@ int main(int argc, char *argv[]) {
     }
 
     /** Update the clock information in new header */
-    vgm_header_postprocess(p_header_buf, &vgmctx.status.stats, &cmd_opts);
+    vgm_header_postprocess(p_header_buf, &vgmctx, &cmd_opts);
 
    
     FILE *p_wf = fopen(p_output_path, "wb");
@@ -708,7 +716,7 @@ int main(int argc, char *argv[]) {
     printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
 
-    if (chip_flags.convert_ym2413) {
+    if (vgmctx.source_fmchip == FMCHIP_YM2413) {
         printf("[YM2413] Debug Verbose: %s\n", debug_opts.verbose ? "ON" : "OFF");
         printf("[YM2413] Audible Sanity: %s\n", debug_opts.audible_sanity ? "ON" : "OFF");
         printf("[YM2413] Emergency Boost: %d \n",  emergency_boost_steps);
