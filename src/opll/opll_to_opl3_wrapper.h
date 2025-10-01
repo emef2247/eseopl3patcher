@@ -32,6 +32,7 @@ typedef struct {
 /** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
 void opll_init(OPL3State *p_state, const CommandOptions* opts) ;
+void opll_print_gate_summary(const CommandOptions* opts);
 
 int opll_write_register(
     VGMBuffer *p_music_data,
