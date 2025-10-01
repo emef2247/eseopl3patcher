@@ -348,9 +348,9 @@ int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
     uint8_t value_b = ((fnum >> 8) & 0x03) | (block << 2) | (keyon ? 0x20 : 0x00);
 
     // Write FNUM LSB (A0..A8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts);
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts, 0);
     // Write FNUM MSB (B0..B8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts);
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts, 0);
     return bytes_written;
 }
 
@@ -362,10 +362,12 @@ int duplicate_write_opl3(
     VGMBuffer *p_music_data,
     VGMStatus *p_vstat,
     OPL3State *p_state,
-    uint8_t reg, uint8_t val, const CommandOptions *opts
+    uint8_t reg, uint8_t val, const CommandOptions *opts,
+    uint16_t next_wait_samples
     // double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1
 ) {
     int addtional_bytes = 0;
+    uint32_t keyon_wait_inserted = 0;  // Track waits inserted by this function
 
     if (p_state->pair_an_bn_enabled) {
         uint8_t detunedA, detunedB;        
@@ -445,8 +447,10 @@ int duplicate_write_opl3(
             addtional_bytes += 2;
         }
        
-        if ( opts->opl3_keyon_wait > 0)
+        if ( opts->opl3_keyon_wait > 0) {
             vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+            keyon_wait_inserted += opts->opl3_keyon_wait;
+        }
 
         uint8_t detunedA, detunedB;
         detune_if_fm(p_state, ch, A_lsb, val, opts->detune, &detunedA, &detunedB);
@@ -457,8 +461,10 @@ int duplicate_write_opl3(
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
             opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
         }
-        if ( opts->opl3_keyon_wait > 0)
+        if ( opts->opl3_keyon_wait > 0) {
             vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+            keyon_wait_inserted += opts->opl3_keyon_wait;
+        }
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -493,6 +499,33 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, reg, val);
         opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
     }
+    
+    // Tail compensation: add any keyon_wait we inserted to the gate compensation debt
+    // and compensate from next_wait_samples if available
+    uint32_t *p_debt = opll_get_gate_comp_debt_ptr();
+    if (keyon_wait_inserted > 0) {
+        *p_debt += keyon_wait_inserted;
+    }
+    
+    // Compensate next_wait_samples from accumulated debt
+    if (next_wait_samples > 0 && *p_debt > 0) {
+        uint16_t compensation = (next_wait_samples >= *p_debt) ? (uint16_t)(*p_debt) : next_wait_samples;
+        uint16_t adjusted = next_wait_samples - compensation;
+        *p_debt -= compensation;
+        
+        if (opts && opts->debug.verbose) {
+            fprintf(stderr, "[GATE COMP] next_wait=%u -> adjusted=%u, debt_left=%u\n",
+                    next_wait_samples, adjusted, *p_debt);
+        }
+        
+        if (adjusted > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, adjusted);
+        }
+    } else if (next_wait_samples > 0) {
+        // No debt to compensate, emit the wait as-is
+        vgm_wait_samples(p_music_data, p_vstat, next_wait_samples);
+    }
+    
     return addtional_bytes;
 }
 

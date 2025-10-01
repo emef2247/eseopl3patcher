@@ -42,4 +42,7 @@ int opll_write_register(
 
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db, CommandOptions* opts);
 
+/** Gate compensation debt access (for duplicate_write_opl3) */
+extern uint32_t* opll_get_gate_comp_debt_ptr(void);
+
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */
