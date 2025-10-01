@@ -731,6 +731,9 @@ int main(int argc, char *argv[]) {
         printf("[OPL3] Total voices in DB: %d\n", state.voice_db.count);
     }
 
+    // Print gate wait summary
+    opll_print_gate_summary(&cmd_opts);
+
     vgm_buffer_free(&vgmctx.buffer);
     vgm_buffer_free(&gd3);
     free(p_vgm_data);

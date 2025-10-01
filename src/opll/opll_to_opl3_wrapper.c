@@ -153,6 +153,22 @@ static uint8_t  g_pending_keyoff_val2n[YM2413_NUM_CH] = {0};
 
 static int g_freqmap_opllblock = 0;
 
+// Gate tracker for timestamp-based wait calculation
+typedef struct {
+    uint32_t last_keyon;   // Sample timestamp of last KeyOn
+    uint32_t last_keyoff;  // Sample timestamp of last KeyOff
+    uint8_t  key_is_on;    // Current key state (1=on, 0=off)
+    // Statistics
+    uint32_t total_pre_wait;
+    uint32_t total_off_on_wait;
+    uint32_t total_min_gate_wait;
+    uint32_t count_pre;
+    uint32_t count_off_on;
+    uint32_t count_min_gate;
+} OpllNoteGateTracker;
+
+static OpllNoteGateTracker g_gate_tracker[YM2413_NUM_CH] = {0};
+
 
 /** Store program arguments for later use */
 void opll_set_program_args(int argc, char **argv) {
@@ -215,9 +231,37 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
         g_gate_elapsed[i] = 0;
         g_has_pending_keyoff[i] = 0;
         g_pending_keyoff_val2n[i] = 0;
+        // Initialize gate tracker
+        memset(&g_gate_tracker[i], 0, sizeof(OpllNoteGateTracker));
     }
     for (int ch = 0; ch < 9; ++ch) {
         p_state->last_key[ch] = 0;
+    }
+}
+
+/** Print gate wait statistics summary */
+void opll_print_gate_summary(const CommandOptions* opts) {
+    if (!opts || !opts->debug.audible_sanity) {
+        return; // No gate waits if audible_sanity is disabled
+    }
+    
+    fprintf(stderr, "\n[GATE WAIT SUMMARY]\n");
+    bool any_activity = false;
+    
+    for (int ch = 0; ch < YM2413_NUM_CH; ++ch) {
+        OpllNoteGateTracker *t = &g_gate_tracker[ch];
+        if (t->count_pre > 0 || t->count_off_on > 0 || t->count_min_gate > 0) {
+            any_activity = true;
+            fprintf(stderr, "  ch=%d: pre=%u samples (%u times), off_on=%u samples (%u times), min_gate=%u samples (%u times)\n",
+                    ch,
+                    t->total_pre_wait, t->count_pre,
+                    t->total_off_on_wait, t->count_off_on,
+                    t->total_min_gate_wait, t->count_min_gate);
+        }
+    }
+    
+    if (!any_activity) {
+        fprintf(stderr, "  (no gate waits inserted)\n");
     }
 }
 
@@ -671,6 +715,10 @@ static inline void opll_tick_pending_on_elapsed(
             g_stamp[ch].last_2n = v2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
             p_state->last_key[ch] = 0;
             g_has_pending_keyoff[ch] = 0;
+            
+            // Update gate tracker
+            g_gate_tracker[ch].last_keyoff = p_vgm_context->status.total_samples;
+            g_gate_tracker[ch].key_is_on = 0;
 
             if (p_opts && p_opts->debug.verbose) {
                 fprintf(stderr,"[DELAY_KEYOFF_FLUSH] ch=%d elapsed=%u/%u reg2n=%02X\n",
@@ -773,20 +821,30 @@ static inline void acc_maybe_flush_triple(
 
     // 既に鳴っている場合でも、ここで必ず即時 KeyOff を吐いてリトリガを保証（遅延を無視）
     if (g_stamp[ch].ko) {
-#if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
-        if (p_opts && p_opts->debug.audible_sanity) {
-            if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
-                uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
-                if (p_opts->debug.verbose) {
-                    fprintf(stderr,"[KEYOFF_INJECT_WAIT][TRIPLE] ch=%d need=%u (elapsed=%u, min=%u)\n",
-                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
-                }
-                vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
-                uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
-                g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
+        // Calculate min_gate wait if needed
+        uint32_t now = p_vgm_context->status.total_samples;
+        uint32_t held = 0;
+        uint16_t min_gate_need = 0;
+        
+        if (p_opts && p_opts->debug.audible_sanity && g_gate_tracker[ch].key_is_on) {
+            held = now - g_gate_tracker[ch].last_keyon;
+            uint16_t min_gate = get_min_gate(p_opts);
+            if (held < min_gate) {
+                min_gate_need = (uint16_t)(min_gate - held);
             }
         }
-#endif
+        
+        // Insert min_gate wait if needed
+        if (min_gate_need > 0) {
+            vgm_wait_samples(p_music_data, &p_vgm_context->status, min_gate_need);
+            g_gate_tracker[ch].total_min_gate_wait += min_gate_need;
+            g_gate_tracker[ch].count_min_gate++;
+            if (p_opts->debug.verbose) {
+                fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (held=%u)\n",
+                        ch, min_gate_need, held);
+            }
+        }
+        
         // 即時 KeyOff
         uint8_t ko_val2n = g_has_pending_keyoff[ch] ? g_pending_keyoff_val2n[ch]
                                                     : opll_make_keyoff(g_stamp[ch].last_2n);
@@ -796,19 +854,80 @@ static inline void acc_maybe_flush_triple(
         g_stamp[ch].last_2n = ko_val2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
         p_state->last_key[ch] = 0;
         g_has_pending_keyoff[ch] = 0;
+        
+        // Update gate tracker
+        g_gate_tracker[ch].last_keyoff = p_vgm_context->status.total_samples;
+        g_gate_tracker[ch].key_is_on = 0;
+        
         if (p_opts && p_opts->debug.verbose)
             fprintf(stderr,"[TRIPLE_PRE_KEYOFF] ch=%d reg2n=%02X\n", ch, ko_val2n);
 
-#if OPLL_ENABLE_WAIT_BEFORE_KEYON
-    // Prevent KeyOff→KeyOn edge collision by adding small wait
-    if (p_opts && p_opts->debug.audible_sanity && get_min_off_on_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)get_min_off_on_wait(p_opts));
-        if (p_opts->debug.verbose) {
-            fprintf(stderr,"[OFF_TO_ON_WAIT][TRIPLE] ch=%d samples=%u\n",
-                    ch, (unsigned)get_min_off_on_wait(p_opts));
+        // Calculate off_on_wait if transitioning to KeyOn
+        uint32_t off_on_need = 0;
+        if (p_opts && p_opts->debug.audible_sanity) {
+            uint16_t min_off_on = get_min_off_on_wait(p_opts);
+            if (min_off_on > 0 && g_gate_tracker[ch].last_keyoff > 0) {
+                uint32_t since_off = p_vgm_context->status.total_samples - g_gate_tracker[ch].last_keyoff;
+                if (since_off < min_off_on) {
+                    off_on_need = min_off_on - since_off;
+                }
+            }
+        }
+        
+        // Insert off_on wait if needed
+        if (off_on_need > 0) {
+            vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)off_on_need);
+            g_gate_tracker[ch].total_off_on_wait += off_on_need;
+            g_gate_tracker[ch].count_off_on++;
+            if (p_opts->debug.verbose) {
+                fprintf(stderr,"[GATE WAIT] ch=%d off_on=%u\n", ch, off_on_need);
+            }
         }
     }
-#endif
+
+    // Calculate and insert off_on wait (if not already done in ko block above)
+    if (!g_stamp[ch].ko && p_opts && p_opts->debug.audible_sanity) {
+        uint32_t off_on_need = 0;
+        uint16_t min_off_on = get_min_off_on_wait(p_opts);
+        if (min_off_on > 0 && g_gate_tracker[ch].last_keyoff > 0) {
+            uint32_t now = p_vgm_context->status.total_samples;
+            uint32_t since_off = now - g_gate_tracker[ch].last_keyoff;
+            if (since_off < min_off_on) {
+                off_on_need = min_off_on - since_off;
+            }
+        }
+        
+        if (off_on_need > 0) {
+            vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)off_on_need);
+            g_gate_tracker[ch].total_off_on_wait += off_on_need;
+            g_gate_tracker[ch].count_off_on++;
+            if (p_opts->debug.verbose) {
+                fprintf(stderr,"[GATE WAIT] ch=%d off_on=%u\n", ch, off_on_need);
+            }
+        }
+    }
+    
+    // Insert pre_keyon wait
+    uint16_t pre_keyon_need = 0;
+    if (p_opts && p_opts->debug.audible_sanity) {
+        pre_keyon_need = get_pre_keyon_wait(p_opts);
+    }
+    
+    if (pre_keyon_need > 0) {
+        vgm_wait_samples(p_music_data, &p_vgm_context->status, pre_keyon_need);
+        g_gate_tracker[ch].total_pre_wait += pre_keyon_need;
+        g_gate_tracker[ch].count_pre++;
+        if (p_opts->debug.verbose) {
+            fprintf(stderr,"[GATE WAIT] ch=%d pre=%u\n", ch, pre_keyon_need);
+        }
+    }
+    
+    // Combined log when any waits were inserted
+    if (p_opts && p_opts->debug.verbose && (pre_keyon_need > 0 || 
+        (g_gate_tracker[ch].count_off_on > 0 && p_vgm_context->status.total_samples == g_gate_tracker[ch].last_keyoff + (g_gate_tracker[ch].total_off_on_wait % 65536)))) {
+        fprintf(stderr,"[GATE WAIT] ch=%d pre=%u off_on=%u (combined for KeyOn)\n",
+                ch, pre_keyon_need, 
+                g_gate_tracker[ch].count_off_on > 0 ? (uint16_t)(g_gate_tracker[ch].total_off_on_wait % 65536) : 0);
     }
 
     // temp pending で KeyOn
@@ -822,6 +941,10 @@ static inline void acc_maybe_flush_triple(
 
     flush_channel(p_music_data, &p_vgm_context->status, p_state,
                   ch, NULL, p_opts, &temp, &g_stamp[ch]);
+    
+    // Update gate tracker after KeyOn
+    g_gate_tracker[ch].last_keyon = p_vgm_context->status.total_samples;
+    g_gate_tracker[ch].key_is_on = 1;
 
     // 後処理: 重複フラッシュ防止
     acc_reset_ch(ch);
@@ -946,6 +1069,10 @@ static inline void flush_channel_ch(
             uint16_t fnum10 = (uint16_t)(((b0_val & 0x03) << 8) | a0_val);
             uint8_t  blk3   = (uint8_t)((b0_val >> 2) & 0x07);
             opl3_metrics_note_on(ch, fnum10, blk3);
+            
+            // Update gate tracker for KeyOn
+            g_gate_tracker[ch].last_keyon = p_vstat->total_samples;
+            g_gate_tracker[ch].key_is_on = 1;
         }
         // 追加: ここで順不同アキュムレータを必ずリセット（この音符はpend/stamp経路で発火済み）
         acc_reset_ch(ch);
@@ -975,6 +1102,11 @@ static inline void flush_channel_ch(
                 uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
                 duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
                 p_state->last_key[ch] = 0;
+                
+                // Update gate tracker
+                g_gate_tracker[ch].last_keyoff = p_vstat->total_samples;
+                g_gate_tracker[ch].key_is_on = 0;
+                
                 if (p_opts && p_opts->debug.verbose)
                     fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (after inject wait)\n", ch, p->reg2n);
 
@@ -996,6 +1128,11 @@ static inline void flush_channel_ch(
             uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
             duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
             p_state->last_key[ch] = 0;
+            
+            // Update gate tracker
+            g_gate_tracker[ch].last_keyoff = p_vstat->total_samples;
+            g_gate_tracker[ch].key_is_on = 0;
+            
             if (p_opts && p_opts->debug.verbose)
                 fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (elapsed=%u)\n", ch, p->reg2n, g_gate_elapsed[ch]);
 
