@@ -731,6 +731,11 @@ int main(int argc, char *argv[]) {
         printf("[OPL3] Total voices in DB: %d\n", state.voice_db.count);
     }
 
+    // Print gate wait summary if YM2413 conversion was performed
+    if (vgmctx.source_fmchip == FMCHIP_YM2413 && cmd_opts.debug.verbose) {
+        opll_print_gate_wait_summary();
+    }
+
     vgm_buffer_free(&vgmctx.buffer);
     vgm_buffer_free(&gd3);
     free(p_vgm_data);
