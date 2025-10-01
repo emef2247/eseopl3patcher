@@ -145,3 +145,95 @@ See test results in commit messages and PR description.
 - VGM file format specification
 - YMF262 (OPL3) hardware documentation
 - Real hardware verification results
+
+## Gate Duration Tuning and Timbre Debugging Features
+
+### 7. Timbre Debugging CLI Flags
+
+**Added** new command-line flags for timbre analysis and debugging:
+
+#### Voice Simplification
+- `--voice-simplify-sine`: Forces both operators to sine wave (WS=0) and FB=0
+  - Preserves modulator TL to allow hearing modulation effects
+  - Useful for isolating harmonic content from waveform effects
+
+#### Modulator Muting
+- `--voice-debug-mute-mod`: Forces modulator TL=63 (complete mute)
+  - Applied after all other mappings
+  - Allows listening to carrier-only sound
+
+#### INST=1 (Violin) Specific Overrides
+- `--inst1-fb-override <0-7>`: Override feedback for INST=1
+- `--inst1-tl-override <0-63>`: Override modulator TL for INST=1
+- `--inst1-ws-override <0-7>`: Override wave select for both operators on INST=1
+
+#### Mid-Note Parameter Changes
+- `--mid-note-param-wait <samples>`: Insert wait before mid-note parameter changes
+  - Helps reduce clicks during parameter updates
+  - Default: 0 (disabled)
+
+**Implementation:** Added fields to `DebugOpts` struct in `vgm_helpers.h` and implemented application logic in `ym2413_patch_convert.c`.
+
+**Why:** Enables systematic timbre analysis and debugging, particularly for INST=1 (Violin) which is commonly used in YM2413 music.
+
+### 8. Gate Duration Tuning Scripts
+
+**Added** comprehensive bash scripts for gate duration tuning and analysis:
+
+#### Core Tuning Scripts
+- `scripts/tune_gate_duration.sh`: Single-file gate duration tuning
+  - Sweeps gate values to match baseline duration
+  - Outputs CSV: gate,seconds,delta_s,abs_delta_s,tempo_ratio
+  - Default FREQSEQ=AB
+  
+- `scripts/tune_gate_batch.sh`: Batch gate duration tuning
+  - Processes multiple VGMs from manifest
+  - Generates summary.csv with best gate per file
+  - Uses Python helper to prevent one-line CSV breakage
+  - Selects best result by minimal abs_delta_s
+
+- `scripts/tune_gate_preoffon.sh`: Stage-2 tuner
+  - Sweeps pre-keyon and off-to-on wait parameters with fixed gate
+  - For files where gate alone can't meet target duration
+  - Outputs: pre,offon,seconds,delta_s,abs_delta_s,tempo_ratio
+
+#### Timbre Analysis
+- `scripts/timbre_sweep_inst1.sh`: INST=1 parameter sweep
+  - Sweeps modulator TL, FB, and WS values
+  - Supports --simplify and --mute-mod flags
+  - Records all combinations to CSV for comparison
+
+#### Helper Scripts
+- `scripts/make_baseline_wav.sh`: Generate baseline WAV from VGM
+  - Tries vgm2wav, vgmplay, or VGMPlay
+  - Shows duration via ffprobe
+
+- `scripts/make_ab_compare.sh`: A/B listening helper
+  - Creates alternating segments from two WAVs
+  - Uses ffmpeg concat demuxer (reliable on ffmpeg 4.4)
+  - Forces s16/stereo/44.1kHz for consistency
+
+#### Visualization
+- `scripts/spectrogram_one.sh`: Generate single spectrogram
+- `scripts/spectrogram_compare.sh`: Side-by-side spectrogram comparison
+- Both use ffmpeg showspectrumpic, 0-8kHz range
+
+#### Configuration
+- `scripts/manifests/ym2413_problematic.txt`: Files for stage-2 tuning
+  - Lists files where -g alone previously undershot target
+  - Used by tune_gate_preoffon.sh
+  
+- `scripts/presets_from_summary.sh`: Generate gate_presets.csv
+  - Merges batch summary CSV files
+  - Creates unified preset configuration
+
+#### Diagnostics
+- `scripts/vgm_diff_opl3_regs.sh`: Compare OPL3 register writes
+  - Uses vgm2txt to dump and diff TL/FB/WS registers
+  - Confirms override flags are applied correctly
+
+**Default Behavior:** All tuning scripts default to FREQSEQ=AB, consistent with hardware-verified frequency sequence.
+
+**CSV Format:** All tuning scripts output CSV with headers including `abs_delta_s` and `tempo_ratio` for consistent analysis.
+
+**Why:** Provides systematic workflow for tuning gate duration parameters and analyzing timbre variations, addressing the challenge of matching YM2413 timing behavior in OPL3 conversion.

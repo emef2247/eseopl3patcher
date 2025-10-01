@@ -51,6 +51,13 @@ typedef struct {
     bool single_port;         /* Emit only port0 writes (suppress port1) */
     bool audible_sanity;   /* “鳴らすため” の安全調整 */
     bool verbose;
+    /* New timbre debugging flags */
+    bool voice_simplify_sine; /* Force both operators to sine wave (WS=0) and FB=0 */
+    bool voice_debug_mute_mod; /* Force modulator TL=63 (mute) after mapping */
+    int inst1_fb_override;    /* INST=1 FB override (-1 = not set, 0-7 = FB value) */
+    int inst1_tl_override;    /* INST=1 modulator TL override (-1 = not set, 0-63 = TL value) */
+    int inst1_ws_override;    /* INST=1 wave select override (-1 = not set, 0-7 = WS value) */
+    uint16_t mid_note_param_wait; /* Optional wait (samples) before mid-note parameter changes */
 } DebugOpts;
 
 typedef struct {

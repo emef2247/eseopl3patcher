@@ -1,0 +1,7 @@
+# Files where -g alone undershot previously (for stage-2 tuning with pre/offon)
+# One VGM basename per line (without .vgm extension)
+chords_mix
+legato_patch_mix
+patch_change_midnote
+release_retrigger
+rhythm_mode_basic
