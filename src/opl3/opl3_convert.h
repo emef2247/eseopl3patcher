@@ -22,7 +22,8 @@ int duplicate_write_opl3(
     OPL3State *p_state,
     uint8_t reg,
     uint8_t val,
-    const CommandOptions *opts);
+    const CommandOptions *opts,
+    uint16_t next_wait_samples);
 
 void opl3_write_reg(
     OPL3State *p_state,

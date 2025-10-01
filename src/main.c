@@ -488,7 +488,7 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts, 0);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -509,7 +509,7 @@ int main(int argc, char *argv[]) {
                     opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
                     state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts, 0);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
@@ -532,23 +532,23 @@ int main(int argc, char *argv[]) {
                     if (cmd_opts.debug.test_tone) {
                         // Simple additive test tone: mod muted, carrier AR=15 etc.
                         // Port0 only
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x05, 0x01, &cmd_opts, 0); // ensure OPL3 mode
                         // Operator settings (slot 0 carrier path simplified)
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x20, 0x01, &cmd_opts); // mul=1
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x40, 0x00, &cmd_opts); // TL=0
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xE0, 0x00, &cmd_opts);
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x20, 0x01, &cmd_opts, 0); // mul=1
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x40, 0x00, &cmd_opts, 0); // TL=0
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x60, 0xF4, &cmd_opts, 0); // AR=F DR=4
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x80, 0x02, &cmd_opts, 0); // SL=0 RR=2
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xE0, 0x00, &cmd_opts, 0);
                         // Set algorithm=1 (additive)
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xC0, 0xC1, &cmd_opts, 0); // FB=0 Alg=1
                         // FNUM for ~A440 (example fnum=0x15B oct=4) => LSB
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xA0, 0x5B, &cmd_opts);
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xA0, 0x5B, &cmd_opts, 0);
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts, 0); // MSB=1, block=4, keyon
                         vgm_wait_samples(&vgmctx.buffer,&vgmctx.status,4410); // 100ms
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
+                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts, 0); // key off
                     }
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts, 0);
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
             }
