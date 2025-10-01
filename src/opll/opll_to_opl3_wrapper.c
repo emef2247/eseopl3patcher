@@ -787,11 +787,12 @@ static inline void acc_maybe_flush_triple(
         if (p_opts && p_opts->debug.audible_sanity) {
             if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
                 uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                g_gate_comp_debt_samples += need;  // Track debt
                 if (p_opts->debug.verbose) {
-                    fprintf(stderr,"[KEYOFF_INJECT_WAIT][TRIPLE] ch=%d need=%u (elapsed=%u, min=%u)\n",
+                    fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
                             ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                 }
-                vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
             }
@@ -812,10 +813,12 @@ static inline void acc_maybe_flush_triple(
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // Prevent KeyOff→KeyOn edge collision by adding small wait
     if (p_opts && p_opts->debug.audible_sanity && get_min_off_on_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)get_min_off_on_wait(p_opts));
+        uint16_t off_on_wait = (uint16_t)get_min_off_on_wait(p_opts);
+        vgm_wait_samples(p_music_data, &p_vgm_context->status, off_on_wait);
+        g_gate_comp_debt_samples += off_on_wait;  // Track debt
         if (p_opts->debug.verbose) {
-            fprintf(stderr,"[OFF_TO_ON_WAIT][TRIPLE] ch=%d samples=%u\n",
-                    ch, (unsigned)get_min_off_on_wait(p_opts));
+            fprintf(stderr,"[GATE WAIT] ch=%d off_on=%u\n",
+                    ch, (unsigned)off_on_wait);
         }
     }
 #endif
@@ -934,10 +937,12 @@ static inline void flush_channel_ch(
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
     if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, p_vstat, (uint16_t)get_pre_keyon_wait(p_opts));
+        uint16_t pre_wait = (uint16_t)get_pre_keyon_wait(p_opts);
+        vgm_wait_samples(p_music_data, p_vstat, pre_wait);
+        g_gate_comp_debt_samples += pre_wait;  // Track debt
         if (p_opts->debug.verbose) {
-            fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n",
-                    ch, (unsigned)get_pre_keyon_wait(p_opts));
+            fprintf(stderr,"[GATE WAIT] ch=%d pre=%u\n",
+                    ch, (unsigned)pre_wait);
         }
     }
 #endif
@@ -971,12 +976,13 @@ static inline void flush_channel_ch(
             // audible-sanity 有効時はここで待ちを注入してから即時 KeyOff
             if (p_opts && p_opts->debug.audible_sanity) {
                 uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
-                if (p_opts->debug.verbose) {
-                    fprintf(stderr,"[KEYOFF_INJECT_WAIT] ch=%d need=%u (elapsed=%u, min=%u)\n",
-                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
-                }
                 // VGMに待ちを注入してからゲート経過を進める
                 vgm_wait_samples(p_music_data, p_vstat, need);
+                g_gate_comp_debt_samples += need;  // Track debt
+                if (p_opts->debug.verbose) {
+                    fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
+                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                }
                 // saturate
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
@@ -1205,11 +1211,12 @@ int opll_write_register(
 #if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
                     if (p_opts && p_opts->debug.audible_sanity) {
                         uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                        vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                        g_gate_comp_debt_samples += need;  // Track debt
                         if (p_opts->debug.verbose) {
-                            fprintf(stderr,"[KEYOFF_INJECT_WAIT][B0] ch=%d need=%u (elapsed=%u, min=%u)\n",
+                            fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
                                     ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                         }
-                        vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
                         uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                         g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
 
