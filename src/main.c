@@ -129,6 +129,9 @@ static void print_usage(const char *progname) {
         "          [--audible-sanity] [--debug-verbose]\n"
         "          [--min-gate-samples <val>] [--pre-keyon-wait <val>] [--min-off-on-wait <val>]\n"
         "          [--strip-unused-chips] [--opl3-clock <val>]\n"
+        "          [--voice-simplify-sine] [--voice-debug-mute-mod]\n"
+        "          [--inst1-fb-override <val>] [--inst1-tl-override <val>] [--inst1-ws-override <val>]\n"
+        "          [--mid-note-param-wait <val>]\n"
         "\n"
         "Options:\n"
         "  --convert-ymXXXX           Explicit chip selection (YM2413, YM3812, YM3526, Y8950).\n"
@@ -156,6 +159,12 @@ static void print_usage(const char *progname) {
         "                             Ensures reliable note retriggering in emulation.\n"
         "  --strip-unused-chips       Set unused chip clocks (YM2413/AY/etc.) to zero in output.\n"
         "  --opl3-clock <val>         Override YMF262 (OPL3) clock value (e.g., 14318180).\n"
+        "  --voice-simplify-sine      Force both operators to sine wave (WS=0) and FB=0.\n"
+        "  --voice-debug-mute-mod     Force modulator TL=63 (mute) after voice mapping.\n"
+        "  --inst1-fb-override <val>  Override FB for INST=1 (Violin) (0-7).\n"
+        "  --inst1-tl-override <val>  Override modulator TL for INST=1 (0-63).\n"
+        "  --inst1-ws-override <val>  Override wave select for INST=1 (0-7).\n"
+        "  --mid-note-param-wait <val> Insert wait (samples) before mid-note parameter changes.\n"
         "  -h, --help                 Show this help message.\n"
         "\n"
         "Example:\n"
@@ -192,6 +201,11 @@ int main(int argc, char *argv[]) {
     bool strip_unused_chip_clocks = false;   // Zero unused chip clocks
     uint32_t override_opl3_clock  = 0;       // If not 0, override OPL3 clock
     DebugOpts debug_opts = {0};
+    // Initialize new timbre debug flags
+    debug_opts.inst1_fb_override = -1;  // -1 = not set
+    debug_opts.inst1_tl_override = -1;  // -1 = not set
+    debug_opts.inst1_ws_override = -1;  // -1 = not set
+    debug_opts.mid_note_param_wait = 0;  // 0 = disabled
 
     // Parse optional args
     for (int i = 3; i < argc; ++i) {
@@ -239,6 +253,18 @@ int main(int argc, char *argv[]) {
             strip_unused_chip_clocks = true;
         } else if (strcmp(argv[i], "--opl3-clock") == 0 && i + 1 < argc) {
             override_opl3_clock = (uint32_t)strtoul(argv[++i], &endptr, 10);
+        } else if (strcmp(argv[i], "--voice-simplify-sine") == 0) {
+            debug_opts.voice_simplify_sine = true;
+        } else if (strcmp(argv[i], "--voice-debug-mute-mod") == 0) {
+            debug_opts.voice_debug_mute_mod = true;
+        } else if (strcmp(argv[i], "--inst1-fb-override") == 0 && i + 1 < argc) {
+            debug_opts.inst1_fb_override = (int)strtoul(argv[++i], &endptr, 10);
+        } else if (strcmp(argv[i], "--inst1-tl-override") == 0 && i + 1 < argc) {
+            debug_opts.inst1_tl_override = (int)strtoul(argv[++i], &endptr, 10);
+        } else if (strcmp(argv[i], "--inst1-ws-override") == 0 && i + 1 < argc) {
+            debug_opts.inst1_ws_override = (int)strtoul(argv[++i], &endptr, 10);
+        } else if (strcmp(argv[i], "--mid-note-param-wait") == 0 && i + 1 < argc) {
+            debug_opts.mid_note_param_wait = (uint16_t)strtoul(argv[++i], &endptr, 10);
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;

@@ -27,6 +27,79 @@ void apply_debug_overrides(OPL3VoiceParam *p_vp, const CommandOptions* p_opts) {
     }
 }
 
+/* Apply voice simplify (sine wave + FB=0) */
+static void apply_voice_simplify_sine(OPL3VoiceParam *p_vp, const CommandOptions* p_opts) {
+    if (!p_vp || !p_opts || !p_opts->debug.voice_simplify_sine) return;
+    
+    // Force both operators to sine wave (WS=0)
+    p_vp->op[0].ws = 0;
+    p_vp->op[1].ws = 0;
+    
+    // Force feedback to 0
+    p_vp->fb[0] = 0;
+    
+    // IMPORTANT: Do NOT mute the modulator here
+    // Leave modulator TL as-is so we can still hear modulation
+    
+    if (p_opts->debug.verbose) {
+        fprintf(stderr, "[VOICE_SIMPLIFY] Applied: WS[0]=0 WS[1]=0 FB=0 (modTL preserved=%u)\n", 
+                p_vp->op[0].tl);
+    }
+}
+
+/* Apply debug mute modulator */
+static void apply_voice_debug_mute_mod(OPL3VoiceParam *p_vp, const CommandOptions* p_opts) {
+    if (!p_vp || !p_opts || !p_opts->debug.voice_debug_mute_mod) return;
+    
+    uint8_t old_tl = p_vp->op[0].tl;
+    p_vp->op[0].tl = 63; // Mute modulator
+    
+    if (p_opts->debug.verbose) {
+        fprintf(stderr, "[MUTE_MOD] Modulator TL: %u -> 63 (muted)\n", old_tl);
+    }
+}
+
+/* Apply INST=1 specific overrides */
+static void apply_inst1_overrides(int inst, OPL3VoiceParam *p_vp, const CommandOptions* p_opts) {
+    if (!p_vp || !p_opts || inst != 1) return;
+    
+    bool applied = false;
+    
+    if (p_opts->debug.inst1_fb_override >= 0 && p_opts->debug.inst1_fb_override <= 7) {
+        uint8_t old_fb = p_vp->fb[0];
+        p_vp->fb[0] = (uint8_t)p_opts->debug.inst1_fb_override;
+        if (p_opts->debug.verbose) {
+            fprintf(stderr, "[INST1_FB] FB: %u -> %u\n", old_fb, p_vp->fb[0]);
+        }
+        applied = true;
+    }
+    
+    if (p_opts->debug.inst1_tl_override >= 0 && p_opts->debug.inst1_tl_override <= 63) {
+        uint8_t old_tl = p_vp->op[0].tl;
+        p_vp->op[0].tl = (uint8_t)p_opts->debug.inst1_tl_override;
+        if (p_opts->debug.verbose) {
+            fprintf(stderr, "[INST1_TL] Modulator TL: %u -> %u\n", old_tl, p_vp->op[0].tl);
+        }
+        applied = true;
+    }
+    
+    if (p_opts->debug.inst1_ws_override >= 0 && p_opts->debug.inst1_ws_override <= 7) {
+        uint8_t old_ws0 = p_vp->op[0].ws;
+        uint8_t old_ws1 = p_vp->op[1].ws;
+        p_vp->op[0].ws = (uint8_t)p_opts->debug.inst1_ws_override;
+        p_vp->op[1].ws = (uint8_t)p_opts->debug.inst1_ws_override;
+        if (p_opts->debug.verbose) {
+            fprintf(stderr, "[INST1_WS] WS: [%u,%u] -> [%u,%u]\n", 
+                    old_ws0, old_ws1, p_vp->op[0].ws, p_vp->op[1].ws);
+        }
+        applied = true;
+    }
+    
+    if (applied && p_opts->debug.verbose) {
+        fprintf(stderr, "[INST1] Applied overrides for Violin (INST=1)\n");
+    }
+}
+
 /* 唯一の “鳴るための” 調整 */
 void apply_audible_sanity(OPL3VoiceParam *p_vp, const CommandOptions *p_opts) {
     if (!p_vp || !p_opts || !p_opts->debug.audible_sanity) return;
@@ -133,6 +206,11 @@ void ym2413_patch_to_opl3_with_fb(int inst,
             p_vp->op[1].tl, p_vp->op[1].ar, p_vp->op[1].dr, p_vp->op[1].sl, p_vp->op[1].rr,
             fb);
     }
+    
+    /* Apply new timbre debugging features (in order) */
+    apply_voice_simplify_sine(p_vp, p_opts);
+    apply_inst1_overrides(inst, p_vp, p_opts);
+    apply_voice_debug_mute_mod(p_vp, p_opts);
 }
 
 static uint8_t final_tl_clamp(uint8_t car40, const CommandOptions *p_opts) {
