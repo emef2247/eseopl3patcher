@@ -874,35 +874,23 @@ static inline void acc_maybe_flush_triple(
             }
         }
         
-        // Insert off_on wait if needed
+        // Insert off_on wait if needed (will be logged with pre_keyon later)
         if (off_on_need > 0) {
             vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)off_on_need);
             g_gate_tracker[ch].total_off_on_wait += off_on_need;
             g_gate_tracker[ch].count_off_on++;
-            if (p_opts->debug.verbose) {
-                fprintf(stderr,"[GATE WAIT] ch=%d off_on=%u\n", ch, off_on_need);
-            }
         }
     }
 
     // Calculate and insert off_on wait (if not already done in ko block above)
+    uint32_t off_on_need = 0;
     if (!g_stamp[ch].ko && p_opts && p_opts->debug.audible_sanity) {
-        uint32_t off_on_need = 0;
         uint16_t min_off_on = get_min_off_on_wait(p_opts);
         if (min_off_on > 0 && g_gate_tracker[ch].last_keyoff > 0) {
             uint32_t now = p_vgm_context->status.total_samples;
             uint32_t since_off = now - g_gate_tracker[ch].last_keyoff;
             if (since_off < min_off_on) {
                 off_on_need = min_off_on - since_off;
-            }
-        }
-        
-        if (off_on_need > 0) {
-            vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)off_on_need);
-            g_gate_tracker[ch].total_off_on_wait += off_on_need;
-            g_gate_tracker[ch].count_off_on++;
-            if (p_opts->debug.verbose) {
-                fprintf(stderr,"[GATE WAIT] ch=%d off_on=%u\n", ch, off_on_need);
             }
         }
     }
@@ -913,21 +901,23 @@ static inline void acc_maybe_flush_triple(
         pre_keyon_need = get_pre_keyon_wait(p_opts);
     }
     
+    // Insert waits (off_on first, then pre_keyon)
+    if (off_on_need > 0) {
+        vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)off_on_need);
+        g_gate_tracker[ch].total_off_on_wait += off_on_need;
+        g_gate_tracker[ch].count_off_on++;
+    }
+    
     if (pre_keyon_need > 0) {
         vgm_wait_samples(p_music_data, &p_vgm_context->status, pre_keyon_need);
         g_gate_tracker[ch].total_pre_wait += pre_keyon_need;
         g_gate_tracker[ch].count_pre++;
-        if (p_opts->debug.verbose) {
-            fprintf(stderr,"[GATE WAIT] ch=%d pre=%u\n", ch, pre_keyon_need);
-        }
     }
     
-    // Combined log when any waits were inserted
-    if (p_opts && p_opts->debug.verbose && (pre_keyon_need > 0 || 
-        (g_gate_tracker[ch].count_off_on > 0 && p_vgm_context->status.total_samples == g_gate_tracker[ch].last_keyoff + (g_gate_tracker[ch].total_off_on_wait % 65536)))) {
-        fprintf(stderr,"[GATE WAIT] ch=%d pre=%u off_on=%u (combined for KeyOn)\n",
-                ch, pre_keyon_need, 
-                g_gate_tracker[ch].count_off_on > 0 ? (uint16_t)(g_gate_tracker[ch].total_off_on_wait % 65536) : 0);
+    // Combined log when any waits were inserted for KeyOn
+    if ((off_on_need > 0 || pre_keyon_need > 0) && p_opts && p_opts->debug.verbose) {
+        fprintf(stderr,"[GATE WAIT] ch=%d pre=%u off_on=%u\n",
+                ch, pre_keyon_need, off_on_need);
     }
 
     // temp pending で KeyOn
