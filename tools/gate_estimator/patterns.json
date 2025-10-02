@@ -1,0 +1,14 @@
+{
+  "patterns": [
+    {
+      "pattern": "example_pattern",
+      "channel": 0,
+      "patch": { "ar": 8, "dr": 6, "sl": 8, "rr": 5, "ksr": true },
+      "notes": [
+        { "fnum": 512, "blk": 3, "t_on": 0.000, "ioi": 0.250 },
+        { "fnum": 542, "blk": 3, "t_on": 0.250, "ioi": 0.250 },
+        { "fnum": 575, "blk": 3, "t_on": 0.500, "ioi": 0.250 }
+      ]
+    }
+  ]
+}
