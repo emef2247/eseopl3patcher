@@ -123,3 +123,7 @@ tools/ssh_check.log
 tmp/
 temp/
 analysis/
+
+# Python cache
+__pycache__/
+*.pyc
