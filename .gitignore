@@ -74,6 +74,7 @@ calibration/reports/warn_pass*.txt
 calibration/logs/
 calibration/p??o4_*_pass*.vgm
 calibration/p??o4_*_pass*.wav
+calibration/
 
 # WAV/VGM general
 *.wav
@@ -116,6 +117,13 @@ tools/ssh_check.log
 out_no_post.log
 tools/ssh_check.log
 
+*.list
+*.tcl
+
 tmp/
 temp/
 analysis/
+
+# Python cache
+__pycache__/
+*.pyc

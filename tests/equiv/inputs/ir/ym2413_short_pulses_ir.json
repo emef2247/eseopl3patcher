@@ -1,0 +1,3706 @@
+{
+  "header": {
+    "version_bcd": 368,
+    "sample_rate": 60,
+    "eof_offset": 1631,
+    "total_samples": 22110,
+    "loop_offset": 0,
+    "loop_samples": 0,
+    "data_offset": 64,
+    "sn76489_clock": 0,
+    "ym2413_clock": 3579545,
+    "gd3_offset": 0,
+    "ym2612_clock": 1048585,
+    "ym2151_clock": 0
+  },
+  "events": [
+    {
+      "time_s": 0.016666666666666666,
+      "samples": 1,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 14,
+      "value": 32,
+      "extras": {
+        "reg": 14
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39055,
+      "value": 31,
+      "extras": {
+        "port": 3,
+        "reg": 0,
+        "abs_addr": 39055,
+        "enable_bits": 31
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.31666666666666665,
+      "samples": 19,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.31666666666666665,
+      "samples": 19,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.4,
+      "samples": 24,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.4,
+      "samples": 24,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.48333333333333334,
+      "samples": 29,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.48333333333333334,
+      "samples": 29,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.5833333333333334,
+      "samples": 35,
+      "chip": "PSG",
+      "channel": 0,
+      "kind": "reg-write",
+      "address": 8,
+      "value": 0,
+      "extras": {
+        "reg": 8,
+        "channel": 0,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.5833333333333334,
+      "samples": 35,
+      "chip": "PSG",
+      "channel": 1,
+      "kind": "reg-write",
+      "address": 9,
+      "value": 0,
+      "extras": {
+        "reg": 9,
+        "channel": 1,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.6,
+      "samples": 36,
+      "chip": "PSG",
+      "channel": 2,
+      "kind": "reg-write",
+      "address": 10,
+      "value": 0,
+      "extras": {
+        "reg": 10,
+        "channel": 2,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.6333333333333333,
+      "samples": 38,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "reg-write",
+      "address": 39050,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 0,
+        "abs_addr": 39050,
+        "channel": 0,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.65,
+      "samples": 39,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "reg-write",
+      "address": 39051,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 1,
+        "abs_addr": 39051,
+        "channel": 1,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6666666666666666,
+      "samples": 40,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "reg-write",
+      "address": 39052,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 2,
+        "abs_addr": 39052,
+        "channel": 2,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6666666666666666,
+      "samples": 40,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38913,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 1,
+        "abs_addr": 38913,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38914,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 2,
+        "abs_addr": 38914,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38915,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 3,
+        "abs_addr": 38915,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38916,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 4,
+        "abs_addr": 38916,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38917,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 5,
+        "abs_addr": 38917,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38918,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 6,
+        "abs_addr": 38918,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38919,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 7,
+        "abs_addr": 38919,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38920,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 8,
+        "abs_addr": 38920,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38921,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 9,
+        "abs_addr": 38921,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38922,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 10,
+        "abs_addr": 38922,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38923,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 11,
+        "abs_addr": 38923,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38924,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 12,
+        "abs_addr": 38924,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38925,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 13,
+        "abs_addr": 38925,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38926,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 14,
+        "abs_addr": 38926,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38927,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 15,
+        "abs_addr": 38927,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38928,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 16,
+        "abs_addr": 38928,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38929,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 17,
+        "abs_addr": 38929,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38930,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 18,
+        "abs_addr": 38930,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38931,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 19,
+        "abs_addr": 38931,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38932,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 20,
+        "abs_addr": 38932,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38933,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 21,
+        "abs_addr": 38933,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38934,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 22,
+        "abs_addr": 38934,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38935,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 23,
+        "abs_addr": 38935,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38936,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 24,
+        "abs_addr": 38936,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38937,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 25,
+        "abs_addr": 38937,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38938,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 26,
+        "abs_addr": 38938,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38939,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 27,
+        "abs_addr": 38939,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38940,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 28,
+        "abs_addr": 38940,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38941,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 29,
+        "abs_addr": 38941,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38942,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 30,
+        "abs_addr": 38942,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38943,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 31,
+        "abs_addr": 38943,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38944,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 32,
+        "abs_addr": 38944,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38945,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 33,
+        "abs_addr": 38945,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38946,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 34,
+        "abs_addr": 38946,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38947,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 35,
+        "abs_addr": 38947,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38948,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 36,
+        "abs_addr": 38948,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38949,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 37,
+        "abs_addr": 38949,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38950,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 38,
+        "abs_addr": 38950,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38951,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 39,
+        "abs_addr": 38951,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38952,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 40,
+        "abs_addr": 38952,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38953,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 41,
+        "abs_addr": 38953,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38954,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 42,
+        "abs_addr": 38954,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38955,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 43,
+        "abs_addr": 38955,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38956,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 44,
+        "abs_addr": 38956,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38957,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 45,
+        "abs_addr": 38957,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38958,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 46,
+        "abs_addr": 38958,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38959,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 47,
+        "abs_addr": 38959,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38960,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 48,
+        "abs_addr": 38960,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38961,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 49,
+        "abs_addr": 38961,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38962,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 50,
+        "abs_addr": 38962,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38963,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 51,
+        "abs_addr": 38963,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38964,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 52,
+        "abs_addr": 38964,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38965,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 53,
+        "abs_addr": 38965,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38966,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 54,
+        "abs_addr": 38966,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38967,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 55,
+        "abs_addr": 38967,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38968,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 56,
+        "abs_addr": 38968,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38969,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 57,
+        "abs_addr": 38969,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38970,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 58,
+        "abs_addr": 38970,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38971,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 59,
+        "abs_addr": 38971,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38972,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 60,
+        "abs_addr": 38972,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38973,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 61,
+        "abs_addr": 38973,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38974,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 62,
+        "abs_addr": 38974,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38975,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 63,
+        "abs_addr": 38975,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38976,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 64,
+        "abs_addr": 38976,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38977,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 65,
+        "abs_addr": 38977,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38978,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 66,
+        "abs_addr": 38978,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38979,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 67,
+        "abs_addr": 38979,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38980,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 68,
+        "abs_addr": 38980,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38981,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 69,
+        "abs_addr": 38981,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38982,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 70,
+        "abs_addr": 38982,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38983,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 71,
+        "abs_addr": 38983,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38984,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 72,
+        "abs_addr": 38984,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38985,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 73,
+        "abs_addr": 38985,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38986,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 74,
+        "abs_addr": 38986,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38987,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 75,
+        "abs_addr": 38987,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38988,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 76,
+        "abs_addr": 38988,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38989,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 77,
+        "abs_addr": 38989,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38990,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 78,
+        "abs_addr": 38990,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38991,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 79,
+        "abs_addr": 38991,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38992,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 80,
+        "abs_addr": 38992,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38993,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 81,
+        "abs_addr": 38993,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38994,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 82,
+        "abs_addr": 38994,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38995,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 83,
+        "abs_addr": 38995,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38996,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 84,
+        "abs_addr": 38996,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38997,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 85,
+        "abs_addr": 38997,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38998,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 86,
+        "abs_addr": 38998,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38999,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 87,
+        "abs_addr": 38999,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39000,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 88,
+        "abs_addr": 39000,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39001,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 89,
+        "abs_addr": 39001,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39002,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 90,
+        "abs_addr": 39002,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39003,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 91,
+        "abs_addr": 39003,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39004,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 92,
+        "abs_addr": 39004,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39005,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 93,
+        "abs_addr": 39005,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39006,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 94,
+        "abs_addr": 39006,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39007,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 95,
+        "abs_addr": 39007,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39008,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 96,
+        "abs_addr": 39008,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39009,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 97,
+        "abs_addr": 39009,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39010,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 98,
+        "abs_addr": 39010,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39011,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 99,
+        "abs_addr": 39011,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39012,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 100,
+        "abs_addr": 39012,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39013,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 101,
+        "abs_addr": 39013,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39014,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 102,
+        "abs_addr": 39014,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39015,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 103,
+        "abs_addr": 39015,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39016,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 104,
+        "abs_addr": 39016,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39017,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 105,
+        "abs_addr": 39017,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39018,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 106,
+        "abs_addr": 39018,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39019,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 107,
+        "abs_addr": 39019,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39020,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 108,
+        "abs_addr": 39020,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39021,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 109,
+        "abs_addr": 39021,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39022,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 110,
+        "abs_addr": 39022,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39023,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 111,
+        "abs_addr": 39023,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39024,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 112,
+        "abs_addr": 39024,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39025,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 113,
+        "abs_addr": 39025,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39026,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 114,
+        "abs_addr": 39026,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39027,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 115,
+        "abs_addr": 39027,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39028,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 116,
+        "abs_addr": 39028,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39029,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 117,
+        "abs_addr": 39029,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39030,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 118,
+        "abs_addr": 39030,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39031,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 119,
+        "abs_addr": 39031,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39032,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 120,
+        "abs_addr": 39032,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39033,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 121,
+        "abs_addr": 39033,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39034,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 122,
+        "abs_addr": 39034,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39035,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 123,
+        "abs_addr": 39035,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39036,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 124,
+        "abs_addr": 39036,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39037,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 125,
+        "abs_addr": 39037,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 1.0666666666666667,
+      "samples": 64,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39038,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 126,
+        "abs_addr": 39038,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 1.0666666666666667,
+      "samples": 64,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39039,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 127,
+        "abs_addr": 39039,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 1.0833333333333333,
+      "samples": 65,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 0,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 1.1,
+      "samples": 66,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 0,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1.1,
+      "samples": 66,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 255,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1.1166666666666667,
+      "samples": 67,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 17,
+      "value": 0,
+      "extras": {
+        "reg": 17
+      }
+    },
+    {
+      "time_s": 1.1333333333333333,
+      "samples": 68,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 33,
+      "value": 0,
+      "extras": {
+        "reg": 33
+      }
+    },
+    {
+      "time_s": 1.1333333333333333,
+      "samples": 68,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 49,
+      "value": 255,
+      "extras": {
+        "reg": 49
+      }
+    },
+    {
+      "time_s": 1.15,
+      "samples": 69,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 18,
+      "value": 0,
+      "extras": {
+        "reg": 18
+      }
+    },
+    {
+      "time_s": 1.1666666666666667,
+      "samples": 70,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 34,
+      "value": 0,
+      "extras": {
+        "reg": 34
+      }
+    },
+    {
+      "time_s": 1.1666666666666667,
+      "samples": 70,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 50,
+      "value": 255,
+      "extras": {
+        "reg": 50
+      }
+    },
+    {
+      "time_s": 1.1833333333333333,
+      "samples": 71,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 19,
+      "value": 0,
+      "extras": {
+        "reg": 19
+      }
+    },
+    {
+      "time_s": 1.2,
+      "samples": 72,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 35,
+      "value": 0,
+      "extras": {
+        "reg": 35
+      }
+    },
+    {
+      "time_s": 1.2,
+      "samples": 72,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 51,
+      "value": 255,
+      "extras": {
+        "reg": 51
+      }
+    },
+    {
+      "time_s": 1.2166666666666666,
+      "samples": 73,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 20,
+      "value": 0,
+      "extras": {
+        "reg": 20
+      }
+    },
+    {
+      "time_s": 1.2333333333333334,
+      "samples": 74,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 36,
+      "value": 0,
+      "extras": {
+        "reg": 36
+      }
+    },
+    {
+      "time_s": 1.2333333333333334,
+      "samples": 74,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 52,
+      "value": 255,
+      "extras": {
+        "reg": 52
+      }
+    },
+    {
+      "time_s": 1.25,
+      "samples": 75,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 21,
+      "value": 0,
+      "extras": {
+        "reg": 21
+      }
+    },
+    {
+      "time_s": 1.2666666666666666,
+      "samples": 76,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 37,
+      "value": 0,
+      "extras": {
+        "reg": 37
+      }
+    },
+    {
+      "time_s": 1.2666666666666666,
+      "samples": 76,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 53,
+      "value": 255,
+      "extras": {
+        "reg": 53
+      }
+    },
+    {
+      "time_s": 1.2833333333333334,
+      "samples": 77,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 22,
+      "value": 0,
+      "extras": {
+        "reg": 22
+      }
+    },
+    {
+      "time_s": 1.3,
+      "samples": 78,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 38,
+      "value": 0,
+      "extras": {
+        "reg": 38
+      }
+    },
+    {
+      "time_s": 1.3,
+      "samples": 78,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 54,
+      "value": 255,
+      "extras": {
+        "reg": 54
+      }
+    },
+    {
+      "time_s": 1.3166666666666667,
+      "samples": 79,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 23,
+      "value": 0,
+      "extras": {
+        "reg": 23
+      }
+    },
+    {
+      "time_s": 1.3333333333333333,
+      "samples": 80,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39,
+      "value": 0,
+      "extras": {
+        "reg": 39
+      }
+    },
+    {
+      "time_s": 1.3333333333333333,
+      "samples": 80,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 55,
+      "value": 255,
+      "extras": {
+        "reg": 55
+      }
+    },
+    {
+      "time_s": 1.35,
+      "samples": 81,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 24,
+      "value": 0,
+      "extras": {
+        "reg": 24
+      }
+    },
+    {
+      "time_s": 1.3666666666666667,
+      "samples": 82,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 40,
+      "value": 0,
+      "extras": {
+        "reg": 40
+      }
+    },
+    {
+      "time_s": 1.3833333333333333,
+      "samples": 83,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 56,
+      "value": 255,
+      "extras": {
+        "reg": 56
+      }
+    },
+    {
+      "time_s": 1.3833333333333333,
+      "samples": 83,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 0,
+      "value": 0,
+      "extras": {
+        "reg": 0
+      }
+    },
+    {
+      "time_s": 1.4,
+      "samples": 84,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 1,
+      "value": 0,
+      "extras": {
+        "reg": 1
+      }
+    },
+    {
+      "time_s": 1.4166666666666667,
+      "samples": 85,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 2,
+      "value": 0,
+      "extras": {
+        "reg": 2
+      }
+    },
+    {
+      "time_s": 1.4166666666666667,
+      "samples": 85,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 3,
+      "value": 0,
+      "extras": {
+        "reg": 3
+      }
+    },
+    {
+      "time_s": 1.4333333333333333,
+      "samples": 86,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 4,
+      "value": 0,
+      "extras": {
+        "reg": 4
+      }
+    },
+    {
+      "time_s": 1.45,
+      "samples": 87,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 5,
+      "value": 0,
+      "extras": {
+        "reg": 5
+      }
+    },
+    {
+      "time_s": 1.45,
+      "samples": 87,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 6,
+      "value": 0,
+      "extras": {
+        "reg": 6
+      }
+    },
+    {
+      "time_s": 1.4666666666666666,
+      "samples": 88,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 7,
+      "value": 0,
+      "extras": {
+        "reg": 7
+      }
+    },
+    {
+      "time_s": 1.4833333333333334,
+      "samples": 89,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 7,
+      "value": 184,
+      "extras": {
+        "reg": 7,
+        "reg7": 184,
+        "modes": {
+          "0": 1,
+          "1": 1,
+          "2": 1
+        }
+      }
+    },
+    {
+      "time_s": 1.4833333333333334,
+      "samples": 89,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 6,
+      "value": 0,
+      "extras": {
+        "reg": 6
+      }
+    },
+    {
+      "time_s": 1.5,
+      "samples": 90,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 11,
+      "value": 255,
+      "extras": {
+        "reg": 11
+      }
+    },
+    {
+      "time_s": 1.5166666666666666,
+      "samples": 91,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 12,
+      "value": 0,
+      "extras": {
+        "reg": 12
+      }
+    },
+    {
+      "time_s": 10.516666666666667,
+      "samples": 631,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 14,
+      "value": 0,
+      "extras": {
+        "reg": 14
+      }
+    },
+    {
+      "time_s": 12.566666666666666,
+      "samples": 754,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 47,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 12.8,
+      "samples": 768,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 12.816666666666666,
+      "samples": 769,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 12.9,
+      "samples": 774,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 24.683333333333334,
+      "samples": 1481,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 24.883333333333333,
+      "samples": 1493,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 24.9,
+      "samples": 1494,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 24.983333333333334,
+      "samples": 1499,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 49.2,
+      "samples": 2952,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 49.416666666666664,
+      "samples": 2965,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 49.416666666666664,
+      "samples": 2965,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 49.5,
+      "samples": 2970,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 61.46666666666667,
+      "samples": 3688,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 61.666666666666664,
+      "samples": 3700,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 61.68333333333333,
+      "samples": 3701,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 61.766666666666666,
+      "samples": 3706,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 73.73333333333333,
+      "samples": 4424,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 73.93333333333334,
+      "samples": 4436,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 73.95,
+      "samples": 4437,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 74.03333333333333,
+      "samples": 4442,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 86.0,
+      "samples": 5160,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 86.2,
+      "samples": 5172,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 86.21666666666667,
+      "samples": 5173,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 86.28333333333333,
+      "samples": 5177,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 110.51666666666667,
+      "samples": 6631,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 110.71666666666667,
+      "samples": 6643,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 110.73333333333333,
+      "samples": 6644,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 110.81666666666666,
+      "samples": 6649,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 122.78333333333333,
+      "samples": 7367,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 122.98333333333333,
+      "samples": 7379,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 123.0,
+      "samples": 7380,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 123.08333333333333,
+      "samples": 7385,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 32,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 135.05,
+      "samples": 8103,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 135.21666666666667,
+      "samples": 8113,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 47,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 135.46666666666667,
+      "samples": 8128,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 135.46666666666667,
+      "samples": 8128,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 194,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 135.55,
+      "samples": 8133,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 147.3,
+      "samples": 8838,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 147.51666666666668,
+      "samples": 8851,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 147.51666666666668,
+      "samples": 8851,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 217,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 147.6,
+      "samples": 8856,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 171.83333333333334,
+      "samples": 10310,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 172.03333333333333,
+      "samples": 10322,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 172.05,
+      "samples": 10323,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 230,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 172.13333333333333,
+      "samples": 10328,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 184.1,
+      "samples": 11046,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 184.3,
+      "samples": 11058,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 25,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 184.31666666666666,
+      "samples": 11059,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 2,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 184.38333333333333,
+      "samples": 11063,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 196.35,
+      "samples": 11781,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 9,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 196.56666666666666,
+      "samples": 11794,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 25,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 196.56666666666666,
+      "samples": 11794,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 34,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 196.65,
+      "samples": 11799,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 208.61666666666667,
+      "samples": 12517,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 9,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 208.81666666666666,
+      "samples": 12529,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 25,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 208.83333333333334,
+      "samples": 12530,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 69,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 208.91666666666666,
+      "samples": 12535,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 233.15,
+      "samples": 13989,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 9,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 233.4,
+      "samples": 14004,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 26,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 233.4,
+      "samples": 14004,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 233.48333333333332,
+      "samples": 14009,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 35,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 245.4,
+      "samples": 14724,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 10,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 245.58333333333334,
+      "samples": 14735,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 44,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 245.81666666666666,
+      "samples": 14749,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 245.83333333333334,
+      "samples": 14750,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 245.91666666666666,
+      "samples": 14755,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 37,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 257.6666666666667,
+      "samples": 15460,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 269.93333333333334,
+      "samples": 16196,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 270.1333333333333,
+      "samples": 16208,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 270.15,
+      "samples": 16209,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 270.23333333333335,
+      "samples": 16214,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 37,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 294.45,
+      "samples": 17667,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 306.71666666666664,
+      "samples": 18403,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 306.9166666666667,
+      "samples": 18415,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 306.93333333333334,
+      "samples": 18416,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 307.01666666666665,
+      "samples": 18421,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 37,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 318.98333333333335,
+      "samples": 19139,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 331.25,
+      "samples": 19875,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 331.45,
+      "samples": 19887,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 331.46666666666664,
+      "samples": 19888,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 331.53333333333336,
+      "samples": 19892,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 37,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 355.76666666666665,
+      "samples": 21346,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 368.03333333333336,
+      "samples": 22082,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 368.15,
+      "samples": 22089,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    }
+  ],
+  "notes": []
+}
