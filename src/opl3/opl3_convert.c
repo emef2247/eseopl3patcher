@@ -7,224 +7,205 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+#include <stdlib.h>  // getenv
+
+typedef enum {
+    FREQSEQ_BAB = 0, // B(OFF) -> A -> B(POST)
+    FREQSEQ_AB  = 1  // A -> B(POST), for hardware experiment use
+} FreqSeqMode;
+
+static FreqSeqMode g_freqseq_mode = FREQSEQ_AB;
+static int g_micro_wait_ab   = 0;  // Interval between B(pre)->A and A->B(post)
+static int g_micro_wait_port = 0;  // Additional wait between port0 and port1 (added to opts->opl3_keyon_wait)
+static int g_debug_freq = 0;
+
+struct OPL3State;
+void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune,
+                  uint8_t *p_outA, uint8_t *p_outB);
+
+static inline int reg_is_An(uint8_t r){ return (r & 0xF0) == 0xA0 && (r & 0x0F) <= 0x08; }
+static inline int reg_is_Bn(uint8_t r){ return (r & 0xF0) == 0xB0 && (r & 0x0F) <= 0x08; }
+static inline int reg_to_ch(uint8_t r){ return r & 0x0F; }
+
+/** Stage the F-Number LSB for a given channel */
+static inline void stage_fnum_lsb(OPL3State *st, int ch9){
+    st->staged_fnum_lsb[ch9] = st->reg[0xA0 + ch9];
+    st->staged_fnum_valid[ch9] = true;
+}
+
+/** Flush the frequency pair for a given channel */
+static void flush_freq_pair(OPL3State *st, VGMBuffer *buf, int ch9, uint8_t regB_val, double detune){
+    if (!st->staged_fnum_valid[ch9]) {
+        st->staged_fnum_lsb[ch9] = st->reg[0xA0 + ch9];
+    }
+    uint8_t A = st->staged_fnum_lsb[ch9];
+    uint8_t B = regB_val;
+    // port0
+    uint8_t A0p0=A, B0p0=B;
+    detune_if_fm(st, ch9, A0p0, B0p0, 0.0, &A0p0, &B0p0);
+    opl3_write_reg(st, buf, 0, 0xB0 + ch9, B0p0);
+    opl3_write_reg(st, buf, 0, 0xA0 + ch9, A0p0);
+    opl3_write_reg(st, buf, 0, 0xB0 + ch9, B0p0);
+    // port1
+    uint8_t A0p1=A, B0p1=B;
+    detune_if_fm(st, ch9+9, A0p1, B0p1, detune, &A0p1, &B0p1);
+    opl3_write_reg(st, buf, 1, 0xA0 + ch9, A0p1);
+    opl3_write_reg(st, buf, 1, 0xB0 + ch9, B0p1);
+    st->staged_fnum_valid[ch9] = false;
+}
 
 /**
  * Calculate frequency in Hz for given chip, clock, block, fnum.
- * @param chip Chip type (OPLL / OPL3)
- * @param clock Chip clock in Hz (from VGM header)
- * @param block Block value
- * @param fnum F-Number
  */
 double calc_fmchip_frequency(FMChipType chip,
                              double clock,
                              unsigned char block,
                              unsigned short fnum)
 {
-    printf("[DEBUG] calc_fmchip_frequency: chip=%d clock=%.0f block=%u fnum=%u\n", chip, clock, block, fnum);
     switch (chip) {
         case FMCHIP_YM2413: // OPLL
-            // f_out = (clock / 72) * 2^(block - 1) * (FNUM / 512)
-            // freq = base * 2^(block-1) * (fnum / 512)
-            return (clock / 72.0) * ldexp((double)fnum / 512.0, block - 1);
-
+            // f ≈ (clock / 72) / 2^18 * fnum * 2^block
+            return (clock / 72.0) / 262144.0 * (double)fnum * ldexp(1.0, block);
         case FMCHIP_YMF262: // OPL3
-            // f_out = (clock / 288) * 2^(block - 1) * (FNUM / 1024)
-            // freq = fnum * base / 2^(20 - block)
-            return  (clock / 288) * (fnum / 1024.0) * ldexp(1.0, block);
+            // f ≈ (clock / 72) / 2^20 * fnum * 2^block
+            return (clock / 72.0) / 1048576.0 * (double)fnum * ldexp(1.0, block);
         case FMCHIP_YM3812: // OPL2
         case FMCHIP_YM3526:
         case FMCHIP_Y8950:
-            // f_out = (clock / 72) * 2^(block - 1) * (FNUM / 1024)
-            return (clock / 72.0) *
-                   ldexp(1.0, block - 1) *
-                   ((double)fnum / 1024.0);
-
+            // f ≈ (clock / 72) / 2^20 * fnum * 2^block (OPL2 family also uses 2^20)
+            return (clock / 72.0) / 1048576.0 * (double)fnum * ldexp(1.0, block);
         default:
             return 0.0;
     }
 }
 
-double calc_opl3_frequency (double clock, unsigned char block, unsigned short fnum) {
-    printf("[DEBUG] calc_opl3_frequency: clock=%.0f block=%u fnum=%u\n", clock, block, fnum);
-            // f_out = (clock / 288) * 2^(block - 1) * (FNUM / 1024)
-            // freq = fnum * base / 2^(20 - block)
-    return (clock / 288) * (fnum / 1024.0) * ldexp(1.0, block);
-}
-
-void opl3_calc_fnum_block_from_freq(double freq, double clock, unsigned char *out_block, unsigned short *out_fnum) {
-    if (freq <= 0.0 || clock <= 0.0) {
-        if (out_block) *out_block = 0;
-        if (out_fnum) *out_fnum = 0;
-        return;
-    }
-
-    // Calculate the base frequency
-    double base = clock / 288.0;
-
-    // Find the block and FNUM
-    unsigned char block = 0;
-    unsigned short fnum = 0;
-
-    for (block = 0; block < 8; ++block) {
-        fnum = (unsigned short)(freq * 1024.0 / (base * (1 << block)) + 0.5);
-        if (fnum > 1023) continue;
-
-        // Check if this is a valid block/FNUM combination
-        double calc_freq = base * (1 << block) * ((double)fnum / 1024.0);
-        if (fabs(calc_freq - freq) < 1e-12) break;
-    }
-
-    if (out_block) *out_block = block;
-    if (out_fnum) *out_fnum = fnum;
+/**
+ * Calculate frequency in Hz for OPL3 chip, clock, block, fnum.
+ */
+double calc_opl3_frequency(double clock, unsigned char block, unsigned short fnum) {
+    // f ≈ (clock / 72) / 2^20 * fnum * 2^block
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0; // 2^20
+    return baseHzPerFnum * (double)fnum * ldexp(1.0, block);
 }
 
 /**
  * Calculate OPL3 FNUM and block for a target frequency.
  * Output values are clipped to valid OPL3 ranges.
- * @param freq Frequency in Hz
- * @param clock OPL3 clock in Hz
- * @param[out] block Pointer to integer for resulting block
- * @param[out] fnum Pointer to integer for resulting FNUM
- */
-
-/* ----------------------
    OPL3 inverse (we assume existing function but include it here)
    freq -> OPL3 FNUM/BLOCK. prefer minimal absolute freq error; tie-breaker prefer smaller block.
 */
-void opl3_calc_fnum_block_from_freq_ldexp(double freq, double clock,unsigned char *out_block,unsigned short *out_fnum, double *out_err)
-{
-    if (freq <= 0.0 || clock <= 0.0) {
-        if (out_block) *out_block = 0;
-        if (out_fnum) *out_fnum = 0;
-        if (out_err) *out_err = 0.0;
-        return;
-    }
+void opl3_calc_fnum_block_from_freq(double freq, double clock,
+                                    unsigned char *out_block, unsigned short *out_fnum) {
+    if (freq <= 0.0 || clock <= 0.0) { if (out_block) *out_block=0; if (out_fnum) *out_fnum=0; return; }
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0; // 2^20
     unsigned char best_b = 0;
     unsigned short best_f = 0;
     double best_err = DBL_MAX;
-    double base = clock / 72.0;
 
-    for (int b = 0; b < 8; ++b) {
-        // raw_fnum = freq * 2^(20-b) / base
-        double raw = ldexp(freq / base, 20 - b);
-        long cand = (long)(raw + 0.5);
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        long   cand       = (long)floor(ideal_fnum + 0.5);
         if (cand < 0 || cand > 1023) continue;
-        double calc_freq = ldexp((double)cand * base, -(20 - b));
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
         double err = fabs(calc_freq - freq);
-        if (err + 1e-12 < best_err || (fabs(err - best_err) < 1e-12 && b < best_b)) {
-            best_err = err; best_b = (unsigned char)b; best_f = (unsigned short)cand;
-        }
+        if (err < best_err) { best_err = err; best_b = (unsigned char)b; best_f = (unsigned short)cand; }
     }
-    if (best_err == DBL_MAX) {
-        *out_block = 0; *out_fnum = 0; return;
+    if (out_block) *out_block = best_b;
+    if (out_fnum)  *out_fnum  = best_f;
+}
+
+
+/** Find the best OPL3 FNUM and block for a given frequency. */
+void opl3_calc_fnum_block_from_freq_ldexp(double freq, double clock,
+                                          unsigned char *out_block, unsigned short *out_fnum, double *out_err)
+{
+    if (freq <= 0.0 || clock <= 0.0) { if (out_block) *out_block=0; if (out_fnum) *out_fnum=0; if (out_err) *out_err=0.0; return; }
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0;
+    unsigned char best_b = 0; unsigned short best_f = 0; double best_err = DBL_MAX;
+
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        long cand = (long)floor(ideal_fnum + 0.5);
+        if (cand < 0 || cand > 1023) continue;
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
+        double err = fabs(calc_freq - freq);
+        if (err < best_err) { best_err = err; best_b = (unsigned char)b; best_f = (unsigned short)cand; }
     }
     if (out_block) *out_block = best_b;
     if (out_fnum)  *out_fnum  = best_f;
     if (out_err)   *out_err   = best_err;
 }
 
-
 /** Find the best OPL3 FNUM and block for a given frequency. */
 void opl3_find_fnum_block_with_pref_block(double freq, double clock,
-                                          unsigned char *best_block,
-                                          unsigned short *best_fnum,
+                                          unsigned char *best_block, unsigned short *best_fnum,
                                           double *best_err, int pref_block) {
-    double min_cost = DBL_MAX;
-    unsigned char b_best = 0;
-    unsigned short f_best = 0;
-    for (unsigned char b = 0; b < 8; ++b) {
-        double base = (clock / 288.0) * (1 << b);
-        int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
-        if (cand_fnum < 0 || cand_fnum > 1023) continue;
-        double calc_freq = base * ((double)cand_fnum / 1024.0);
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0;
+    double min_cost = DBL_MAX; unsigned char b_best=0; unsigned short f_best=0; double e_best=DBL_MAX;
+
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        int cand = (int)floor(ideal_fnum + 0.5);
+        if (cand < 0 || cand > 1023) continue;
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
         double freq_err  = fabs(calc_freq - freq);
-        double block_penalty = fabs((double)b - (double)pref_block) * 0.5;
-        double cost = freq_err + block_penalty;
-        if (cost < min_cost) {
-            min_cost = cost;
-            b_best = b;
-            f_best = (unsigned short)cand_fnum;
-        }
+        double block_pen = (pref_block >= 0) ? fabs((double)b - (double)pref_block) * 0.5 : 0.0;
+        double cost = freq_err + block_pen;
+        if (cost < min_cost) { min_cost = cost; e_best = freq_err; b_best=(unsigned char)b; f_best=(unsigned short)cand; }
     }
-    *best_block = b_best;
-    *best_fnum  = f_best;
-    *best_err   = min_cost;
+    *best_block = b_best; *best_fnum = f_best; *best_err = e_best;
 }
 
+/** Find the best OPL3 FNUM and block for a given frequency, with adjustable block penalty weight. */
 void opl3_find_fnum_block_with_weight(double freq, double clock,
                                       unsigned char *best_block, unsigned short *best_fnum,
                                       double *best_err, int pref_block, double mult_weight) {
-    double min_cost = DBL_MAX;
-    double best_freq_err = DBL_MAX;
-    unsigned char b_best = 0;
-    unsigned short f_best = 0;
-    for (unsigned char b = 0; b < 8; ++b) {
-        double base = (clock / 288.0) * (1 << b);
-        int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
-        if (cand_fnum < 0 || cand_fnum > 1023) continue;
-        double calc_freq = base * ((double)cand_fnum / 1024.0);
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0;
+    double min_cost=DBL_MAX, e_best=DBL_MAX; unsigned char b_best=0; unsigned short f_best=0;
+
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        int cand = (int)floor(ideal_fnum + 0.5);
+        if (cand < 0 || cand > 1023) continue;
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
         double freq_err = fabs(calc_freq - freq);
-        double block_penalty = 0.0;
-        if (pref_block >= 0) {
-            double weight = 0.25 + (mult_weight * 0.25);
-            block_penalty = fabs((double)b - (double)pref_block) * weight;
-        }
-        double cost = freq_err + block_penalty;
-        if (cost < min_cost) {
-            min_cost = cost;
-            best_freq_err = freq_err;
-            b_best = b;
-            f_best = (unsigned short)cand_fnum;
-        }
+        double weight = 0.25 + (mult_weight * 0.25);
+        double block_pen = (pref_block >= 0) ? fabs((double)b - (double)pref_block) * weight : 0.0;
+        double cost = freq_err + block_pen;
+        if (cost < min_cost) { min_cost = cost; e_best=freq_err; b_best=(unsigned char)b; f_best=(unsigned short)cand; }
     }
-    *best_block = b_best;
-    *best_fnum  = f_best;
-    *best_err   = best_freq_err;
+    *best_block=b_best; *best_fnum=f_best; *best_err=e_best;
 }
 
+/** Find the best OPL3 FNUM and block for a given frequency, with machine learning-based block penalty. */
 void opl3_find_fnum_block_with_ml(double freq, double clock,
                                   unsigned char *best_block, unsigned short *best_fnum,
                                   double *best_err,int pref_block,
                                   double mult0,double mult1) {
-    double min_cost = DBL_MAX;
-    double best_freq_err = DBL_MAX;
-    unsigned char b_best = 0;
-    unsigned short f_best = 0;
-    double ml_weight = 1.0 + 0.1 * ((mult0 + mult1) / 2.0);
-    for (unsigned char b = 0; b < 8; ++b) {
-        double base = (clock / 288.0) * (1 << b);
-        int cand_fnum = (int)(freq * 1024.0 / base + 0.5);
-        if (cand_fnum < 0 || cand_fnum > 1023) continue;
-        double calc_freq = base * ((double)cand_fnum / 1024.0);
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0;
+    double min_cost=DBL_MAX, e_best=DBL_MAX; unsigned char b_best=0; unsigned short f_best=0;
+    double ml_weight = 1.0 + 0.1 * ((mult0 + mult1) * 0.5);
+
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        int cand = (int)floor(ideal_fnum + 0.5);
+        if (cand < 0 || cand > 1023) continue;
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
         double freq_err = fabs(calc_freq - freq);
-        double block_penalty = 0.0;
-        if (pref_block >= 0) {
-            block_penalty = fabs((double)b - (double)pref_block) * ml_weight * 0.1;
-        }
-        double cost = freq_err + block_penalty;
-        if (cost < min_cost) {
-            min_cost = cost;
-            best_freq_err = freq_err;
-            b_best = b;
-            f_best = (unsigned short)cand_fnum;
-        }
+        double block_pen = (pref_block >= 0) ? fabs((double)b - (double)pref_block) * ml_weight * 0.1 : 0.0;
+        double cost = freq_err + block_pen;
+        if (cost < min_cost) { min_cost = cost; e_best=freq_err; b_best=(unsigned char)b; f_best=(unsigned short)cand; }
     }
-    *best_block = b_best;
-    *best_fnum  = f_best;
-    *best_err   = best_freq_err;
+    *best_block=b_best; *best_fnum=f_best; *best_err=e_best;
 }
 
 /*
- * freq : 目標周波数 (Hz) - ここには calc_fmchip_frequency(FMCHIP_YM2413, ...) の戻り値を渡す
- * clock: 変換先チップのクロック (Hz) - ここには OPL3 のクロック (get_fm_target_clock()) を渡す
- *
- * pref_block : OPLL 側の block（-1 なら無視）
- * mult0, mult1: キャリア/モジュレータの MULT (0..15)。2op の場合 mult1 = 0 で OK
- *
- * best_err は 最終的に選ばれた (周波数誤差 in cents) を返します（Hz ではない点に注意）
- *
- * 使い方: この関数は「周波数整合を第一優先」にして、その上で ML による僅かな
- *        block 偏向を許容する設計です。
+ * freq : Target frequency (Hz) - pass the return value of calc_fmchip_frequency(FMCHIP_YM2413, ...)
+ * clock: Destination chip clock (Hz) - pass the OPL3 clock (get_fm_target_clock())
+ * pref_block : OPLL block (-1 to ignore)
+ * mult0, mult1: Carrier/modulator MULT (0..15). For 2op, set mult1 = 0.
+ * best_err returns the finally selected (frequency error in cents) (note: not Hz)
+ * Usage: This function prioritizes "frequency matching," while allowing slight block bias by ML.
  */
 static inline double hz_to_cents(double a, double b) {
     if (a <= 0.0 || b <= 0.0) return DBL_MAX;
@@ -237,75 +218,44 @@ void opl3_find_fnum_block_with_ml_cents(double freq, double clock,
                                         int pref_block,
                                         double mult0, double mult1)
 {
-    const double PENALTY_CENTS_PER_BLOCK = 50.0; /* ブロック差1につき何セント分ペナルティを与えるか */
-    const double ML_ALPHA = 0.08; /* ML の影響係数（0.0 = 無視、大きいと ML を強く反映） */
+    const double PENALTY_CENTS_PER_BLOCK = 50.0;
+    const double ML_ALPHA = 0.08;
 
-    double min_cost = DBL_MAX;
-    double chosen_cents_err = DBL_MAX;
-    unsigned char b_best = 0;
-    unsigned short f_best = 0;
+    const double baseHzPerFnum = (clock / 72.0) / 1048576.0;
+    double min_cost = DBL_MAX, chosen_cents_err = DBL_MAX;
+    unsigned char b_best=0; unsigned short f_best=0;
 
-    /* ML合成 (2opなら mult1=0). 平均をとっておく */
     double ml_mean = (mult0 + mult1) * 0.5;
+    double ml_factor = 1.0 + ML_ALPHA * ml_mean;
 
-    /* ml_factor: 1.0 が基本。ML が大きいほど block ペナルティを少し増やす */
-    double ml_factor = 1.0 + ML_ALPHA * ml_mean; /* 例: mult_mean=4 -> 1 + 0.08*4 = 1.32 */
+    for (int b=0; b<8; ++b) {
+        double ideal_fnum = freq / (baseHzPerFnum * ldexp(1.0, b));
+        int cand = (int)floor(ideal_fnum + 0.5);
+        if (cand < 0) cand = 0;
+        if (cand > 1023) cand = 1023;
 
-    /* 基底の周波数比 (clock/288) を先に計算（高精度に ldexp を使う） */
-    for (int b = 0; b < 8; ++b) {
-        /* base = (clock / 288.0) * 2^b */
-        double base = (clock / 288.0) * ldexp(1.0, b);
+        double calc_freq = baseHzPerFnum * (double)cand * ldexp(1.0, b);
+        double cents_err = fabs(hz_to_cents(calc_freq, freq));
 
-        /* 理想的な fnum (実数) */
-        double ideal_fnum = freq * 1024.0 / base;
+        double block_penalty = (pref_block >= 0)
+            ? fabs((double)b - (double)pref_block) * PENALTY_CENTS_PER_BLOCK * ml_factor
+            : 0.0;
 
-        /* 四捨五入して候補 FNUM を得る */
-        int cand_fnum = (int)floor(ideal_fnum + 0.5);
-
-        /* 範囲チェック */
-        if (cand_fnum < 0) cand_fnum = 0;
-        if (cand_fnum > 1023) cand_fnum = 1023;
-
-        /* 計算後の周波数 */
-        double calc_freq = base * ((double)cand_fnum / 1024.0);
-
-        /* 周波数差を cents で評価（対数差） */
-        double cents_err = fabs(hz_to_cents(calc_freq, freq)); /* >=0 */
-
-        /* ブロック差のペナルティ（cents 単位で） */
-        double block_penalty = 0.0;
-        if (pref_block >= 0) {
-            block_penalty = fabs((double)b - (double)pref_block) * PENALTY_CENTS_PER_BLOCK * ml_factor;
-        }
-
-        /* 合成コスト（cents） */
         double cost = cents_err + block_penalty;
-
-        /* デバッグ: 各候補の中身を出力したいときは有効にする */
-        #if 0
-        printf("DEBUG b=%d base=%.6f ideal_fnum=%.3f cand=%d calc_freq=%.3f cents_err=%.2f block_penalty=%.2f cost=%.2f\n",
-               b, base, ideal_fnum, cand_fnum, calc_freq, cents_err, block_penalty, cost);
-        #endif
-
         if (cost < min_cost) {
             min_cost = cost;
             chosen_cents_err = cents_err;
-            b_best = (unsigned char)b;
-            f_best = (unsigned short)cand_fnum;
+            b_best=(unsigned char)b; f_best=(unsigned short)cand;
         }
     }
-
     *best_block = b_best;
     *best_fnum  = f_best;
-    *best_err   = chosen_cents_err; /* cents 単位 */
+    *best_err   = chosen_cents_err;
 }
 
 
 /**
  * Attenuate TL (Total Level) using volume ratio.
- * @param orig_val Original TL register value.
- * @param v_ratio Volume ratio (0.0 .. 1.0).
- * @return TL value modified by ratio.
  */
 static uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
     if (v_ratio == 1.0) return orig_val;
@@ -324,12 +274,7 @@ static uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
 
 /**
  * Write a value to the OPL3 register mirror and update internal state flags.
- * Always writes to the register mirror (reg[]).
- * @param p_state Pointer to OPL3State.
- * @param p_music_data Pointer to VGMBuffer for music data.
- * @param port OPL3 port (0 or 1).
- * @param reg Register address.
- * @param value Value to write.
+ * Always writes to the register mirror (reg[]). Also writes to VGMBuffer.
  */
 void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value) {
     int reg_addr = reg + (port ? 0x100 : 0x000);
@@ -348,15 +293,9 @@ void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8
 
 /**
  * Detune helper for FM channels (used for frequency detune effects).
- * @param p_state Pointer to OPL3State.
- * @param ch Channel index.
- * @param regA Frequency LSB.
- * @param regB Frequency MSB.
- * @param detune Detune amount (percent).
- * @param p_outA Pointer to output detuned LSB.
- * @param p_outB Pointer to output detuned MSB.
+ * Rhythm channels (6,7,8 and 15,16,17) are not detuned in rhythm mode.
  */
-void get_detuned_value(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB) {
+void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune, uint8_t *p_outA, uint8_t *p_outB) {
     // Rhythm channels (6,7,8 and 15,16,17) are not detuned in rhythm mode
     if ((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode)) {
         *p_outA = regA;
@@ -374,6 +313,21 @@ void get_detuned_value(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, d
     *p_outB = (regB & 0xFC) | ((fnum_detuned >> 8) & 3);
 }
 
+/** Calculate frequency in Hz for OPL3 chip, clock, block, fnum. */
+static inline double opl3_calc_hz_dbg(uint8_t block, uint16_t fnum) {
+    // General approximation for OPL3 (YM3812/262 family):
+    // f ≈ (clock / 72) * (fnum * 2^block) / 2^20
+    // Example: when clock=14318180, the constant is ≈ 0.1897 Hz/LSB@block=0
+    const double base = (OPL3_CLOCK / 72.0) / 1048576.0; // 2^20
+    return base * (double)fnum * ldexp(1.0, block);
+}
+
+/**
+ * Merge two FNUM values (LSB from A, MSB from B).
+ */
+static inline uint16_t merge_fnum_dbg(uint8_t A_lsb, uint8_t B_msb) { return (uint16_t)(((B_msb & 0x03) << 8) | A_lsb); }
+
+/** Create a KeyOff message for a given OPL3 register value. */
 uint8_t opl3_make_keyoff(uint8_t val) {
     return (val & ~(1 << 6)); //  Clear bit 6 (KeyOn)
 }
@@ -394,34 +348,41 @@ int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
     uint8_t value_b = ((fnum >> 8) & 0x03) | (block << 2) | (keyon ? 0x20 : 0x00);
 
     // Write FNUM LSB (A0..A8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts);
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts, 0);
     // Write FNUM MSB (B0..B8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts);
+    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts, 0);
     return bytes_written;
 }
 
 /**
  * Main OPL3/OPL2 register write handler (supports OPL3 chorus and register mirroring).
- * @param p_music_data Pointer to VGMBuffer for music data.
- * @param p_vstat Pointer to VGMStatus.
- * @param p_state Pointer to OPL3State.
- * @param reg Register address.
- * @param val Value to write.
- * @param detune Detune amount.
- * @param opl3_keyon_wait KeyOn/Off wait (in samples).
- * @param ch_panning Channel panning mode.
- * @param v_ratio0 Volume ratio for port 0.
- * @param v_ratio1 Volume ratio for port 1.
- * @return Bytes written to port 1.
+ * Returns the number of additional bytes written (beyond the initial 3-byte write).
  */
 int duplicate_write_opl3(
     VGMBuffer *p_music_data,
     VGMStatus *p_vstat,
     OPL3State *p_state,
-    uint8_t reg, uint8_t val, const CommandOptions *opts
+    uint8_t reg, uint8_t val, const CommandOptions *opts,
+    uint16_t next_wait_samples
     // double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1
 ) {
     int addtional_bytes = 0;
+    uint32_t keyon_wait_inserted = 0;  // Track waits inserted by this function
+
+    if (p_state->pair_an_bn_enabled) {
+        uint8_t detunedA, detunedB;        
+        if (reg_is_An(reg)) {
+            int ch = reg_to_ch(reg);
+            p_state->reg[(0x000 + reg)] = val;
+            stage_fnum_lsb(p_state, ch);
+            return 0;
+        }
+        if (reg_is_Bn(reg)) {
+            int ch = reg_to_ch(reg);
+            flush_freq_pair(p_state, p_music_data, ch, val, opts->detune);
+            return 6;
+        }
+    }
 
     if (reg == 0x01 || reg == 0x02 || reg == 0x03 || reg == 0x04) {
         // Write only to port 0
@@ -468,20 +429,42 @@ int duplicate_write_opl3(
         // Write B0 (KeyOn/Block/FnumMSB) and handle detune
         // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
         int ch = reg - 0xB0;
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, p_state->reg[0xA0 + ch]);
-        opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-        // Extra 3 bytes
-        addtional_bytes += 3;
-        vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+        uint8_t A_lsb = p_state->reg[0xA0 + ch];
+        fprintf(stderr, "[SEQ0] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) ",
+                ch, g_freqseq_mode==FREQSEQ_BAB?"BAB":"AB", A_lsb, val, p_state->rhythm_mode);
+        if (g_freqseq_mode == FREQSEQ_BAB) {
+            fprintf(stderr, "port0: B(%02X)->A(%02X)->B(%02X)\n",val, A_lsb, val);
+            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
+            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+             // Extra 3 bytes
+            addtional_bytes += 3;
+        } else {
+            fprintf(stderr, "port0: A(%02X)->B(%02X)\n", A_lsb, val);
+            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
+            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            // Extra 2 bytes
+            addtional_bytes += 2;
+        }
+       
+        if ( opts->opl3_keyon_wait > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+            keyon_wait_inserted += opts->opl3_keyon_wait;
+        }
 
         uint8_t detunedA, detunedB;
-        get_detuned_value(p_state, ch, p_state->reg[0xA0 + ch], val, opts->detune, &detunedA, &detunedB);
+        detune_if_fm(p_state, ch, A_lsb, val, opts->detune, &detunedA, &detunedB);
+        fprintf(stderr, "[SEQ1] ch=%d mode=%s A=%02X B=%02X (rhythm=%d) ",
+                ch, g_freqseq_mode==FREQSEQ_BAB?"BAB":"AB", detunedA, detunedB, p_state->rhythm_mode);
+        fprintf(stderr, "port1: A(%02X)->B(%02X)\n", detunedA, detunedB);
         opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA); addtional_bytes += 3;
         if (!((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode))) {
             opl3_write_reg(p_state, p_music_data, 1, reg, detunedB); addtional_bytes += 3;
         }
-        vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+        if ( opts->opl3_keyon_wait > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, opts->opl3_keyon_wait);
+            keyon_wait_inserted += opts->opl3_keyon_wait;
+        }
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -516,6 +499,33 @@ int duplicate_write_opl3(
         opl3_write_reg(p_state, p_music_data, 0, reg, val);
         opl3_write_reg(p_state, p_music_data, 1, reg, val); addtional_bytes += 3;
     }
+    
+    // Tail compensation: add any keyon_wait we inserted to the gate compensation debt
+    // and compensate from next_wait_samples if available
+    uint32_t *p_debt = opll_get_gate_comp_debt_ptr();
+    if (keyon_wait_inserted > 0) {
+        *p_debt += keyon_wait_inserted;
+    }
+    
+    // Compensate next_wait_samples from accumulated debt
+    if (next_wait_samples > 0 && *p_debt > 0) {
+        uint16_t compensation = (next_wait_samples >= *p_debt) ? (uint16_t)(*p_debt) : next_wait_samples;
+        uint16_t adjusted = next_wait_samples - compensation;
+        *p_debt -= compensation;
+        
+        if (opts && opts->debug.verbose) {
+            fprintf(stderr, "[GATE COMP] next_wait=%u -> adjusted=%u, debt_left=%u\n",
+                    next_wait_samples, adjusted, *p_debt);
+        }
+        
+        if (adjusted > 0) {
+            vgm_wait_samples(p_music_data, p_vstat, adjusted);
+        }
+    } else if (next_wait_samples > 0) {
+        // No debt to compensate, emit the wait as-is
+        vgm_wait_samples(p_music_data, p_vstat, next_wait_samples);
+    }
+    
     return addtional_bytes;
 }
 
@@ -531,10 +541,13 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     p_state->opl3_mode_initialized = false;
     p_state->source_fmchip = source_fmchip;
 
-     // Initialize OPL3VoiceDB
-    p_state->source_fmchip = source_fmchip;
+    const char *seq = getenv("ESEOPL3_FREQSEQ");
+    if (seq && (seq[0]=='a' || seq[0]=='A')) g_freqseq_mode = FREQSEQ_AB;
+    fprintf(stderr, "[FREQSEQ] selected=%s (ESEOPL3_FREQSEQ=%s)\n",
+            g_freqseq_mode==FREQSEQ_BAB ? "BAB" : "AB",
+            seq ? seq : "(unset)");
 
-     // Initialize OPL3VoiceDB
+    // Initialize OPL3VoiceDB
     opl3_voice_db_init(&p_state->voice_db);
 
     // OPL3 global registers (Port 1 only)
@@ -546,7 +559,7 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS
 
     // Port 1 general init
-    // opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
+    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
 
     // Channel-level control
     for (uint8_t i = 0; i < 9; ++i) {
@@ -575,18 +588,14 @@ void opl3_init(VGMBuffer *p_music_data, int stereo_mode, OPL3State *p_state, FMC
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
         opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
     }
-
-    /* last_key は memset で 0 済み。念のためフラグ */
-    p_state->opl3_mode_initialized = 1;
 }
 
-
 /* 
- * YM2413 音量 nibble -> OPL3 TL 加算値マッピング
- *   0..15 (0=最大, 15=最小)
- *   MODE 1: TL_add = vol * 4        (シンプル 4dB 近似)
- *   MODE 2: TL_add = vol * 3        (やや細かく 3dB 近似)
- *   MODE 3: 手動テーブル (例示: 実測/参考差し替え用)
+ * YM2413 volume nibble -> OPL3 TL add value mapping
+ *   0..15 (0=maximum, 15=minimum)
+ *   MODE 1: TL_add = vol * 4        (simple approximation, about 4dB per step)
+ *   MODE 2: TL_add = vol * 3        (slightly finer, about 3dB per step)
+ *   MODE 3: Manual table (example: for measured/reference substitution)
  */
 #ifndef Y2413_VOL_MAP_MODE
 #define Y2413_VOL_MAP_MODE 1
@@ -601,7 +610,7 @@ static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
     return (uint8_t)((vol & 0x0F) * 3);
 }
 #else
-/* カスタムテーブル: 必要なら実測値に差し替え */
+/* Custom table: replace with measured values if needed */
 static const uint8_t kYM2413VolToTLAdd[16] = {
     0, 3, 6, 9, 12, 15, 18, 21,
     24,27,30,33,36,39,42,45
@@ -616,21 +625,21 @@ static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
 #endif
 /*
  * make_carrier_40_from_vol
- * YM2413 の $3n レジスタ (reg3n) 下位 4bit (VOL) を OPL3 Carrier TL に反映して
- * 0x40 + slotCar へ書く値 (KSL/TL) を返す。
- *  - vp->op[1].ksl: 上位 2bit (KSL)
- *  - vp->op[1].tl : 基本 TL
- *  - VOL nibble   : TL に加算 (0=加算0, 15=最大加算)
- * クリップ: 63 を超えたら 63。
+ * Reflect YM2413 $3n register (reg3n) lower 4 bits (VOL) into OPL3 Carrier TL,
+ * and return the value to write to 0x40 + slotCar (KSL/TL).
+ *  - vp->op[1].ksl: upper 2 bits (KSL)
+ *  - vp->op[1].tl : base TL
+ *  - VOL nibble   : added to TL (0=add 0, 15=maximum add)
+ * Clip: if over 63, set to 63.
  */
-/* 旧 make_carrier_40_from_vol を完全に置換 */
+/* Fully replaces old make_carrier_40_from_vol */
 uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n)
 {
     /* YM2413 volume nibble: 0=loudest .. 15=softest */
     uint8_t vol = reg3n & 0x0F;          // 0..15
     uint8_t base_tl = (uint8_t)(vp->op[1].tl & 0x3F);
 
-    /* STEP: 2 => 3dB弱/段 (0.75dB * 2 ≈1.5dB)。必要ならオプション化 */
+    /* STEP: 2 => slightly less than 3dB per step (0.75dB * 2 ≈1.5dB). Make this configurable if needed */
     const uint8_t STEP = YM2413_VOL_MAP_STEP;
 
     uint16_t tl = (uint16_t)base_tl + (uint16_t)vol * STEP;
@@ -639,7 +648,7 @@ uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n)
     /* KSL bits preserved */
     uint8_t ksl_bits = (vp->op[1].ksl & 0x03) << 6;
 
-    /* デバッグ用 (最初数回だけ) */
+    /* For debugging (only first few times) */
     static int dbg_cnt = 0;
     if (dbg_cnt < 8) {
         fprintf(stderr,
