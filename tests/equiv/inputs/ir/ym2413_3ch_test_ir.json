@@ -1,0 +1,6449 @@
+{
+  "header": {
+    "version_bcd": 368,
+    "sample_rate": 60,
+    "eof_offset": 2834,
+    "total_samples": 180297,
+    "loop_offset": 0,
+    "loop_samples": 0,
+    "data_offset": 64,
+    "sn76489_clock": 0,
+    "ym2413_clock": 3579545,
+    "gd3_offset": 0,
+    "ym2612_clock": 1048585,
+    "ym2151_clock": 0
+  },
+  "events": [
+    {
+      "time_s": 0.016666666666666666,
+      "samples": 1,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 14,
+      "value": 32,
+      "extras": {
+        "reg": 14
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39055,
+      "value": 31,
+      "extras": {
+        "port": 3,
+        "reg": 0,
+        "abs_addr": 39055,
+        "enable_bits": 31
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.23333333333333334,
+      "samples": 14,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.31666666666666665,
+      "samples": 19,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.31666666666666665,
+      "samples": 19,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.4,
+      "samples": 24,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.4,
+      "samples": 24,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.48333333333333334,
+      "samples": 29,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 255,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.48333333333333334,
+      "samples": 29,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.5833333333333334,
+      "samples": 35,
+      "chip": "PSG",
+      "channel": 0,
+      "kind": "reg-write",
+      "address": 8,
+      "value": 0,
+      "extras": {
+        "reg": 8,
+        "channel": 0,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.5833333333333334,
+      "samples": 35,
+      "chip": "PSG",
+      "channel": 1,
+      "kind": "reg-write",
+      "address": 9,
+      "value": 0,
+      "extras": {
+        "reg": 9,
+        "channel": 1,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.6,
+      "samples": 36,
+      "chip": "PSG",
+      "channel": 2,
+      "kind": "reg-write",
+      "address": 10,
+      "value": 0,
+      "extras": {
+        "reg": 10,
+        "channel": 2,
+        "vol4": 0,
+        "VA": 0,
+        "mode": 1
+      }
+    },
+    {
+      "time_s": 0.6333333333333333,
+      "samples": 38,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "reg-write",
+      "address": 39050,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 0,
+        "abs_addr": 39050,
+        "channel": 0,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.65,
+      "samples": 39,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "reg-write",
+      "address": 39051,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 1,
+        "abs_addr": 39051,
+        "channel": 1,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6666666666666666,
+      "samples": 40,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "reg-write",
+      "address": 39052,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 2,
+        "abs_addr": 39052,
+        "channel": 2,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6666666666666666,
+      "samples": 40,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38912,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 0,
+        "abs_addr": 38912,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38913,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 1,
+        "abs_addr": 38913,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.6833333333333333,
+      "samples": 41,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38914,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 2,
+        "abs_addr": 38914,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38915,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 3,
+        "abs_addr": 38915,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38916,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 4,
+        "abs_addr": 38916,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38917,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 5,
+        "abs_addr": 38917,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38918,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 6,
+        "abs_addr": 38918,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.7,
+      "samples": 42,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38919,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 7,
+        "abs_addr": 38919,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38920,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 8,
+        "abs_addr": 38920,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38921,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 9,
+        "abs_addr": 38921,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38922,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 10,
+        "abs_addr": 38922,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38923,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 11,
+        "abs_addr": 38923,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38924,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 12,
+        "abs_addr": 38924,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.7166666666666667,
+      "samples": 43,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38925,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 13,
+        "abs_addr": 38925,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38926,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 14,
+        "abs_addr": 38926,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38927,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 15,
+        "abs_addr": 38927,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38928,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 16,
+        "abs_addr": 38928,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38929,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 17,
+        "abs_addr": 38929,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.7333333333333333,
+      "samples": 44,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38930,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 18,
+        "abs_addr": 38930,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38931,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 19,
+        "abs_addr": 38931,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38932,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 20,
+        "abs_addr": 38932,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38933,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 21,
+        "abs_addr": 38933,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38934,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 22,
+        "abs_addr": 38934,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38935,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 23,
+        "abs_addr": 38935,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.75,
+      "samples": 45,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38936,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 24,
+        "abs_addr": 38936,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38937,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 25,
+        "abs_addr": 38937,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38938,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 26,
+        "abs_addr": 38938,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38939,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 27,
+        "abs_addr": 38939,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38940,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 28,
+        "abs_addr": 38940,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38941,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 29,
+        "abs_addr": 38941,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.7666666666666667,
+      "samples": 46,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38942,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 30,
+        "abs_addr": 38942,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 0,
+      "kind": "wtb-write",
+      "address": 38943,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 31,
+        "abs_addr": 38943,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38944,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 32,
+        "abs_addr": 38944,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38945,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 33,
+        "abs_addr": 38945,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38946,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 34,
+        "abs_addr": 38946,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.7833333333333333,
+      "samples": 47,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38947,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 35,
+        "abs_addr": 38947,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38948,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 36,
+        "abs_addr": 38948,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38949,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 37,
+        "abs_addr": 38949,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38950,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 38,
+        "abs_addr": 38950,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38951,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 39,
+        "abs_addr": 38951,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38952,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 40,
+        "abs_addr": 38952,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.8,
+      "samples": 48,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38953,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 41,
+        "abs_addr": 38953,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38954,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 42,
+        "abs_addr": 38954,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38955,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 43,
+        "abs_addr": 38955,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38956,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 44,
+        "abs_addr": 38956,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38957,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 45,
+        "abs_addr": 38957,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.8166666666666667,
+      "samples": 49,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38958,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 46,
+        "abs_addr": 38958,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38959,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 47,
+        "abs_addr": 38959,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38960,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 48,
+        "abs_addr": 38960,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38961,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 49,
+        "abs_addr": 38961,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38962,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 50,
+        "abs_addr": 38962,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38963,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 51,
+        "abs_addr": 38963,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.8333333333333334,
+      "samples": 50,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38964,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 52,
+        "abs_addr": 38964,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38965,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 53,
+        "abs_addr": 38965,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38966,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 54,
+        "abs_addr": 38966,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38967,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 55,
+        "abs_addr": 38967,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38968,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 56,
+        "abs_addr": 38968,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38969,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 57,
+        "abs_addr": 38969,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.85,
+      "samples": 51,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38970,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 58,
+        "abs_addr": 38970,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38971,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 59,
+        "abs_addr": 38971,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38972,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 60,
+        "abs_addr": 38972,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38973,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 61,
+        "abs_addr": 38973,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38974,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 62,
+        "abs_addr": 38974,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.8666666666666667,
+      "samples": 52,
+      "chip": "SCC",
+      "channel": 1,
+      "kind": "wtb-write",
+      "address": 38975,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 63,
+        "abs_addr": 38975,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38976,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 64,
+        "abs_addr": 38976,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38977,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 65,
+        "abs_addr": 38977,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38978,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 66,
+        "abs_addr": 38978,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38979,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 67,
+        "abs_addr": 38979,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38980,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 68,
+        "abs_addr": 38980,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.8833333333333333,
+      "samples": 53,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38981,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 69,
+        "abs_addr": 38981,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38982,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 70,
+        "abs_addr": 38982,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38983,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 71,
+        "abs_addr": 38983,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38984,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 72,
+        "abs_addr": 38984,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38985,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 73,
+        "abs_addr": 38985,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 0.9,
+      "samples": 54,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38986,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 74,
+        "abs_addr": 38986,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38987,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 75,
+        "abs_addr": 38987,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38988,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 76,
+        "abs_addr": 38988,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38989,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 77,
+        "abs_addr": 38989,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38990,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 78,
+        "abs_addr": 38990,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38991,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 79,
+        "abs_addr": 38991,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 0.9166666666666666,
+      "samples": 55,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38992,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 80,
+        "abs_addr": 38992,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38993,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 81,
+        "abs_addr": 38993,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38994,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 82,
+        "abs_addr": 38994,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38995,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 83,
+        "abs_addr": 38995,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38996,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 84,
+        "abs_addr": 38996,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 0.9333333333333333,
+      "samples": 56,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38997,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 85,
+        "abs_addr": 38997,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38998,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 86,
+        "abs_addr": 38998,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 38999,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 87,
+        "abs_addr": 38999,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39000,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 88,
+        "abs_addr": 39000,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39001,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 89,
+        "abs_addr": 39001,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39002,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 90,
+        "abs_addr": 39002,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 0.95,
+      "samples": 57,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39003,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 91,
+        "abs_addr": 39003,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39004,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 92,
+        "abs_addr": 39004,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39005,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 93,
+        "abs_addr": 39005,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39006,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 94,
+        "abs_addr": 39006,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 2,
+      "kind": "wtb-write",
+      "address": 39007,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 95,
+        "abs_addr": 39007,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39008,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 96,
+        "abs_addr": 39008,
+        "wtb_index": 0
+      }
+    },
+    {
+      "time_s": 0.9666666666666667,
+      "samples": 58,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39009,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 97,
+        "abs_addr": 39009,
+        "wtb_index": 1
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39010,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 98,
+        "abs_addr": 39010,
+        "wtb_index": 2
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39011,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 99,
+        "abs_addr": 39011,
+        "wtb_index": 3
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39012,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 100,
+        "abs_addr": 39012,
+        "wtb_index": 4
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39013,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 101,
+        "abs_addr": 39013,
+        "wtb_index": 5
+      }
+    },
+    {
+      "time_s": 0.9833333333333333,
+      "samples": 59,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39014,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 102,
+        "abs_addr": 39014,
+        "wtb_index": 6
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39015,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 103,
+        "abs_addr": 39015,
+        "wtb_index": 7
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39016,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 104,
+        "abs_addr": 39016,
+        "wtb_index": 8
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39017,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 105,
+        "abs_addr": 39017,
+        "wtb_index": 9
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39018,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 106,
+        "abs_addr": 39018,
+        "wtb_index": 10
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39019,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 107,
+        "abs_addr": 39019,
+        "wtb_index": 11
+      }
+    },
+    {
+      "time_s": 1.0,
+      "samples": 60,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39020,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 108,
+        "abs_addr": 39020,
+        "wtb_index": 12
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39021,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 109,
+        "abs_addr": 39021,
+        "wtb_index": 13
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39022,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 110,
+        "abs_addr": 39022,
+        "wtb_index": 14
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39023,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 111,
+        "abs_addr": 39023,
+        "wtb_index": 15
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39024,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 112,
+        "abs_addr": 39024,
+        "wtb_index": 16
+      }
+    },
+    {
+      "time_s": 1.0166666666666666,
+      "samples": 61,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39025,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 113,
+        "abs_addr": 39025,
+        "wtb_index": 17
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39026,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 114,
+        "abs_addr": 39026,
+        "wtb_index": 18
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39027,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 115,
+        "abs_addr": 39027,
+        "wtb_index": 19
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39028,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 116,
+        "abs_addr": 39028,
+        "wtb_index": 20
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39029,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 117,
+        "abs_addr": 39029,
+        "wtb_index": 21
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39030,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 118,
+        "abs_addr": 39030,
+        "wtb_index": 22
+      }
+    },
+    {
+      "time_s": 1.0333333333333334,
+      "samples": 62,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39031,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 119,
+        "abs_addr": 39031,
+        "wtb_index": 23
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39032,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 120,
+        "abs_addr": 39032,
+        "wtb_index": 24
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39033,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 121,
+        "abs_addr": 39033,
+        "wtb_index": 25
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39034,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 122,
+        "abs_addr": 39034,
+        "wtb_index": 26
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39035,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 123,
+        "abs_addr": 39035,
+        "wtb_index": 27
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39036,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 124,
+        "abs_addr": 39036,
+        "wtb_index": 28
+      }
+    },
+    {
+      "time_s": 1.05,
+      "samples": 63,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39037,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 125,
+        "abs_addr": 39037,
+        "wtb_index": 29
+      }
+    },
+    {
+      "time_s": 1.0666666666666667,
+      "samples": 64,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39038,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 126,
+        "abs_addr": 39038,
+        "wtb_index": 30
+      }
+    },
+    {
+      "time_s": 1.0666666666666667,
+      "samples": 64,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "wtb-write",
+      "address": 39039,
+      "value": 0,
+      "extras": {
+        "port": 0,
+        "reg": 127,
+        "abs_addr": 39039,
+        "wtb_index": 31
+      }
+    },
+    {
+      "time_s": 1.0833333333333333,
+      "samples": 65,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 0,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 1.1,
+      "samples": 66,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 0,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1.1,
+      "samples": 66,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 255,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1.1166666666666667,
+      "samples": 67,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 17,
+      "value": 0,
+      "extras": {
+        "reg": 17
+      }
+    },
+    {
+      "time_s": 1.1333333333333333,
+      "samples": 68,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 33,
+      "value": 0,
+      "extras": {
+        "reg": 33
+      }
+    },
+    {
+      "time_s": 1.1333333333333333,
+      "samples": 68,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 49,
+      "value": 255,
+      "extras": {
+        "reg": 49
+      }
+    },
+    {
+      "time_s": 1.15,
+      "samples": 69,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 18,
+      "value": 0,
+      "extras": {
+        "reg": 18
+      }
+    },
+    {
+      "time_s": 1.1666666666666667,
+      "samples": 70,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 34,
+      "value": 0,
+      "extras": {
+        "reg": 34
+      }
+    },
+    {
+      "time_s": 1.1666666666666667,
+      "samples": 70,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 50,
+      "value": 255,
+      "extras": {
+        "reg": 50
+      }
+    },
+    {
+      "time_s": 1.1833333333333333,
+      "samples": 71,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 19,
+      "value": 0,
+      "extras": {
+        "reg": 19
+      }
+    },
+    {
+      "time_s": 1.2,
+      "samples": 72,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 35,
+      "value": 0,
+      "extras": {
+        "reg": 35
+      }
+    },
+    {
+      "time_s": 1.2,
+      "samples": 72,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 51,
+      "value": 255,
+      "extras": {
+        "reg": 51
+      }
+    },
+    {
+      "time_s": 1.2166666666666666,
+      "samples": 73,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 20,
+      "value": 0,
+      "extras": {
+        "reg": 20
+      }
+    },
+    {
+      "time_s": 1.2333333333333334,
+      "samples": 74,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 36,
+      "value": 0,
+      "extras": {
+        "reg": 36
+      }
+    },
+    {
+      "time_s": 1.2333333333333334,
+      "samples": 74,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 52,
+      "value": 255,
+      "extras": {
+        "reg": 52
+      }
+    },
+    {
+      "time_s": 1.25,
+      "samples": 75,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 21,
+      "value": 0,
+      "extras": {
+        "reg": 21
+      }
+    },
+    {
+      "time_s": 1.2666666666666666,
+      "samples": 76,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 37,
+      "value": 0,
+      "extras": {
+        "reg": 37
+      }
+    },
+    {
+      "time_s": 1.2666666666666666,
+      "samples": 76,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 53,
+      "value": 255,
+      "extras": {
+        "reg": 53
+      }
+    },
+    {
+      "time_s": 1.2833333333333334,
+      "samples": 77,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 22,
+      "value": 0,
+      "extras": {
+        "reg": 22
+      }
+    },
+    {
+      "time_s": 1.3,
+      "samples": 78,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 38,
+      "value": 0,
+      "extras": {
+        "reg": 38
+      }
+    },
+    {
+      "time_s": 1.3,
+      "samples": 78,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 54,
+      "value": 255,
+      "extras": {
+        "reg": 54
+      }
+    },
+    {
+      "time_s": 1.3166666666666667,
+      "samples": 79,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 23,
+      "value": 0,
+      "extras": {
+        "reg": 23
+      }
+    },
+    {
+      "time_s": 1.3333333333333333,
+      "samples": 80,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39,
+      "value": 0,
+      "extras": {
+        "reg": 39
+      }
+    },
+    {
+      "time_s": 1.3333333333333333,
+      "samples": 80,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 55,
+      "value": 255,
+      "extras": {
+        "reg": 55
+      }
+    },
+    {
+      "time_s": 1.35,
+      "samples": 81,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 24,
+      "value": 0,
+      "extras": {
+        "reg": 24
+      }
+    },
+    {
+      "time_s": 1.3666666666666667,
+      "samples": 82,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 40,
+      "value": 0,
+      "extras": {
+        "reg": 40
+      }
+    },
+    {
+      "time_s": 1.3833333333333333,
+      "samples": 83,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 56,
+      "value": 255,
+      "extras": {
+        "reg": 56
+      }
+    },
+    {
+      "time_s": 1.3833333333333333,
+      "samples": 83,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 0,
+      "value": 0,
+      "extras": {
+        "reg": 0
+      }
+    },
+    {
+      "time_s": 1.4,
+      "samples": 84,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 1,
+      "value": 0,
+      "extras": {
+        "reg": 1
+      }
+    },
+    {
+      "time_s": 1.4166666666666667,
+      "samples": 85,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 2,
+      "value": 0,
+      "extras": {
+        "reg": 2
+      }
+    },
+    {
+      "time_s": 1.4166666666666667,
+      "samples": 85,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 3,
+      "value": 0,
+      "extras": {
+        "reg": 3
+      }
+    },
+    {
+      "time_s": 1.4333333333333333,
+      "samples": 86,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 4,
+      "value": 0,
+      "extras": {
+        "reg": 4
+      }
+    },
+    {
+      "time_s": 1.45,
+      "samples": 87,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 5,
+      "value": 0,
+      "extras": {
+        "reg": 5
+      }
+    },
+    {
+      "time_s": 1.45,
+      "samples": 87,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 6,
+      "value": 0,
+      "extras": {
+        "reg": 6
+      }
+    },
+    {
+      "time_s": 1.4666666666666666,
+      "samples": 88,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 7,
+      "value": 0,
+      "extras": {
+        "reg": 7
+      }
+    },
+    {
+      "time_s": 1.4833333333333334,
+      "samples": 89,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 7,
+      "value": 184,
+      "extras": {
+        "reg": 7,
+        "reg7": 184,
+        "modes": {
+          "0": 1,
+          "1": 1,
+          "2": 1
+        }
+      }
+    },
+    {
+      "time_s": 1.4833333333333334,
+      "samples": 89,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 6,
+      "value": 0,
+      "extras": {
+        "reg": 6
+      }
+    },
+    {
+      "time_s": 1.5,
+      "samples": 90,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 11,
+      "value": 255,
+      "extras": {
+        "reg": 11
+      }
+    },
+    {
+      "time_s": 1.5166666666666666,
+      "samples": 91,
+      "chip": "PSG",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 12,
+      "value": 0,
+      "extras": {
+        "reg": 12
+      }
+    },
+    {
+      "time_s": 10.95,
+      "samples": 657,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 14,
+      "value": 0,
+      "extras": {
+        "reg": 14
+      }
+    },
+    {
+      "time_s": 12.75,
+      "samples": 765,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39046,
+      "value": 174,
+      "extras": {
+        "port": 1,
+        "reg": 6,
+        "abs_addr": 39046,
+        "kind": "f1"
+      }
+    },
+    {
+      "time_s": 12.75,
+      "samples": 765,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39047,
+      "value": 6,
+      "extras": {
+        "port": 1,
+        "reg": 7,
+        "abs_addr": 39047,
+        "kind": "f2"
+      }
+    },
+    {
+      "time_s": 12.85,
+      "samples": 771,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 13.266666666666667,
+      "samples": 796,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 87,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 13.266666666666667,
+      "samples": 796,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 3,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 13.35,
+      "samples": 801,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 13.566666666666666,
+      "samples": 814,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 47,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 13.816666666666666,
+      "samples": 829,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 22,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 13.816666666666666,
+      "samples": 829,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 13.9,
+      "samples": 834,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 110.75,
+      "samples": 6645,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 110.76666666666667,
+      "samples": 6646,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 110.85,
+      "samples": 6651,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 196.63333333333333,
+      "samples": 11798,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 11,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 11
+      }
+    },
+    {
+      "time_s": 196.88333333333333,
+      "samples": 11813,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 166,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 196.98333333333332,
+      "samples": 11819,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 197.05,
+      "samples": 11823,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 6,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 197.25,
+      "samples": 11835,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 22,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 197.26666666666668,
+      "samples": 11836,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 194,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 197.35,
+      "samples": 11841,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 294.68333333333334,
+      "samples": 17681,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 294.78333333333336,
+      "samples": 17687,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 392.8333333333333,
+      "samples": 23570,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 9,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 9
+      }
+    },
+    {
+      "time_s": 393.0833333333333,
+      "samples": 23585,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 87,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 393.0833333333333,
+      "samples": 23585,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 3,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 393.18333333333334,
+      "samples": 23591,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 393.25,
+      "samples": 23595,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 6,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 393.45,
+      "samples": 23607,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 22,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 393.46666666666664,
+      "samples": 23608,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 217,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 393.55,
+      "samples": 23613,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 478.6333333333333,
+      "samples": 28718,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 478.6333333333333,
+      "samples": 28718,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 478.71666666666664,
+      "samples": 28723,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 576.6833333333333,
+      "samples": 34601,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39046,
+      "value": 117,
+      "extras": {
+        "port": 1,
+        "reg": 6,
+        "abs_addr": 39046,
+        "kind": "f1"
+      }
+    },
+    {
+      "time_s": 576.6833333333333,
+      "samples": 34601,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39047,
+      "value": 4,
+      "extras": {
+        "port": 1,
+        "reg": 7,
+        "abs_addr": 39047,
+        "kind": "f2"
+      }
+    },
+    {
+      "time_s": 576.7833333333333,
+      "samples": 34607,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 577.0333333333333,
+      "samples": 34622,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 166,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 577.1166666666667,
+      "samples": 34627,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 577.1833333333333,
+      "samples": 34631,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 6,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 577.4,
+      "samples": 34644,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 22,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 577.4,
+      "samples": 34644,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 230,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 577.4833333333333,
+      "samples": 34649,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 662.5666666666667,
+      "samples": 39754,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 662.6666666666666,
+      "samples": 39760,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 760.7166666666667,
+      "samples": 45643,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 11,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 11
+      }
+    },
+    {
+      "time_s": 760.9666666666667,
+      "samples": 45658,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 128,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 761.05,
+      "samples": 45663,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 761.1166666666667,
+      "samples": 45667,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 6,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 761.3333333333334,
+      "samples": 45680,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 23,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 761.3333333333334,
+      "samples": 45680,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 2,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 761.4166666666666,
+      "samples": 45685,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 858.7666666666667,
+      "samples": 51526,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 252,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 858.7666666666667,
+      "samples": 51526,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 858.8666666666667,
+      "samples": 51532,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 944.65,
+      "samples": 56679,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 9,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 9
+      }
+    },
+    {
+      "time_s": 944.9,
+      "samples": 56694,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 128,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 944.9,
+      "samples": 56694,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 945.0,
+      "samples": 56700,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 945.0666666666667,
+      "samples": 56704,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 7,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 945.2666666666667,
+      "samples": 56716,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 23,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 945.2833333333333,
+      "samples": 56717,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 34,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 945.35,
+      "samples": 56721,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1042.7,
+      "samples": 62562,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 252,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1042.7166666666667,
+      "samples": 62563,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1042.8,
+      "samples": 62568,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1140.9,
+      "samples": 68454,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39046,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 6,
+        "abs_addr": 39046,
+        "kind": "f1"
+      }
+    },
+    {
+      "time_s": 1140.9,
+      "samples": 68454,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39047,
+      "value": 5,
+      "extras": {
+        "port": 1,
+        "reg": 7,
+        "abs_addr": 39047,
+        "kind": "f2"
+      }
+    },
+    {
+      "time_s": 1141.0,
+      "samples": 68460,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 1141.2333333333333,
+      "samples": 68474,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1141.25,
+      "samples": 68475,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1141.3333333333333,
+      "samples": 68480,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1141.4,
+      "samples": 68484,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 7,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1141.6166666666666,
+      "samples": 68497,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 23,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1141.6166666666666,
+      "samples": 68497,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 69,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 1141.7,
+      "samples": 68502,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1226.6333333333334,
+      "samples": 73598,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 197,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1226.65,
+      "samples": 73599,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1226.7333333333333,
+      "samples": 73604,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1324.85,
+      "samples": 79491,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1324.85,
+      "samples": 79491,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1324.9333333333334,
+      "samples": 79496,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1325.0,
+      "samples": 79500,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 7,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1325.2666666666667,
+      "samples": 79516,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1325.2666666666667,
+      "samples": 79516,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 172,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 1325.35,
+      "samples": 79521,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1336.7833333333333,
+      "samples": 80207,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1349.0333333333333,
+      "samples": 80942,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1361.3,
+      "samples": 81678,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1373.5666666666666,
+      "samples": 82414,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1385.8166666666666,
+      "samples": 83149,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1398.0833333333333,
+      "samples": 83885,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1410.35,
+      "samples": 84621,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1410.6166666666666,
+      "samples": 84637,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 197,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1410.6166666666666,
+      "samples": 84637,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1410.7,
+      "samples": 84642,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1422.6166666666666,
+      "samples": 85357,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1434.8666666666666,
+      "samples": 86092,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1447.1333333333334,
+      "samples": 86828,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1459.4,
+      "samples": 87564,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1471.6666666666667,
+      "samples": 88300,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1483.9166666666667,
+      "samples": 89035,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1496.1833333333334,
+      "samples": 89771,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1508.45,
+      "samples": 90507,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1508.7333333333333,
+      "samples": 90524,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 1508.9833333333333,
+      "samples": 90539,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 87,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1509.0,
+      "samples": 90540,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 3,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1509.0833333333333,
+      "samples": 90545,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1509.3833333333334,
+      "samples": 90563,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1606.8333333333333,
+      "samples": 96410,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 171,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1606.8333333333333,
+      "samples": 96410,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 1,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1606.9166666666667,
+      "samples": 96415,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1692.7666666666667,
+      "samples": 101566,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39048,
+      "value": 58,
+      "extras": {
+        "port": 1,
+        "reg": 8,
+        "abs_addr": 39048
+      }
+    },
+    {
+      "time_s": 1692.7666666666667,
+      "samples": 101566,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39049,
+      "value": 2,
+      "extras": {
+        "port": 1,
+        "reg": 9,
+        "abs_addr": 39049
+      }
+    },
+    {
+      "time_s": 1692.8666666666666,
+      "samples": 101572,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 12,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1692.9333333333334,
+      "samples": 101576,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1704.6666666666667,
+      "samples": 102280,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1704.8166666666666,
+      "samples": 102289,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1716.9166666666667,
+      "samples": 103015,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1729.1666666666667,
+      "samples": 103750,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1741.4333333333334,
+      "samples": 104486,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1753.7,
+      "samples": 105222,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1765.9666666666667,
+      "samples": 105958,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1778.2166666666667,
+      "samples": 106693,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1790.4833333333333,
+      "samples": 107429,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1802.75,
+      "samples": 108165,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1802.8666666666666,
+      "samples": 108172,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1815.0166666666667,
+      "samples": 108901,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1815.1166666666666,
+      "samples": 108907,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1827.2666666666667,
+      "samples": 109636,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1827.3666666666666,
+      "samples": 109642,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1839.5333333333333,
+      "samples": 110372,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1839.6333333333334,
+      "samples": 110378,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1851.8,
+      "samples": 111108,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1851.9,
+      "samples": 111114,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1864.0666666666666,
+      "samples": 111844,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1864.1666666666667,
+      "samples": 111850,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1876.3166666666666,
+      "samples": 112579,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1876.4166666666667,
+      "samples": 112585,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1888.5833333333333,
+      "samples": 113315,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 1888.7666666666667,
+      "samples": 113326,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39046,
+      "value": 117,
+      "extras": {
+        "port": 1,
+        "reg": 6,
+        "abs_addr": 39046,
+        "kind": "f1"
+      }
+    },
+    {
+      "time_s": 1888.7833333333333,
+      "samples": 113327,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39047,
+      "value": 4,
+      "extras": {
+        "port": 1,
+        "reg": 7,
+        "abs_addr": 39047,
+        "kind": "f2"
+      }
+    },
+    {
+      "time_s": 1888.8666666666666,
+      "samples": 113332,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 1888.95,
+      "samples": 113337,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1889.3166666666666,
+      "samples": 113359,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 25,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 1889.3166666666666,
+      "samples": 113359,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 2,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 1889.4,
+      "samples": 113364,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 1900.9333333333334,
+      "samples": 114056,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1913.1833333333334,
+      "samples": 114791,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1925.45,
+      "samples": 115527,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1937.7,
+      "samples": 116262,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1949.9666666666667,
+      "samples": 116998,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1962.2333333333333,
+      "samples": 117734,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1974.5,
+      "samples": 118470,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1986.7666666666667,
+      "samples": 119206,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 1999.0166666666667,
+      "samples": 119941,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2011.2833333333333,
+      "samples": 120677,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2023.55,
+      "samples": 121413,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2035.8,
+      "samples": 122148,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2048.0666666666666,
+      "samples": 122884,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2060.3333333333335,
+      "samples": 123620,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2072.7,
+      "samples": 124362,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2072.7833333333333,
+      "samples": 124367,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 9,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 2072.983333333333,
+      "samples": 124379,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 24,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 2073.0,
+      "samples": 124380,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 16,
+      "value": 217,
+      "extras": {
+        "reg": 16
+      }
+    },
+    {
+      "time_s": 2073.0833333333335,
+      "samples": 124385,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 33,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 2084.8,
+      "samples": 125088,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2084.9,
+      "samples": 125094,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2097.05,
+      "samples": 125823,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2097.15,
+      "samples": 125829,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2109.3166666666666,
+      "samples": 126559,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2109.4166666666665,
+      "samples": 126565,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2121.5666666666666,
+      "samples": 127294,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2121.6666666666665,
+      "samples": 127300,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2133.8333333333335,
+      "samples": 128030,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2133.9333333333334,
+      "samples": 128036,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2146.1,
+      "samples": 128766,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2146.2,
+      "samples": 128772,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2158.366666666667,
+      "samples": 129502,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2158.4666666666667,
+      "samples": 129508,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2170.616666666667,
+      "samples": 130237,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2170.7166666666667,
+      "samples": 130243,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2182.883333333333,
+      "samples": 130973,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2182.983333333333,
+      "samples": 130979,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2195.15,
+      "samples": 131709,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2195.25,
+      "samples": 131715,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2207.4166666666665,
+      "samples": 132445,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2207.516666666667,
+      "samples": 132451,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2219.6666666666665,
+      "samples": 133180,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2219.766666666667,
+      "samples": 133186,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2231.9333333333334,
+      "samples": 133916,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2232.0333333333333,
+      "samples": 133922,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2244.2,
+      "samples": 134652,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2244.3,
+      "samples": 134658,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2256.4666666666667,
+      "samples": 135388,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2256.733333333333,
+      "samples": 135404,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 13,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 13
+      }
+    },
+    {
+      "time_s": 2256.8166666666666,
+      "samples": 135409,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2256.9,
+      "samples": 135414,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 2257.0833333333335,
+      "samples": 135425,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 48,
+      "value": 46,
+      "extras": {
+        "reg": 48
+      }
+    },
+    {
+      "time_s": 2268.8,
+      "samples": 136128,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2268.883333333333,
+      "samples": 136133,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 2281.05,
+      "samples": 136863,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2293.3166666666666,
+      "samples": 137599,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2305.5833333333335,
+      "samples": 138335,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2317.85,
+      "samples": 139071,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2330.1,
+      "samples": 139806,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2342.366666666667,
+      "samples": 140542,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2354.633333333333,
+      "samples": 141278,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2354.733333333333,
+      "samples": 141284,
+      "chip": "SCC",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 39054,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 4,
+        "abs_addr": 39054
+      }
+    },
+    {
+      "time_s": 2452.6666666666665,
+      "samples": 147160,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2464.9166666666665,
+      "samples": 147895,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2477.1833333333334,
+      "samples": 148631,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2489.45,
+      "samples": 149367,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2501.7166666666667,
+      "samples": 150103,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2513.9666666666667,
+      "samples": 150838,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2526.233333333333,
+      "samples": 151574,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2538.5,
+      "samples": 152310,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2550.766666666667,
+      "samples": 153046,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2563.016666666667,
+      "samples": 153781,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2575.2833333333333,
+      "samples": 154517,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2587.55,
+      "samples": 155253,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2599.8166666666666,
+      "samples": 155989,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2612.0666666666666,
+      "samples": 156724,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2624.3333333333335,
+      "samples": 157460,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2636.6,
+      "samples": 158196,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2637.0333333333333,
+      "samples": 158222,
+      "chip": "YM2413",
+      "channel": null,
+      "kind": "reg-write",
+      "address": 32,
+      "value": 8,
+      "extras": {
+        "reg": 32
+      }
+    },
+    {
+      "time_s": 2648.866666666667,
+      "samples": 158932,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2661.116666666667,
+      "samples": 159667,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2673.383333333333,
+      "samples": 160403,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2685.65,
+      "samples": 161139,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2697.9166666666665,
+      "samples": 161875,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2710.1666666666665,
+      "samples": 162610,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2722.4333333333334,
+      "samples": 163346,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2734.7,
+      "samples": 164082,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2746.9666666666667,
+      "samples": 164818,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2759.2166666666667,
+      "samples": 165553,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2771.483333333333,
+      "samples": 166289,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2783.75,
+      "samples": 167025,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2796.016666666667,
+      "samples": 167761,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2808.266666666667,
+      "samples": 168496,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2820.5333333333333,
+      "samples": 169232,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2832.8,
+      "samples": 169968,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2845.0666666666666,
+      "samples": 170704,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2857.3166666666666,
+      "samples": 171439,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2869.5833333333335,
+      "samples": 172175,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2881.85,
+      "samples": 172911,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2894.116666666667,
+      "samples": 173647,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2906.366666666667,
+      "samples": 174382,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2918.633333333333,
+      "samples": 175118,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2930.9,
+      "samples": 175854,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2943.1666666666665,
+      "samples": 176590,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2955.4166666666665,
+      "samples": 177325,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2967.6833333333334,
+      "samples": 178061,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2979.95,
+      "samples": 178797,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 2992.2166666666667,
+      "samples": 179533,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 3004.4666666666667,
+      "samples": 180268,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    },
+    {
+      "time_s": 3004.5833333333335,
+      "samples": 180275,
+      "chip": "SCC",
+      "channel": 3,
+      "kind": "reg-write",
+      "address": 39053,
+      "value": 0,
+      "extras": {
+        "port": 2,
+        "reg": 3,
+        "abs_addr": 39053,
+        "channel": 3,
+        "vol": 0
+      }
+    }
+  ],
+  "notes": [
+    {
+      "chip": "SCC",
+      "channel": 3,
+      "t_on": 12.85,
+      "t_off": 1336.7833333333333,
+      "pitch_hz": null,
+      "volume": 13,
+      "cause": "vol-rise",
+      "meta": {},
+      "duration_s": 1323.9333333333334
+    },
+    {
+      "chip": "SCC",
+      "channel": 3,
+      "t_on": 1508.7333333333333,
+      "t_off": 1704.6666666666667,
+      "pitch_hz": null,
+      "volume": 13,
+      "cause": "vol-rise",
+      "meta": {},
+      "duration_s": 195.9333333333334
+    },
+    {
+      "chip": "SCC",
+      "channel": 3,
+      "t_on": 1888.8666666666666,
+      "t_off": 2084.8,
+      "pitch_hz": null,
+      "volume": 13,
+      "cause": "vol-rise",
+      "meta": {},
+      "duration_s": 195.93333333333362
+    },
+    {
+      "chip": "SCC",
+      "channel": 3,
+      "t_on": 2256.733333333333,
+      "t_off": 2452.6666666666665,
+      "pitch_hz": null,
+      "volume": 13,
+      "cause": "vol-rise",
+      "meta": {},
+      "duration_s": 195.9333333333334
+    }
+  ]
+}
