@@ -8,10 +8,8 @@ Goals
 - Non-destructive: produce CSV recommendations; external `-g` overrides still respected.
 
 Inputs
-- A small manifest JSON (patterns.json) describing notes per pattern/channel:
-  - Patch EG parameters (AR/DR/SL/RR, KSR flag)
-  - Note list with `t_on` (sec), `ioi` (sec), `fnum`, `blk`
-- Next step: add a loader to read your existing IR/CSV under `tests/equiv/outputs/ir` directly.
+- A YM2413 timeline CSV with per-write events (e.g., `..._timeline_YM2413.csv`) OR a small manifest JSON (`patterns.json`).
+- Patch EG parameters passed via CLI (`--ar/--dr/--sl/--rr/--ksr`) when using timeline CSV.
 
 Outputs
 - CSV with recommended Gate per pattern/channel and summary metrics:
@@ -20,30 +18,28 @@ Outputs
   - `chosen_gate`
 
 How it works
-1) Build a per-note timeline: onset t_on, inter-onset interval IOI, candidate KO_off = t_on + gate * IOI.
-2) Simulate envelope states (A→D→S while KO=1; R when KO=0) with KSR-adjusted rates.
-3) Score Gate by:
-   - Residual amplitude just before next onset (smaller is better).
-   - Overlap/gap penalties (overlap if residual > threshold; gap if sustain is unnaturally short).
-   - Stability constraints (avoid zero/negative effective duration).
+1) From timeline CSV, detect KO rising edges (register `0x20..0x28` bit4) to define note onsets.
+2) Track FNUM low (`0x10..0x18`) and high+BLK (`0x20..0x28`) to attach pitch to each note.
+3) Compute IOI from neighboring onsets and simulate EG (A→D→S while KO=1; R when KO=0).
 4) Grid-search Gate in [gate_min, gate_max] and pick the best.
 
-Caveats and TODOs
-- Initial rate-time mapping is an approximation; replace with exact rate tables later.
-- KSR mapping is simplified; provide a config hook to calibrate.
-- For legato (KO stays high), note boundaries are inferred from pitch changes (>= semitone) and vol=0 events.
+Run (timeline CSV)
+```
+python -m tools.gate_estimator.run_estimation \
+  --timeline-csv tests/equiv/inputs/ir/ym2413_scale_chromatic_timeline_YM2413.csv \
+  --pattern ym2413_scale_chromatic \
+  --ar 8 --dr 6 --sl 8 --rr 5 --ksr 1 \
+  --out tests/equiv/outputs/gate_estimates_scale_chromatic.csv
+```
 
-References (for future alignment)
-- ymfm (Aaron Giles)
-- MAME YM2413 core
-- EMU2413 (Okazaki)
-
-Run
+Run (manifest JSON)
 ```
 python -m tools.gate_estimator.run_estimation \
   --ir-root tools/gate_estimator \
   --out tests/equiv/outputs/gate_estimates.csv
 ```
 
-Configuration
-- Defaults are reasonable; tune via CLI flags or editing constants in model.py and optimizer.py.
+Caveats and TODOs
+- Rate-time mapping is approximate; we will replace with exact rate tables later.
+- If your timeline CSV uses different header names, adjust `loader_ir.py` or let us know the header row.
+- For legato (KO stays high), boundary inference (pitch/volume) will be added later.
