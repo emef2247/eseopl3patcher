@@ -13,6 +13,7 @@
 #include "../override_loader.h"
 #include "../compat_bool.h"
 #include "../compat_string.h"
+#include "../gate_loader.h"
 
 static VGMContext *g_last_ctx = NULL;
 static int g_triple_force_retrigger = 0;
@@ -156,6 +157,9 @@ static uint32_t g_gate_comp_debt_samples = 0;
 
 static int g_freqmap_opllblock = 0;
 
+// Gate loader integration - track if gates CSV is loaded
+static int g_gates_csv_loaded = 0;
+
 
 /** Store program arguments for later use */
 void opll_set_program_args(int argc, char **argv) {
@@ -211,6 +215,22 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     fprintf(stderr, "[TRIPLE] force_retrigger=%d (ESEOPL3_TRIPLE_FORCE_RETRIGGER=%s)\n",
             g_triple_force_retrigger, tr ? tr : "(unset)");
 
+    // Load gates.csv if available
+    const char *gates_csv_path = getenv("ESEOPL3_GATES_CSV");
+    if (!gates_csv_path || !gates_csv_path[0]) {
+        // Fallback to dist/gates.csv
+        gates_csv_path = "dist/gates.csv";
+    }
+    
+    if (gate_loader_init(gates_csv_path) == 0) {
+        g_gates_csv_loaded = 1;
+        fprintf(stderr, "[GATES] Loaded gates from: %s (%d entries)\n",
+                gates_csv_path, gate_loader_count());
+    } else {
+        g_gates_csv_loaded = 0;
+        fprintf(stderr, "[GATES] No gates CSV loaded (tried: %s), using default gate values\n",
+                gates_csv_path);
+    }
 
     opl3_register_all_ym2413(&p_state->voice_db, p_opts);
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
@@ -454,11 +474,55 @@ static inline uint8_t enforce_min_attack(uint8_t ar, const char* stage, int inst
     return ar;
 }
 
+/**
+ * Get current patch/instrument number for a channel from YM2413 registers
+ */
+static inline int get_current_patch_for_ch(int ch) {
+    if (ch < 0 || ch >= YM2413_NUM_CH) return 0;
+    
+    // Register 0x30-0x38 contains instrument/volume for each channel
+    uint8_t reg3n_addr = 0x30 + ch;
+    uint8_t reg3n = g_ym2413_regs[reg3n_addr];
+    
+    // Upper nibble is instrument number (0-15)
+    return (reg3n >> 4) & 0x0F;
+}
+
 /** 
  * Get min_gate_samples (OPLL_MIN_GATE_SAMPLES)
  *  Minimum duration (in samples) that the gate (key-on state) must be held to ensure proper note triggering in OPLL emulation.
+ *  This now integrates with gate_loader to use per-patch/channel gate values from gates.csv if available.
+ */
+static inline uint16_t get_min_gate_for_ch(int ch, int patch, const CommandOptions* o) {
+    // Try to get per-patch/channel gate from loaded CSV
+    if (g_gates_csv_loaded) {
+        uint16_t csv_gate = 0;
+        if (gate_loader_lookup(patch, ch, &csv_gate) == 0) {
+            return csv_gate;
+        }
+        // Fall back to default from gate_loader if not found
+        csv_gate = gate_loader_get_default();
+        if (csv_gate > 0) {
+            return csv_gate;
+        }
+    }
+    
+    // Fall back to command options or compile-time default
+    return (o && o->min_gate_samples) ? o->min_gate_samples : (uint16_t)OPLL_MIN_GATE_SAMPLES;
+}
+
+/** 
+ * Legacy wrapper for get_min_gate - uses default fallback without patch/channel info
+ * Now enhanced to try per-channel lookup if channel context is available
  */
 static inline uint16_t get_min_gate(const CommandOptions* o) {
+    // If gates CSV is loaded, use its default
+    if (g_gates_csv_loaded) {
+        uint16_t csv_default = gate_loader_get_default();
+        if (csv_default > 0) {
+            return csv_default;
+        }
+    }
     return (o && o->min_gate_samples) ? o->min_gate_samples : (uint16_t)OPLL_MIN_GATE_SAMPLES;
 }
 
@@ -671,7 +735,9 @@ static inline void opll_tick_pending_on_elapsed(
         }
 
         // 3) Delayed KeyOff flush (emit B0 when minimum gate is satisfied)
-        if (g_has_pending_keyoff[ch] && g_gate_elapsed[ch] >= get_min_gate(p_opts)) {
+        int patch = get_current_patch_for_ch(ch);
+        uint16_t min_gate = get_min_gate_for_ch(ch, patch, p_opts);
+        if (g_has_pending_keyoff[ch] && g_gate_elapsed[ch] >= min_gate) {
             uint8_t v2n = g_pending_keyoff_val2n[ch];
             uint8_t opl3_bn = opll_to_opl3_bn(v2n); // v2n は KO=0 にクリア済みを想定
             duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
@@ -683,8 +749,8 @@ static inline void opll_tick_pending_on_elapsed(
             g_has_pending_keyoff[ch] = 0;
 
             if (p_opts && p_opts->debug.verbose) {
-                fprintf(stderr,"[DELAY_KEYOFF_FLUSH] ch=%d elapsed=%u/%u reg2n=%02X\n",
-                        ch, g_gate_elapsed[ch], get_min_gate(p_opts), v2n);
+                fprintf(stderr,"[DELAY_KEYOFF_FLUSH] ch=%d patch=%d elapsed=%u/%u reg2n=%02X\n",
+                        ch, patch, g_gate_elapsed[ch], min_gate, v2n);
             }
             opl3_metrics_note_off(ch);
             if (g_opl3_hooks.on_note_off) g_opl3_hooks.on_note_off(ch);
@@ -785,13 +851,15 @@ static inline void acc_maybe_flush_triple(
     if (g_stamp[ch].ko) {
 #if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
         if (p_opts && p_opts->debug.audible_sanity) {
-            if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
-                uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+            int patch = get_current_patch_for_ch(ch);
+            uint16_t min_gate = get_min_gate_for_ch(ch, patch, p_opts);
+            if (g_gate_elapsed[ch] < min_gate) {
+                uint16_t need = (uint16_t)(min_gate - g_gate_elapsed[ch]);
                 vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
                 g_gate_comp_debt_samples += need;  // Track debt
                 if (p_opts->debug.verbose) {
-                    fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
-                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                    fprintf(stderr,"[GATE WAIT] ch=%d patch=%d min_gate=%u (elapsed=%u, min=%u)\n",
+                            ch, patch, need, g_gate_elapsed[ch], min_gate);
                 }
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
@@ -971,17 +1039,19 @@ static inline void flush_channel_ch(
     }
     else if (e.has_2n && e.note_off_edge) {
         // 変更: 最小ゲート未満なら KeyOff を保留
-        if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
+        int patch = get_current_patch_for_ch(ch);
+        uint16_t min_gate = get_min_gate_for_ch(ch, patch, p_opts);
+        if (g_gate_elapsed[ch] < min_gate) {
 #if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
             // audible-sanity 有効時はここで待ちを注入してから即時 KeyOff
             if (p_opts && p_opts->debug.audible_sanity) {
-                uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                uint16_t need = (uint16_t)(min_gate - g_gate_elapsed[ch]);
                 // VGMに待ちを注入してからゲート経過を進める
                 vgm_wait_samples(p_music_data, p_vstat, need);
                 g_gate_comp_debt_samples += need;  // Track debt
                 if (p_opts->debug.verbose) {
-                    fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
-                            ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                    fprintf(stderr,"[GATE WAIT] ch=%d patch=%d min_gate=%u (elapsed=%u, min=%u)\n",
+                            ch, patch, need, g_gate_elapsed[ch], min_gate);
                 }
                 // saturate
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
@@ -1004,8 +1074,8 @@ static inline void flush_channel_ch(
                 g_pending_keyoff_val2n[ch] = p->reg2n;
                 delayed_keyoff = true;
                 if (p_opts && p_opts->debug.verbose)
-                    fprintf(stderr,"[DELAY_KEYOFF_ARM] ch=%d elapsed=%u/%u val=%02X\n",
-                            ch, g_gate_elapsed[ch], get_min_gate(p_opts), p->reg2n);
+                    fprintf(stderr,"[DELAY_KEYOFF_ARM] ch=%d patch=%d elapsed=%u/%u val=%02X\n",
+                            ch, patch, g_gate_elapsed[ch], min_gate, p->reg2n);
             }
         } else {
             // 閾値以上なら即時 KeyOff
@@ -1207,15 +1277,17 @@ int opll_write_register(
                 // KeyOff: 最小ゲート保留（従来どおり）
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val); // stamp 用に保持
 
-                if (g_gate_elapsed[ch] < get_min_gate(p_opts)) {
+                int patch = get_current_patch_for_ch(ch);
+                uint16_t min_gate = get_min_gate_for_ch(ch, patch, p_opts);
+                if (g_gate_elapsed[ch] < min_gate) {
 #if OPLL_ENABLE_INJECT_WAIT_ON_KEYOFF
                     if (p_opts && p_opts->debug.audible_sanity) {
-                        uint16_t need = (uint16_t)(get_min_gate(p_opts) - g_gate_elapsed[ch]);
+                        uint16_t need = (uint16_t)(min_gate - g_gate_elapsed[ch]);
                         vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
                         g_gate_comp_debt_samples += need;  // Track debt
                         if (p_opts->debug.verbose) {
-                            fprintf(stderr,"[GATE WAIT] ch=%d min_gate=%u (elapsed=%u, min=%u)\n",
-                                    ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
+                            fprintf(stderr,"[GATE WAIT] ch=%d patch=%d min_gate=%u (elapsed=%u, min=%u)\n",
+                                    ch, patch, need, g_gate_elapsed[ch], min_gate);
                         }
                         uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                         g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
@@ -1240,8 +1312,8 @@ int opll_write_register(
                         g_pending_keyoff_val2n[ch] = val;
                         if (p_opts && p_opts->debug.verbose) {
                             fprintf(stderr,
-                                "[DELAY_KEYOFF_ARM][B0] ch=%d elapsed=%u/%u val=%02X\n",
-                                ch, g_gate_elapsed[ch], get_min_gate(p_opts), val);
+                                "[DELAY_KEYOFF_ARM][B0] ch=%d patch=%d elapsed=%u/%u val=%02X\n",
+                                ch, patch, g_gate_elapsed[ch], min_gate, val);
                         }
                         // s->ko は維持
                     }
