@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
+ #include <string.h>
+ 
 /* Maximum number of gate entries we can store */
 #define MAX_GATE_ENTRIES 256
 

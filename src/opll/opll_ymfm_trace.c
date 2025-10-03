@@ -1,7 +1,7 @@
 #include "opll_ymfm_trace.h"
 #include "../compat_string.h"
 #include "../compat_bool.h"
-#include "../../include/compat_case.h"
+#include "compat_case.h"
 #include <stdio.h>
 #include <stdlib.h>
 

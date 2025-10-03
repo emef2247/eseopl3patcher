@@ -11,6 +11,7 @@ USE_YMFM ?= 0
 USER_DEFINES ?=
 
 CPPFLAGS  := $(USER_DEFINES)
+CPPFLAGS  += -D_POSIX_C_SOURCE=200809L
 CFLAGS    := -O2 -Wall -Wextra -std=c11   -MMD -MP
 CXXFLAGS  := -O2 -Wall -Wextra -std=c++17 -MMD -MP
 LDFLAGS   :=
@@ -45,12 +46,12 @@ SRCS_CPP :=
 ifeq ($(USE_YMFM),1)
   # YMFM C bridge
   SRCS_CPP += src/ymfm_bridge/ymfm_c_api.cpp
-  # YMFM core sources (need to be compiled and linked)
+  # YMFM core sources (ymfm_fm.cpp は該当リビジョンに無いため含めない)
   SRCS_CPP += third_party/ymfm/src/ymfm_opl.cpp \
-              third_party/ymfm/src/ymfm_fm.cpp  \
               third_party/ymfm/src/ymfm_pcm.cpp \
               third_party/ymfm/src/ymfm_ssg.cpp \
-              third_party/ymfm/src/ymfm_misc.cpp
+              third_party/ymfm/src/ymfm_misc.cpp \
+              third_party/ymfm/src/ymfm_adpcm.cpp
 endif
 
 # Objects (dedup just in case)
@@ -65,13 +66,20 @@ all: $(TARGET)
 $(BIN_DIR) $(OBJ_DIR):
 	@mkdir -p "$@"
 
+# Generic C rule
 $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
 	@mkdir -p "$(dir $@)"
 	$(CC)  $(CPPFLAGS) $(CFLAGS)   $(INC_FLAGS) -c $< -o $@
 
+# Generic C++ rule
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INC_FLAGS) -c $< -o $@
+
+# YMFM third_party explicit rule (robust)
+$(OBJ_DIR)/third_party/ymfm/src/%.o: third_party/ymfm/src/%.cpp | $(OBJ_DIR)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Ithird_party/ymfm/src $(INC_FLAGS) -c $< -o $@
 
 $(TARGET): $(BIN_DIR) $(OBJS_C) $(OBJS_CPP)
 ifeq ($(USE_YMFM),1)

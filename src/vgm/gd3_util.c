@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-
+ #include <string.h>
+ 
 /**
  * Read a 32-bit little-endian integer from a byte array.
  */
