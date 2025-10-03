@@ -133,4 +133,13 @@ tools/*/*/__pycache__
 
 *.bak
 # third_party
-third_party/
+# third_party は追跡対象にする。生成物のみ個別に除外。
+third_party/*/build/
+third_party/*/bin/
+third_party/*/obj/
+third_party/*/CMakeFiles/
+third_party/*/CMakeCache.txt
+third_party/*/Makefile
+third_party/*/.vs/
+third_party/*/.vscode/
+third_party/*/compile_commands.json
