@@ -172,6 +172,17 @@ uint32_t* opll_get_gate_comp_debt_ptr(void) {
     return &g_gate_comp_debt_samples;
 }
 
+/** Gate loader status - check if gates CSV is loaded */
+int opll_gates_loaded(void) {
+    return g_gates_csv_loaded;
+}
+
+/** Get gate value for specific patch/channel (returns 0 if not found) */
+int opll_gate_lookup(int patch, int channel, uint16_t *out_gate) {
+    if (!g_gates_csv_loaded) return -1;
+    return gate_loader_lookup(patch, channel, out_gate);
+}
+
 /** Helper functions to check pending/stamp readiness */
 static inline bool have_inst_ready_policy(const OpllPendingCh* p, const OpllStampCh* s) {
     return (p && p->has_3n) || (s && s->valid_3n);
