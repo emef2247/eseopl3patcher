@@ -15,6 +15,7 @@
         "debug_opts.h": "c",
         "vgm_header.h": "c",
         "override_apply.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "stdio.h": "c"
     }
 }

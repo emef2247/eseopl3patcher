@@ -13,6 +13,8 @@
 #include "../override_loader.h"
 #include "../compat_bool.h"
 #include "../compat_string.h"
+#include "opll_ymfm_trace.h"   /* YMFM trace bridge (no-op when USE_YMFM=0) */
+#include <stdlib.h>            /* atexit */
 #include "../gate_loader.h"
 
 static VGMContext *g_last_ctx = NULL;
@@ -189,7 +191,12 @@ static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const 
  * Initialize OPLL/OPL3 voice DB and state
  */
 void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
-    if (!p_state) return;
+    
+    /* YMFM trace (only active when ESEOPL3_YMFM_TRACE=1 and USE_YMFM=1) */
+    opll_ymfm_trace_init();
+    /* ensure cleanup at process end even if caller forgets */
+    atexit(opll_ymfm_trace_shutdown);
+if (!p_state) return;
 
     // Read frequency mapping mode
     const char *fm = getenv("ESEOPL3_FREQMAP");
@@ -1143,7 +1150,12 @@ int opll_write_register(
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
     const CommandOptions *p_opts)
 {
-    g_last_ctx = p_vgm_context;
+    
+    /* Mirror YM2413 write into YMFM analyzer first (no-op if disabled) */
+    if (opll_ymfm_trace_enabled()) {
+        opll_ymfm_trace_write(addr, val);
+    }
+g_last_ctx = p_vgm_context;
     // Handle global registers (0x00 - 0x07)
     // グローバルレジスタ(<=0x07)での保留フラッシュを厳格化（inst+fresh fnum が必須）
     if (addr <= 0x07) {
@@ -1354,5 +1366,10 @@ int opll_write_register(
         acc_maybe_flush_triple(p_music_data, p_vgm_context, p_state, p_opts, ch);
     }
 
-    return additional_bytes;
+    
+    /* Before returning, advance YMFM by the wait to next event (if any) */
+    if (opll_ymfm_trace_enabled() && next_wait_samples > 0) {
+        opll_ymfm_trace_advance((uint32_t)next_wait_samples);
+    }
+return additional_bytes;
 }
