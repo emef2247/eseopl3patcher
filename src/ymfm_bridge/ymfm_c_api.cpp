@@ -129,13 +129,17 @@ void ymfm_opll_write(ymfm_ctx_t* ctx, uint32_t reg, uint8_t data) {
 static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool compute_db) {
 #if defined(USE_YMFM) && USE_YMFM
     using output_t = ymfm::opll_base::output_data; // ymfm_output<2>
-    std::vector<output_t> frames(n_samples);
-    ctx->chip->generate(frames.data(), n_samples);
+    std::vector<output_t> frames(n_samples ? n_samples : 1);
+    if (n_samples) {
+        ctx->chip->generate(frames.data(), n_samples);
+    }
 
     double sum_abs = 0.0;
     double sum_sq  = 0.0;
     uint32_t nz = 0;
-    for (uint32_t i = 0; i < n_samples; ++i) {
+    uint32_t N = n_samples ? n_samples : 1;
+
+    for (uint32_t i = 0; i < N; ++i) {
         int32_t l = frames[i].data[0];
         int32_t r = frames[i].data[1];
         int64_t ll = (int64_t)l;
@@ -144,7 +148,6 @@ static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool comput
         if (a != 0) ++nz;
         sum_abs += (double)a;
         if (compute_db) {
-            // Stereo RMS: (L^2 + R^2)/2 の平均 → ここでは縦続きで平均
             double lf = (double)l;
             double rf = (double)r;
             sum_sq += 0.5 * (lf*lf + rf*rf);
@@ -152,21 +155,21 @@ static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool comput
     }
 
     // mean_abs: ざっくり正規化（~20-22bit想定）。控えめに2^20で割る。
-    double mean_abs = (sum_abs / (double)n_samples) / (double)(1 << 20);
+    double mean_abs = (sum_abs / (double)N) / (double)(1 << 20);
     if (mean_abs < 0.0) mean_abs = 0.0;
     if (mean_abs > 1.0) mean_abs = 1.0;
     ctx->last_mean_abs = (float)mean_abs;
 
     if (compute_db) {
-        double rms = sqrt(sum_sq / (double)n_samples);           // 生PCMのRMS
-        double norm = (double)(1 << 23);                         // ~24bitスケール
+        double rms = sqrt(sum_sq / (double)N);             // 生PCMのRMS
+        double norm = (double)(1 << 23);                   // ~24bitスケール
         double rms_norm = rms / norm;
         if (rms_norm < 1e-12) rms_norm = 1e-12;
-        ctx->last_rms_db = (float)(20.0 * log10(rms_norm));      // dBFS
+        ctx->last_rms_db = (float)(20.0 * log10(rms_norm)); // dBFS
     }
 
     ctx->last_nonzero = nz;
-    ctx->total_advanced += n_samples;
+    if (n_samples) ctx->total_advanced += n_samples;
 #else
     (void)n_samples; (void)compute_db;
     ctx->last_mean_abs = 0.0f;
@@ -177,7 +180,6 @@ static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool comput
 
 float ymfm_step_and_measure(ymfm_ctx_t* ctx, uint32_t n_samples) {
     if (!ctx) return 0.0f;
-    // 追加: n_samples==0 は「前回の値を返す」だけ（前進しない）
     if (n_samples == 0) {
         return ctx->last_mean_abs;
     }
@@ -186,13 +188,35 @@ float ymfm_step_and_measure(ymfm_ctx_t* ctx, uint32_t n_samples) {
 }
 
 float ymfm_step_and_measure_db(ymfm_ctx_t* ctx, uint32_t n_samples) {
-    if (!ctx || n_samples == 0) return -120.0f;
+    if (!ctx) return -120.0f;
+    if (n_samples == 0) {
+        return ctx->last_rms_db;
+    }
     measure_common(ctx, n_samples, true);
     return ctx->last_rms_db;
 }
 
 uint32_t ymfm_get_last_nonzero(const ymfm_ctx_t* ctx) {
     return ctx ? ctx->last_nonzero : 0;
+}
+
+/* ====== EG analysis getters (stubs until YMFM_ANALYSIS is provided) ====== */
+int ymfm_get_op_env_phase(ymfm_ctx_t* /*ctx*/, int /*ch*/, int /*op_index*/) {
+#if defined(YMFM_ANALYSIS) && (defined(USE_YMFM) && USE_YMFM)
+    // TODO: implement when YMFM is patched with analysis accessors
+    return -1;
+#else
+    return -1; // unavailable
+#endif
+}
+
+float ymfm_get_op_env_level_db(ymfm_ctx_t* /*ctx*/, int /*ch*/, int /*op_index*/) {
+#if defined(YMFM_ANALYSIS) && (defined(USE_YMFM) && USE_YMFM)
+    // TODO: implement when YMFM is patched with analysis accessors
+    return -240.0f;
+#else
+    return -240.0f; // unavailable
+#endif
 }
 
 void ymfm_debug_print(const ymfm_ctx_t* ctx, const char* tag) {
