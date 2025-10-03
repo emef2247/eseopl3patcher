@@ -34,16 +34,10 @@ struct has_set_unscaled_clock {
     static auto test(...) -> std::false_type;
     static constexpr bool value = decltype(test<T>(0))::value;
 };
-
 template <class T>
 inline void try_set_unscaled_clock(T& chip, uint32_t clk) {
-    if constexpr (has_set_unscaled_clock<T>::value) {
-        chip.set_unscaled_clock(clk);
-    } else {
-        (void)chip; (void)clk;
-    }
+    if constexpr (has_set_unscaled_clock<T>::value) chip.set_unscaled_clock(clk);
 }
-
 template <class T>
 struct has_set_framerate {
     template <class U>
@@ -52,14 +46,9 @@ struct has_set_framerate {
     static auto test(...) -> std::false_type;
     static constexpr bool value = decltype(test<T>(0))::value;
 };
-
 template <class T>
 inline void try_set_framerate(T& chip, uint32_t rate) {
-    if constexpr (has_set_framerate<T>::value) {
-        chip.set_framerate(rate);
-    } else {
-        (void)chip; (void)rate;
-    }
+    if constexpr (has_set_framerate<T>::value) chip.set_framerate(rate);
 }
 
 struct ymfm_ctx {
@@ -126,48 +115,43 @@ void ymfm_opll_write(ymfm_ctx_t* ctx, uint32_t reg, uint8_t data) {
 #endif
 }
 
+#if defined(USE_YMFM) && USE_YMFM
+using output_t = ymfm::opll_base::output_data; // ymfm_output<2>
+#endif
+
 static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool compute_db) {
 #if defined(USE_YMFM) && USE_YMFM
-    using output_t = ymfm::opll_base::output_data; // ymfm_output<2>
     std::vector<output_t> frames(n_samples ? n_samples : 1);
     if (n_samples) {
         ctx->chip->generate(frames.data(), n_samples);
     }
 
-    double sum_abs = 0.0;
-    double sum_sq  = 0.0;
+    double sum_abs = 0.0, sum_sq = 0.0;
     uint32_t nz = 0;
     uint32_t N = n_samples ? n_samples : 1;
 
     for (uint32_t i = 0; i < N; ++i) {
         int32_t l = frames[i].data[0];
         int32_t r = frames[i].data[1];
-        int64_t ll = (int64_t)l;
-        int64_t rr = (int64_t)r;
-        int64_t a = std::max(ll >= 0 ? ll : -ll, rr >= 0 ? rr : -rr);
+        int64_t a = std::max<int64_t>(llabs((long long)l), llabs((long long)r));
         if (a != 0) ++nz;
         sum_abs += (double)a;
         if (compute_db) {
-            double lf = (double)l;
-            double rf = (double)r;
+            double lf = (double)l, rf = (double)r;
             sum_sq += 0.5 * (lf*lf + rf*rf);
         }
     }
 
-    // mean_abs: ざっくり正規化（~20-22bit想定）。控えめに2^20で割る。
-    double mean_abs = (sum_abs / (double)N) / (double)(1 << 20);
-    if (mean_abs < 0.0) mean_abs = 0.0;
-    if (mean_abs > 1.0) mean_abs = 1.0;
+    double mean_abs = (sum_abs / (double)N) / (double)(1 << 20); // ~2^20で正規化
+    mean_abs = std::clamp(mean_abs, 0.0, 1.0);
     ctx->last_mean_abs = (float)mean_abs;
 
     if (compute_db) {
-        double rms = sqrt(sum_sq / (double)N);             // 生PCMのRMS
-        double norm = (double)(1 << 23);                   // ~24bitスケール
-        double rms_norm = rms / norm;
-        if (rms_norm < 1e-12) rms_norm = 1e-12;
-        ctx->last_rms_db = (float)(20.0 * log10(rms_norm)); // dBFS
+        double rms = sqrt(sum_sq / (double)N);
+        double norm = (double)(1 << 23); // ~24bitスケール
+        double rms_norm = std::max(rms / norm, 1e-12);
+        ctx->last_rms_db = (float)(20.0 * log10(rms_norm));
     }
-
     ctx->last_nonzero = nz;
     if (n_samples) ctx->total_advanced += n_samples;
 #else
@@ -180,18 +164,14 @@ static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool comput
 
 float ymfm_step_and_measure(ymfm_ctx_t* ctx, uint32_t n_samples) {
     if (!ctx) return 0.0f;
-    if (n_samples == 0) {
-        return ctx->last_mean_abs;
-    }
+    if (n_samples == 0) return ctx->last_mean_abs;
     measure_common(ctx, n_samples, false);
     return ctx->last_mean_abs;
 }
 
 float ymfm_step_and_measure_db(ymfm_ctx_t* ctx, uint32_t n_samples) {
     if (!ctx) return -120.0f;
-    if (n_samples == 0) {
-        return ctx->last_rms_db;
-    }
+    if (n_samples == 0) return ctx->last_rms_db;
     measure_common(ctx, n_samples, true);
     return ctx->last_rms_db;
 }
@@ -200,22 +180,24 @@ uint32_t ymfm_get_last_nonzero(const ymfm_ctx_t* ctx) {
     return ctx ? ctx->last_nonzero : 0;
 }
 
-/* ====== EG analysis getters (stubs until YMFM_ANALYSIS is provided) ====== */
-int ymfm_get_op_env_phase(ymfm_ctx_t* /*ctx*/, int /*ch*/, int /*op_index*/) {
-#if defined(YMFM_ANALYSIS) && (defined(USE_YMFM) && USE_YMFM)
-    // TODO: implement when YMFM is patched with analysis accessors
-    return -1;
+// ====== EG analysis getters ======
+int ymfm_get_op_env_phase(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_env_phase(ch, op_index);
 #else
-    return -1; // unavailable
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
 #endif
 }
 
-float ymfm_get_op_env_level_db(ymfm_ctx_t* /*ctx*/, int /*ch*/, int /*op_index*/) {
-#if defined(YMFM_ANALYSIS) && (defined(USE_YMFM) && USE_YMFM)
-    // TODO: implement when YMFM is patched with analysis accessors
-    return -240.0f;
+int ymfm_get_op_env_att(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_env_att(ch, op_index);
 #else
-    return -240.0f; // unavailable
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
 #endif
 }
 

@@ -28,12 +28,17 @@ int ymfm_trace_csv_get_focus_ch(void);
 /* Log a wait window measurement for the current focus note (if any).
  * mean_abs/rms_db/nz: the values measured over this wait window.
  * wait_samples: window length in samples.
- * EG (optional): pass -1 / -240.0f if unavailable.
+ * EG fields:
+ *  - phase_mod/phase_car: envelope_state as int (0..5), -1 if unavailable
+ *  - att_mod/att_car: raw envelope attenuation 0..1023 (0=max), -1 if unavailable
+ *  - att_mod_db/att_car_db: approximate dB conversion from raw attenuation
  */
-void ymfm_trace_csv_on_wait(uint32_t wait_samples,
-                            float mean_abs, float rms_db, uint32_t nz,
-                            int phase_mod, float level_mod_db,
-                            int phase_car, float level_car_db);
+void ymfm_trace_csv_on_wait(
+    uint32_t wait_samples,
+    float mean_abs, float rms_db, uint32_t nz,
+    int phase_mod, int att_mod, float att_mod_db,
+    int phase_car, int att_car, float att_car_db
+);
 
 #ifdef __cplusplus
 }

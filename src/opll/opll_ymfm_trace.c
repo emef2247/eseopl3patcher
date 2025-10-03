@@ -7,6 +7,7 @@
 #include <string.h> // getenv, atoi
 
 #include "../../include/ymfm_c_api.h"
+#include "ymfm_trace_csv.h"
 
 /* 環境変数
    - ESEOPL3_YMFM_TRACE: 1/true で有効
@@ -53,6 +54,9 @@ void opll_ymfm_trace_init(void) {
     memset(s_prev_reg2n, 0, sizeof(s_prev_reg2n));
     memset(s_prev_ko,    0, sizeof(s_prev_ko));
     s_init_done = 1;
+
+    ymfm_trace_csv_init();
+    atexit(ymfm_trace_csv_shutdown);
 #else
     s_enabled = 0;
     (void)s_ctx; (void)s_min_log_wait; (void)s_verbose;
@@ -89,8 +93,10 @@ void opll_ymfm_trace_write(uint8_t addr, uint8_t data) {
             if (ko != s_prev_ko[ch]) {
                 if (ko) {
                     printf("[YMFM][KO-ON ] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
+                    ymfm_trace_csv_on_ko_edge(ch, 1, data);
                 } else {
                     printf("[YMFM][KO-OFF] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
+                    ymfm_trace_csv_on_ko_edge(ch, 0, data);
                 }
                 s_prev_ko[ch] = ko;
             }
@@ -99,19 +105,44 @@ void opll_ymfm_trace_write(uint8_t addr, uint8_t data) {
     }
 
     ymfm_opll_write(s_ctx, addr, data);
-    // 詳細な書込ログはVerboseのみ
     if (s_verbose) {
         printf("[YMFM][W] addr=%02X data=%02X\n", addr, data);
     }
 }
 
+/* 生attenuation(0..1023)→近似dB換算（0で0dB、1023で約-96dB） */
+static inline float eg_att_to_db_approx(int att_raw) {
+    if (att_raw < 0) return -240.0f;
+    if (att_raw > 1023) att_raw = 1023;
+    return -(float)att_raw * (96.0f / 1023.0f);
+}
+
 void opll_ymfm_trace_advance(uint32_t wait_samples) {
     if (!s_enabled || !s_ctx || wait_samples == 0) return;
 
-    // 測定は常に行う（内部的に状態を進める）が、表示はしきい値で抑制
     float rms_db = ymfm_step_and_measure_db(s_ctx, wait_samples);
-    float mean_abs = ymfm_step_and_measure(s_ctx, 0); // 0指定でも最後の値を返す前提で呼ばない。上で更新済み。
+    float mean_abs = ymfm_step_and_measure(s_ctx, 0);
     uint32_t nz = ymfm_get_last_nonzero(s_ctx);
+
+    // EG（フォーカスch）を取得
+    int focus = ymfm_trace_csv_get_focus_ch();
+    int ph_m = -1, ph_c = -1;
+    int att_m = -1, att_c = -1;
+    float att_m_db = -240.0f, att_c_db = -240.0f;
+    if (focus >= 0) {
+        ph_m = ymfm_get_op_env_phase(s_ctx, focus, 0);
+        att_m = ymfm_get_op_env_att(s_ctx, focus, 0);
+        ph_c = ymfm_get_op_env_phase(s_ctx, focus, 1);
+        att_c = ymfm_get_op_env_att(s_ctx, focus, 1);
+        att_m_db = eg_att_to_db_approx(att_m);
+        att_c_db = eg_att_to_db_approx(att_c);
+    }
+
+    ymfm_trace_csv_on_wait(
+        wait_samples, mean_abs, rms_db, nz,
+        ph_m, att_m, att_m_db,
+        ph_c, att_c, att_c_db
+    );
 
     if (s_verbose || wait_samples >= s_min_log_wait) {
         printf("[YMFM][S] wait=%u mean_abs=%.6f rms_db=%.2f nz=%u\n",
