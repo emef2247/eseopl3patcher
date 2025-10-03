@@ -1,0 +1,27 @@
+{
+  "description": "Provisional YM2413 envelope generator timing tables (ymfm/MAME/EMU2413-based)",
+  "source": "Provisional values for validation; will be replaced with strict ymfm tables later",
+  "clock_hz": 3579545,
+  "eg_times_ms": {
+    "attack": [
+      0.0, 0.5, 1.0, 1.6, 2.0, 2.5, 3.2, 4.0,
+      5.0, 6.4, 8.0, 10.0, 12.8, 16.0, 20.0, 32.0
+    ],
+    "decay": [
+      0.0, 1.2, 2.4, 3.6, 4.8, 6.0, 9.6, 12.0,
+      19.2, 24.0, 38.4, 48.0, 76.8, 96.0, 192.0, 384.0
+    ],
+    "release": [
+      0.0, 1.2, 2.4, 3.6, 4.8, 6.0, 9.6, 12.0,
+      19.2, 24.0, 38.4, 48.0, 76.8, 96.0, 192.0, 384.0
+    ]
+  },
+  "ksr": {
+    "description": "Key Scale Rate: per-block shift values (0-7 for FNUM blocks 0-7)",
+    "per_blk_shift": [0, 0, 1, 1, 2, 2, 3, 3]
+  },
+  "sustain_level": {
+    "description": "Sustain Level (SL) values in dB attenuation",
+    "values_db": [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 93]
+  }
+}
