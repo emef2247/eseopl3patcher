@@ -124,6 +124,13 @@ tmp/
 temp/
 analysis/
 
+*trials.csv
+
 # Python cache
 __pycache__/
+tools/*/*/__pycache__
 *.pyc
+
+*.bak
+# third_party
+third_party/

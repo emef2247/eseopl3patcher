@@ -1,0 +1,2 @@
+scenario,iter,base_release_ms,exp_shape,ksr_scale_per_blk,sl_floor,sl_curve,residual_threshold_db,db_weight,gap_weight,avg_score,avg_residual,avg_db_norm,avg_sustain_loss,total_overlap_events,sequences
+01Sample_1_timeline_YM2413,0,0.4,1.1,0.1,0.03,0.8,-30.0,0.1,0.1,0.4455374194432687,0.38959486211511923,0.5594255732814952,0.0,407,6

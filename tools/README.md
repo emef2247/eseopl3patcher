@@ -34,3 +34,31 @@ Re-run the fetch script with the same argument; it will overwrite the old versio
 
 The binaries are NOT committed to the repository. Refer to upstream license files in their respective source repositories.
 
+
+# vgm_ir (prototype): VGM -> IR extractor + utilities
+
+Updates in this version
+- New per-write timeline CSV that matches your expectation:
+  - 1 VGM register write = 1 row
+  - time origin at the first write (time=0), ticks=ceil(time*60) with the special-case ticks==1 -> 0
+  - Register-aware type column (PSG: fCA/fCB/aVC/mode/wNC/envL/envM/envS/ioP1/ioP2; SCC: wtb/f1/f2/vol/en)
+  - Optional convenience columns (reg16/pitch_hz/vol4) are included; raw reg/dd always present
+
+CLI
+```bash
+# Per-write timeline (for diff against your expected CSV)
+python -m tools.vgm_ir.vgm2ir input.vgm --out analysis/ir --timeline-per-write
+
+# Aggregated (previous) f/v/fV timeline is still available:
+python -m tools.vgm_ir.vgm2ir input.vgm --out analysis/ir --timeline-quant
+```
+
+Per-write file format
+```
+chip,ch,tick,time_s,type,reg,dd,reg16,pitch_hz,vol4,samples
+# samples is relative samples from the first register write
+```
+
+Notes
+- The previous aggregated timeline deduplicated unchanged values; the new per-write timeline does not deduplicate and therefore preserves 1:1 parity with VGM writes, resolving the “one-row shift”.
+- time and tick are computed with a fixed 44100.0 base to align with openMSX vgmrecorder.

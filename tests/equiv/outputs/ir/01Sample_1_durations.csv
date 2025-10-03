@@ -1,0 +1,6 @@
+ch,note_index,t_on_s,t_off_s,dur_s,t_next_on_s,interval_to_next_on_s,dur_to_next_on_ratio,close_reason,blk_on,fnum_on,fnumL_on,dt_a0_before_on_s,dt_a0_after_on_s,a0_before_on_in_window,a0_after_on_in_window,fnumL_before_on,fnumL_after_on,dt_iv_before_on_s,dt_iv_after_on_s,iv_before_on_in_window,iv_after_on_in_window,inst_before_on,vol_before_on,inst_after_on,vol_after_on
+0,0,16.01,17.61,1.5999999999999979,17.61,1.5999999999999979,1.0,ko_off,3.0,305.0,49.0,0.0,0.0,True,True,49.0,49.0,0.0,0.0,True,True,1.0,3.0,1.0,3.0
+0,1,17.61,19.21,1.6000000000000014,19.21,1.6000000000000014,1.0,ko_off,4.0,171.0,171.0,0.0,0.0,True,True,171.0,171.0,1.5999999999999979,,False,False,1.0,3.0,,
+0,2,19.21,20.81,1.5999999999999979,20.81,1.5999999999999979,1.0,ko_off,3.0,305.0,49.0,0.0,0.0,True,True,49.0,49.0,3.1999999999999993,,False,False,1.0,3.0,,
+0,3,20.81,22.41,1.6000000000000014,22.41,1.6000000000000014,1.0,ko_off,4.0,171.0,171.0,0.0,0.0,True,True,171.0,171.0,4.799999999999997,,False,False,1.0,3.0,,
+0,4,22.41,,,,,,none,4.0,192.0,192.0,0.0,0.0,True,True,192.0,192.0,6.399999999999999,,False,False,1.0,3.0,,

@@ -1,0 +1,14 @@
+scenario,iter,base_release_ms,exp_shape,ksr_scale_per_blk,sl_floor,sl_curve,residual_threshold_db,db_weight,gap_weight,avg_score,avg_residual,avg_db_norm,avg_sustain_loss,total_overlap_events,sequences
+ym2413_3ch_test_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_block_boundary_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_highlow_range_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_legato_patch_mix_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_patch_change_midnote_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_redundant_fnum_writes_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_release_retrigger_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_rhythm_mode_basic_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_rhythm_mode_toggle_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_scale_chromatic_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_scale_rom1_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_short_pulses_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+ym2413_volume_sweep_timeline_YM2413,0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1

@@ -1,0 +1,17 @@
+{
+  "iter": 2,
+  "base_release_ms": 0.175,
+  "exp_shape": 0.55,
+  "ksr_scale_per_blk": 0.025,
+  "sl_floor": 0.00375,
+  "sl_curve": 0.5375,
+  "residual_threshold_db": -71.25,
+  "db_weight": -0.05,
+  "gap_weight": -0.05,
+  "avg_score": -0.08249999999999996,
+  "avg_residual": 0.0,
+  "avg_db_norm": 0.0,
+  "avg_sustain_loss": 0.0,
+  "total_overlap_events": 0,
+  "sequences": 1
+}

@@ -1,10 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple, List, Dict, Any
+import math
 
-# Simplified envelope model for YM2413-like behavior.
-# Intent: structure matches public emulator concepts (AR/DR/SL/RR, KSR, KO state machine),
-# but rate->time is parametric to be replaced with exact tables from ymfm/EMU2413 later.
+# Simplified envelope model for YM2413-like behavior, with parametric rate mapping.
 
 @dataclass
 class PatchParams:
@@ -20,20 +19,16 @@ class NoteContext:
     blk: int    # 0..7
     t_on: float # seconds
     ioi: float  # seconds to next onset (inter-onset interval)
-    # If KO already toggled in source, we keep it; otherwise estimator will select KO_off by gate.
 
 class YM2413EnvelopeModel:
     def __init__(
         self,
-        # Base time scales (rough; will be replaced by proper tables later)
-        base_attack_ms: float = 0.50,   # AR=8..10 around ~fast 0.1..0.2s; AR small -> slower
+        base_attack_ms: float = 0.50,
         base_decay_ms: float = 1.00,
-        base_release_ms: float = 0.80,
-        # Shape controls: 0=linear, 1=exp-like
+        # More realistic provisional release time so residual depends on Gate
+        base_release_ms: float = 0.60,
         exp_shape: float = 0.85,
-        # KSR scaling per octave (blk step). Positive reduces times for higher pitch.
         ksr_scale_per_blk: float = 0.15,
-        # Sustain level mapping: convert 0..15 SL to amplitude (0..1)
         sl_floor: float = 0.05,
         sl_curve: float = 1.0,
     ):
@@ -64,27 +59,39 @@ class YM2413EnvelopeModel:
 
         return self._amp_at_time(t_query, t_on, t_off, ar_s, dr_s, rr_s, sl_amp)
 
-    def choose_gate_grid(self, patch: PatchParams, notes: list[NoteContext],
-                         gate_min: float = 0.60, gate_max: float = 0.98, gate_step: float = 0.01,
-                         residual_threshold: float = 0.02,
-                         overlap_weight: float = 1.0, gap_weight: float = 0.2) -> Tuple[float, dict]:
+    def choose_gate_grid(
+        self,
+        patch: PatchParams,
+        notes: list[NoteContext],
+        gate_min: float = 0.45,
+        gate_max: float = 0.98,
+        gate_step: float = 0.005,
+        residual_threshold_db: float = -50.0,  # treat below -50 dB as sufficiently silent
+        overlap_weight: float = 1.0,
+        gap_weight: float = 0.25,
+        db_weight: float = 0.25,  # dB-domain stabilizer
+    ) -> Tuple[float, dict]:
         """
         Grid search a single Gate for a sequence (pattern/channel).
-        Objective focuses on minimizing residual amplitude at next onset,
-        with mild penalty for too-early KO (gap) based on sustain loss.
+        Scoring combines linear amplitude residual, dB-domain residual, and a gap penalty.
         """
         best_gate, best_score, best_metrics = None, float("inf"), {}
-        gates = [round(gate_min + i * gate_step, 4) for i in range(int((gate_max - gate_min) / gate_step) + 1)]
+        n_steps = int((gate_max - gate_min) / gate_step) + 1
+        gates = [round(gate_min + i * gate_step, 4) for i in range(n_steps)]
+
+        def amp_to_db(a: float) -> float:
+            a = max(1e-6, min(1.0, a))
+            return 20.0 * math.log10(a)
 
         for g in gates:
             residual_sum = 0.0
+            residual_db_sum = 0.0
             overlap_events = 0
             gap_penalty_sum = 0.0
             sustain_loss_sum = 0.0
             count = 0
 
             for i, n in enumerate(notes):
-                # Skip last note for residual-at-next-onset
                 if i + 1 >= len(notes):
                     break
                 next_on = notes[i + 1].t_on
@@ -92,33 +99,40 @@ class YM2413EnvelopeModel:
                 # Residual from current note at next onset
                 amp_res = self.residual_at(patch, n, g, next_on)
                 residual_sum += amp_res
+                res_db = amp_to_db(amp_res)
+                residual_db_sum += max(0.0, (res_db - residual_threshold_db) / abs(residual_threshold_db))
                 count += 1
-                if amp_res > residual_threshold:
+                if res_db > residual_threshold_db:
                     overlap_events += 1
 
                 # Gap/sustain evaluation: amplitude near 0.8*IOI should not be too low while KO=1
                 t_probe = n.t_on + min(0.8 * n.ioi, max(1e-4, g * n.ioi) - 1e-4)
                 amp_probe = self.residual_at(patch, n, g, t_probe)
-                # Sustain target approx: between SL and 1 depending on decay progress
                 sustain_target = max(self._sl_to_amp(patch.sl), 0.2)
                 loss = max(0.0, sustain_target - amp_probe)
                 sustain_loss_sum += loss
 
-                # Penalize KO too early vs IOI (encourage at least 60% of IOI by default)
-                if g < 0.65:
-                    gap_penalty_sum += (0.65 - g)
+                # Penalize KO too early vs IOI（threshold 0.60, linear）
+                if g < 0.60:
+                    gap_penalty_sum += (0.60 - g)
 
             if count == 0:
                 continue
             avg_residual = residual_sum / count
+            avg_residual_db_norm = residual_db_sum / count
             avg_sustain_loss = sustain_loss_sum / count
-            score = avg_residual * overlap_weight + (avg_sustain_loss + gap_penalty_sum) * gap_weight
+            score = (
+                avg_residual * overlap_weight
+                + (avg_sustain_loss + gap_penalty_sum) * gap_weight
+                + avg_residual_db_norm * db_weight
+            )
 
             if score < best_score:
                 best_gate = g
                 best_score = score
                 best_metrics = {
                     "avg_residual": avg_residual,
+                    "avg_residual_db_norm": avg_residual_db_norm,
                     "overlap_events": overlap_events,
                     "avg_sustain_loss": avg_sustain_loss,
                     "score": score,
@@ -126,48 +140,107 @@ class YM2413EnvelopeModel:
 
         return best_gate if best_gate is not None else 0.8, best_metrics
 
+    # --- Diagnostics (optional) ---
+
+    def evaluate_gate_grid(
+        self,
+        patch: PatchParams,
+        notes: list[NoteContext],
+        gate_min: float = 0.45,
+        gate_max: float = 0.98,
+        gate_step: float = 0.005,
+        residual_threshold_db: float = -50.0,
+        overlap_weight: float = 1.0,
+        gap_weight: float = 0.25,
+        db_weight: float = 0.25,
+    ) -> List[Dict[str, Any]]:
+        """Return metrics per gate for diagnostics (not used by sweep.py directly)."""
+        n_steps = int((gate_max - gate_min) / gate_step) + 1
+        gates = [round(gate_min + i * gate_step, 4) for i in range(n_steps)]
+
+        def amp_to_db(a: float) -> float:
+            a = max(1e-6, min(1.0, a))
+            return 20.0 * math.log10(a)
+
+        rows: List[Dict[str, Any]] = []
+        for g in gates:
+            residual_sum = 0.0
+            residual_db_sum = 0.0
+            overlap_events = 0
+            gap_penalty_sum = 0.0
+            sustain_loss_sum = 0.0
+            count = 0
+
+            for i, n in enumerate(notes):
+                if i + 1 >= len(notes):
+                    break
+                next_on = notes[i + 1].t_on
+                amp_res = self.residual_at(patch, n, g, next_on)
+                residual_sum += amp_res
+                res_db = amp_to_db(amp_res)
+                residual_db_sum += max(0.0, (res_db - residual_threshold_db) / abs(residual_threshold_db))
+                count += 1
+                if res_db > residual_threshold_db:
+                    overlap_events += 1
+
+                t_probe = n.t_on + min(0.8 * n.ioi, max(1e-4, g * n.ioi) - 1e-4)
+                amp_probe = self.residual_at(patch, n, g, t_probe)
+                sustain_target = max(self._sl_to_amp(patch.sl), 0.2)
+                loss = max(0.0, sustain_target - amp_probe)
+                sustain_loss_sum += loss
+
+                if g < 0.60:
+                    gap_penalty_sum += (0.60 - g)
+
+            if count == 0:
+                continue
+            avg_residual = residual_sum / count
+            avg_residual_db_norm = residual_db_sum / count
+            avg_sustain_loss = sustain_loss_sum / count
+            score = (
+                avg_residual * overlap_weight
+                + (avg_sustain_loss + gap_penalty_sum) * gap_weight
+                + avg_residual_db_norm * db_weight
+            )
+            rows.append({
+                "gate": g,
+                "avg_residual": avg_residual,
+                "avg_residual_db_norm": avg_residual_db_norm,
+                "avg_sustain_loss": avg_sustain_loss,
+                "overlap_events": overlap_events,
+                "score": score,
+            })
+        return rows
+
     # --- Internals ---
 
     def _ksr_factor(self, patch: PatchParams, fnum: int, blk: int) -> float:
         if not patch.ksr:
             return 1.0
-        # Simplified: higher blk speeds up envelope (shorter times).
-        # Each blk step reduces time by ksr_scale_per_blk.
-        factor = max(0.3, 1.0 - self.ksr_scale_per_blk * max(0, min(7, blk)))
-        return factor
+        # Higher blk speeds up envelope (shorter times).
+        return max(0.3, 1.0 - self.ksr_scale_per_blk * max(0, min(7, blk)))
 
     def _code_to_time_sec(self, code: int, base_ms: float, ksr_factor: float) -> float:
-        """
-        Map 0..15 code to a time constant. Code==0 considered 'hold' (very long).
-        Shape is exponential-like; calibrated later with real tables.
-        """
         if code <= 0:
-            return 10.0  # effectively 'no change'
-        # Faster for larger code. 15 -> very fast; 1 -> very slow.
-        from math import pow
+            return 10.0  # effectively 'hold'
         rel = code - 8
-        scale = pow(0.5, rel / 4.0)  # every +4 steps ~half the time
+        scale = math.pow(0.5, rel / 4.0)  # every +4 steps ~half the time
         t = max(1e-4, base_ms * scale * ksr_factor)
         return t
 
     def _sl_to_amp(self, sl_code: int) -> float:
-        # Map 0..15 to amplitude [sl_floor..1], 0=1.0, 15=sl_floor
         sl_code = max(0, min(15, sl_code))
         span = 1.0 - self.sl_floor
         x = 1.0 - (sl_code / 15.0)
         try:
-            from math import pow
             if self.sl_curve != 1.0:
-                x = pow(x, self.sl_curve)
+                x = math.pow(x, self.sl_curve)
         except Exception:
             pass
         return self.sl_floor + span * x
 
     def _amp_at_time(self, t: float, t_on: float, t_off: float,
                      ar_s: float, dr_s: float, rr_s: float, sl_amp: float) -> float:
-        """
-        Piecewise AD(S)R with simple curves. Returns amplitude [0..1].
-        """
         if t <= t_on:
             return 0.0
 
@@ -204,12 +277,10 @@ class YM2413EnvelopeModel:
         return self._mix(lvl_off, 0.0, dr / tr)
 
     def _rise(self, x: float) -> float:
-        # 0..1 -> 0..1, exp-shaped rise
         s = self.exp_shape
         if s <= 0.0:
             return x
-        from math import exp
-        return 1.0 - exp(-x * (1.0 / max(1e-3, s)))
+        return 1.0 - math.exp(-x * (1.0 / max(1e-3, s)))
 
     def _mix(self, a: float, b: float, x: float) -> float:
         x = max(0.0, min(1.0, x))

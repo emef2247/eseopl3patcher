@@ -1,0 +1,14 @@
+{
+  "gate": { "min": 0.45, "max": 0.98, "step": 0.005 },
+  "ranges": {
+    "base_release_ms": [0.4, 1.0],
+    "residual_threshold_db": [-60.0, -30.0],
+    "db_weight": [0.10, 0.50],
+    "gap_weight": [0.10, 0.50],
+    "exp_shape": [0.7, 1.1],
+    "ksr_scale_per_blk": [0.10, 0.30],
+    "sl_floor": [0.03, 0.10],
+    "sl_curve": [0.8, 1.5]
+  },
+  "search": { "points": 3, "iters": 3, "shrink": 0.5 }
+}

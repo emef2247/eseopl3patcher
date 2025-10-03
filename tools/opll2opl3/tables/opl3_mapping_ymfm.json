@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "source": "ymfm-guided mapping (provisional)",
+    "notes": "Static rate/TL/FB/wave maps; refine via fitting later."
+  },
+  "fnum_shift": 1,
+  "rate_map": {
+    "ar": [0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,15],
+    "dr": [0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,15],
+    "rr": [0,2,3,4,5,6,7,8,8,9,10,11,12,13,14,15]
+  },
+  "fb_map": [0,1,2,3,4,5,6,7],
+  "wave_map": { "opll_wf0": 0, "opll_wf1": 1 },
+  "ksr_rule": { "opl3_ksr_on": true },
+  "tl_scale": {
+    "vol_to_tl_car": [0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60],
+    "scale_tl_mod": false
+  },
+  "rhythm": {
+    "patches": {
+      "bd":  { "tl": 32, "ar": 12, "dr": 8, "sl": 8, "rr": 6, "wf": 0, "fb": 2 },
+      "sd":  { "tl": 40, "ar": 12, "dr": 10, "sl": 10, "rr": 8, "wf": 1 },
+      "tom": { "tl": 36, "ar": 12, "dr": 9,  "sl": 9,  "rr": 7, "wf": 0 },
+      "tc":  { "tl": 44, "ar": 12, "dr": 11, "sl": 11, "rr": 9, "wf": 1 },
+      "hh":  { "tl": 44, "ar": 12, "dr": 11, "sl": 11, "rr": 9, "wf": 1 }
+    }
+  }
+}

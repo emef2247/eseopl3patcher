@@ -1,103 +1,120 @@
-CC       = gcc
-CC_WIN   = x86_64-w64-mingw32-gcc
+# eseopl3patcher Makefile (YMFM optional integration)
+# Usage:
+#   make                  # YMFMなしでビルド（常時通る: トレースはNO-OP）
+#   make USE_YMFM=1 -j    # YMFM有効（scripts/setup_ymfm.sh 実行後）
+#   ESEOPL3_YMFM_TRACE=1 ./build/bin/eseopl3patcher <args>  # YMFMトレース出力（USE_YMFM=1時）
 
-# 追加: ユーザー定義マクロ/フラグ
-CPPFLAGS ?=
+# Compilers
+CC       := gcc
+CXX      := g++
+
+# Feature toggles
+USE_YMFM ?= 0   # 0: off (default, builds always) / 1: on (requires third_party/ymfm)
+
+# User-provided preprocessor defines (e.g., USER_DEFINES="-DENABLE_FOO=1")
 USER_DEFINES ?=
-CPPFLAGS += $(USER_DEFINES)
 
-CFLAGS   = -O2 -Wall -Iinclude -Isrc/opl3 -Isrc/vgm -Isrc/opll
+# Common flags
+CPPFLAGS  := $(USER_DEFINES)
+CFLAGS    := -O2 -Wall -Wextra -std=c11   -MMD -MP
+CXXFLAGS  := -O2 -Wall -Wextra -std=c++17 -MMD -MP
+LDFLAGS   :=
+LDLIBS    := -lm   # <= add libm for floor/log10/log2
 
-BUILD_DIR = build
 
-TEST_DETUNE ?= 0
-TEST_EXTRA_ARGS ?= --convert-ym2413
+# Include paths
+INC_DIRS := include src/opl3 src/opll src/vgm
+INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-SRCS = $(wildcard src/opl3/*.c) \
-       $(wildcard src/vgm/*.c)  \
-       $(wildcard src/opll/*.c) \
-       $(wildcard src/*.c)
+# YMFM (optional)
+ifeq ($(USE_YMFM),1)
+  CPPFLAGS  += -DUSE_YMFM=1
+  CXXFLAGS  += -Ithird_party/ymfm/src
+  # C側にも ymfm_bridge のヘッダを見せるため共通インクルードを追加
+  INC_FLAGS += -Iinclude
+else
+  CPPFLAGS  += -DUSE_YMFM=0
+endif
 
-TARGET      = $(BUILD_DIR)/eseopl3patcher
-TARGET_WIN  = $(BUILD_DIR)/eseopl3patcher.exe
+# Directories
+BUILD_DIR := build
+BIN_DIR   := $(BUILD_DIR)/bin
+OBJ_DIR   := $(BUILD_DIR)/obj
 
+# Target
+TARGET := $(BIN_DIR)/eseopl3patcher
+
+# Sources
+SRCS_C   := $(wildcard src/*.c) \
+            $(wildcard src/opl3/*.c) \
+            $(wildcard src/opll/*.c) \
+            $(wildcard src/vgm/*.c)
+
+SRCS_CPP :=
+ifeq ($(USE_YMFM),1)
+  # YMFM C bridge
+  SRCS_CPP += src/ymfm_bridge/ymfm_c_api.cpp
+endif
+
+# Object files (preserve directory structure under OBJ_DIR)
+OBJS_C    := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRCS_C))
+OBJS_CPP  := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS_CPP))
+
+# Dependency files
+DEPS := $(OBJS_C:.o=.d) $(OBJS_CPP:.o=.d)
+
+# Default target
+.PHONY: all
 all: $(TARGET)
 
-$(BUILD_DIR):
-	@mkdir -p $(BUILD_DIR)
+# Create directories
+$(BIN_DIR) $(OBJ_DIR):
+	@mkdir -p "$@"
 
-$(TARGET): $(SRCS) | $(BUILD_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ -lm
+# Pattern rules for C/C++
+# Ensure object subdirectories exist
+$(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
+	@mkdir -p "$(dir $@)"
+	$(CC)  $(CPPFLAGS) $(CFLAGS)   $(INC_FLAGS) -c $< -o $@
 
-win: $(SRCS) | $(BUILD_DIR)
-	$(CC_WIN) $(CPPFLAGS) $(CFLAGS) -o $(TARGET_WIN) $^ -lm
+$(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INC_FLAGS) -c $< -o $@
 
-release: $(TARGET)
-	@mkdir -p release_temp
-	@if [ -f $(TARGET) ]; then cp -f $(TARGET) release_temp/; fi
-	@if [ -f $(TARGET_WIN) ]; then cp -f $(TARGET_WIN) release_temp/; fi
-	@echo "Copied binaries to release_temp/"
+# Link
+# If YMFM is enabled, link with C++ linker to pull in libstdc++ automatically.
+$(TARGET): $(BIN_DIR) $(OBJS_C) $(OBJS_CPP)
+ifeq ($(USE_YMFM),1)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS_C) $(OBJS_CPP) $(LDLIBS)
+else
+	$(CC)  $(LDFLAGS) -o $@ $(OBJS_C)            $(LDLIBS)
+endif
+	@echo "[OK] Built $@"
 
+# Convenience: fetch YMFM
+.PHONY: setup-ymfm
+setup-ymfm:
+	@bash scripts/setup_ymfm.sh
+
+# Clean
+.PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) release_temp
+	@rm -rf "$(BUILD_DIR)"
 
-.PHONY: test-equivalence baseline-update baseline-init
+# Print variables (debug)
+.PHONY: vars
+vars:
+	@echo "USE_YMFM=$(USE_YMFM)"
+	@echo "CC=$(CC)"
+	@echo "CXX=$(CXX)"
+	@echo "CPPFLAGS=$(CPPFLAGS)"
+	@echo "CFLAGS=$(CFLAGS)"
+	@echo "CXXFLAGS=$(CXXFLAGS)"
+	@echo "INC_FLAGS=$(INC_FLAGS)"
+	@echo "SRCS_C count=$(words $(SRCS_C))"
+	@echo "SRCS_CPP count=$(words $(SRCS_CPP))"
+	@echo "TARGET=$(TARGET)"
 
-test-equivalence: $(TARGET)
-	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET)
-
-baseline-update: $(TARGET)
-	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET) --update-baseline
-
-baseline-init: $(TARGET)
-	@DETUNE=$(TEST_DETUNE) EXTRA_ARGS="$(TEST_EXTRA_ARGS)" scripts/test_vgm_equiv.sh $(TARGET) --init-baseline
-
-# 便利ターゲット
-.PHONY: tl0 nogate tl0-nogate print-flags
-tl0:
-	@$(MAKE) clean
-	@$(MAKE) all USER_DEFINES="-DOPLL_DEBUG_FORCE_CAR_TL_ZERO=1"
-
-nogate:
-	@$(MAKE) clean
-	@$(MAKE) all USER_DEFINES="-DOPLL_MIN_GATE_SAMPLES=0"
-
-tl0-nogate:
-	@$(MAKE) clean
-	@$(MAKE) all USER_DEFINES="-DOPLL_DEBUG_FORCE_CAR_TL_ZERO=1 -DOPLL_MIN_GATE_SAMPLES=0"
-
-print-flags:
-	@echo "CC             = $(CC)"
-	@echo "CC_WIN         = $(CC_WIN)"
-	@echo "CPPFLAGS       = $(CPPFLAGS)"
-	@echo "CFLAGS         = $(CFLAGS)"
-	@echo "USER_DEFINES   = $(USER_DEFINES)"
-	@echo "TEST_DETUNE    = $(TEST_DETUNE)"
-	@echo "TEST_EXTRA_ARGS= $(TEST_EXTRA_ARGS)"
-
-.PHONY: all win release clean
-
-SPECTRO_SCRIPT = scripts/wav_spectrogram.py
-
-.PHONY: vgm2wav spectrogram
-vgm2wav: $(TARGET)
-	# VGM -> WAV (vgmplay のオプションは環境により異なる場合あり)
-	# 例: VGMPlay -o out.wav -l 1 test.vgm
-	VGMPlay -o out.wav -l 1 test.vgm
-
-spectrogram:
-	python3 $(SPECTRO_SCRIPT) out.wav --out out_spec.png --max_freq 8000 --n_fft 4096 --hop 512
-	@echo "Generated: out_spec.png"
-
-# Gate sweep one-shot
-# Usage:
-#   make gate-sweep IN=tests/equiv/inputs/ym2413_scale_chromatic.vgm BASE=tests/equiv/inputs/ym2413_scale_chromatic.wav LABEL=scale
-.PHONY: gate-sweep
-gate-sweep: $(TARGET)
-	@bash scripts/auto_analyze_vgm.sh -i "$(IN)" -b "$(BASE)" -l "$(LABEL)" --adv-onset --adv-env
-
-# Quick: choose gates inline
-#   make gate-sweep-gates IN=... GATES="8192 10240 12288"
-.PHONY: gate-sweep-gates
-gate-sweep-gates: $(TARGET)
-	@bash scripts/auto_analyze_vgm.sh -i "$(IN)" -b "$(BASE)" -l "$(LABEL)" -g "$(GATES)" --adv-onset --adv-env
+# Include auto-generated dependencies
+# (only if files exist, to avoid first-run errors)
+-include $(DEPS)

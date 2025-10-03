@@ -1,0 +1,3 @@
+iter,base_release_ms,exp_shape,ksr_scale_per_blk,sl_floor,sl_curve,residual_threshold_db,db_weight,gap_weight,avg_score,avg_residual,avg_db_norm,avg_sustain_loss,total_overlap_events,sequences
+0,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
+1,0.4,0.7,0.1,0.03,0.8,-60.0,0.1,0.1,0.0,0.0,0.0,0.0,0,1
