@@ -45,4 +45,10 @@ void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db, CommandOption
 /** Gate compensation debt access (for duplicate_write_opl3) */
 extern uint32_t* opll_get_gate_comp_debt_ptr(void);
 
+/** Gate loader status - check if gates CSV is loaded */
+int opll_gates_loaded(void);
+
+/** Get gate value for specific patch/channel (returns 0 if not found) */
+int opll_gate_lookup(int patch, int channel, uint16_t *out_gate);
+
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */
