@@ -19,13 +19,8 @@ void        ymfm_destroy(ymfm_ctx_t* ctx);
 void        ymfm_opll_write(ymfm_ctx_t* ctx, uint32_t addr, uint8_t data);
 
 // Nサンプル進めて、簡単な応答メトリクスを返す
-// 戻り値: 平均絶対振幅（0..1目安、内部正規化係数は実装依存）
 float       ymfm_step_and_measure(ymfm_ctx_t* ctx, uint32_t n_samples);
-
-// Nサンプル進めて、RMS→dBFSを返す（0dBFSがフルスケール、無音は -inf に近い値）
 float       ymfm_step_and_measure_db(ymfm_ctx_t* ctx, uint32_t n_samples);
-
-// 直近測定の非ゼロサンプル数（0なら完全無音だったことを示す）
 uint32_t    ymfm_get_last_nonzero(const ymfm_ctx_t* ctx);
 
 // EG内部（分析ビルドで有効）
@@ -35,7 +30,19 @@ uint32_t    ymfm_get_last_nonzero(const ymfm_ctx_t* ctx);
 int         ymfm_get_op_env_phase(ymfm_ctx_t* ctx, int ch, int op_index);
 int         ymfm_get_op_env_att(ymfm_ctx_t* ctx, int ch, int op_index);
 
-// デバッグ出力（直近の指標などをSTDOUTへ）
+// 追加のキャッシュ値（YMFM内部の有効値）
+// total_level_x8: KSL合成後TL（×8スケール）
+// multiple_x2   : multiple の x.1 値を整数化（×2）
+// eg_rate       : KSR適用後のrate（state: 0..5 = DP/ATK/DEC/SUS/REL/REV）
+// eg_sustain_x32: SLの内部単位（<<5 済み）
+// block_freq    : cache の block_freq
+int         ymfm_get_op_cache_total_level_x8(ymfm_ctx_t* ctx, int ch, int op_index);
+int         ymfm_get_op_cache_multiple_x2(ymfm_ctx_t* ctx, int ch, int op_index);
+int         ymfm_get_op_cache_eg_rate(ymfm_ctx_t* ctx, int ch, int op_index, int eg_state);
+int         ymfm_get_op_cache_eg_sustain_x32(ymfm_ctx_t* ctx, int ch, int op_index);
+int         ymfm_get_op_cache_block_freq(ymfm_ctx_t* ctx, int ch, int op_index);
+
+// デバッグ出力
 void        ymfm_debug_print(const ymfm_ctx_t* ctx, const char* tag);
 
 #ifdef __cplusplus

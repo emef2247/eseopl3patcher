@@ -25,7 +25,7 @@ public:
     void ymfm_external_write(ymfm::access_class /*type*/, uint32_t /*address*/, uint8_t /*data*/) override {}
 };
 
-// --------- API-diff tolerant helpers (C++17 SFINAE) ---------
+// --------- API-diff tolerant helpers ---------
 template <class T>
 struct has_set_unscaled_clock {
     template <class U>
@@ -142,13 +142,13 @@ static inline void measure_common(ymfm_ctx* ctx, uint32_t n_samples, bool comput
         }
     }
 
-    double mean_abs = (sum_abs / (double)N) / (double)(1 << 20); // ~2^20で正規化
+    double mean_abs = (sum_abs / (double)N) / (double)(1 << 20);
     mean_abs = std::clamp(mean_abs, 0.0, 1.0);
     ctx->last_mean_abs = (float)mean_abs;
 
     if (compute_db) {
         double rms = sqrt(sum_sq / (double)N);
-        double norm = (double)(1 << 23); // ~24bitスケール
+        double norm = (double)(1 << 23);
         double rms_norm = std::max(rms / norm, 1e-12);
         ctx->last_rms_db = (float)(20.0 * log10(rms_norm));
     }
@@ -195,6 +195,57 @@ int ymfm_get_op_env_att(ymfm_ctx_t* ctx, int ch, int op_index) {
 #if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
     if (!ctx || !ctx->chip) return -1;
     return ctx->chip->analysis_get_op_env_att(ch, op_index);
+#else
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
+#endif
+}
+
+// ====== Cache analysis getters ======
+int ymfm_get_op_cache_total_level_x8(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_cache_total_level_x8(ch, op_index);
+#else
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
+#endif
+}
+
+int ymfm_get_op_cache_multiple_x2(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_cache_multiple_x2(ch, op_index);
+#else
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
+#endif
+}
+
+int ymfm_get_op_cache_eg_rate(ymfm_ctx_t* ctx, int ch, int op_index, int eg_state) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_cache_eg_rate(ch, op_index, eg_state);
+#else
+    (void)ctx; (void)ch; (void)op_index; (void)eg_state;
+    return -1;
+#endif
+}
+
+int ymfm_get_op_cache_eg_sustain_x32(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_cache_eg_sustain_x32(ch, op_index);
+#else
+    (void)ctx; (void)ch; (void)op_index;
+    return -1;
+#endif
+}
+
+int ymfm_get_op_cache_block_freq(ymfm_ctx_t* ctx, int ch, int op_index) {
+#if defined(USE_YMFM) && USE_YMFM && defined(YMFM_ANALYSIS)
+    if (!ctx || !ctx->chip) return -1;
+    return ctx->chip->analysis_get_op_cache_block_freq(ch, op_index);
 #else
     (void)ctx; (void)ch; (void)op_index;
     return -1;

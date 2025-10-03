@@ -16,9 +16,71 @@
 #include "opll_ymfm_trace.h"   /* YMFM trace bridge (no-op when USE_YMFM=0) */
 #include <stdlib.h>            /* atexit */
 #include "../gate_loader.h"
+#include "opll_duration_follow.h"
+static inline uint8_t opl3_local_mod_slot(uint8_t ch_local);
+static inline uint8_t opl3_local_car_slot(uint8_t ch_local);
 
 static VGMContext *g_last_ctx = NULL;
 static int g_triple_force_retrigger = 0;
+static int s_dura_enabled = 0;
+static OpllDurationFollow s_dura;
+static uint8_t s_prev_ko_for_dura[9] = {0};
+
+static void duration_load_env(OpllDurationCfg* cfg) {
+    const char* v;
+    if ((v=getenv("ESEOPL3_DURA_END_DB")))       cfg->end_db = (float)atof(v);
+    if ((v=getenv("ESEOPL3_DURA_MIN_GATE")))     cfg->min_gate_samples = (uint32_t)atoi(v);
+    if ((v=getenv("ESEOPL3_DURA_HOLD")))         cfg->end_hold_samples = (uint32_t)atoi(v);
+    if ((v=getenv("ESEOPL3_DURA_GRACE")))        cfg->start_grace_samples = (uint32_t)atoi(v);
+    if ((v=getenv("ESEOPL3_DURA_TLMUTE")))       cfg->use_tl_mute = atoi(v)?1:0;
+}
+
+
+
+static void duration_try_init(void) {
+    if (s_dura_enabled) return;
+    ymfm_ctx_t* ctx = opll_ymfm_trace_get_ctx();
+    if (ctx) {
+        OpllDurationCfg cfg = {0};
+        opll_duration_follow_init(&s_dura, ctx, &cfg);
+        duration_load_env(&s_dura.cfg);
+        s_dura_enabled = 1;
+        fprintf(stderr, "[DURATION] follow enabled (db=%.1f, gate=%u, hold=%u, tlmute=%d)\n",
+                s_dura.cfg.end_db, s_dura.cfg.min_gate_samples,
+                s_dura.cfg.end_hold_samples, s_dura.cfg.use_tl_mute);
+    } else {
+        s_dura_enabled = 0;
+    }
+}
+
+/* KeyOff/TLミュートの挿入: regミラー(p_state->reg)を使い、duplicate_write_opl3経由で出力 */
+static void duration_inject_keyoff_and_maybe_mute(
+    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    const CommandOptions *p_opts, int ch_opll, int use_tl_mute)
+{
+    uint16_t b_addr = (uint16_t)(0xB0 + ch_opll);
+    uint8_t  b_val  = p_state->reg[b_addr] & (uint8_t)~0x20;
+    duplicate_write_opl3(p_music_data, p_vstat, p_state, b_addr, b_val, p_opts, 0);
+
+    {
+        extern OpllStampCh g_stamp[9];
+        uint8_t reg2n = (g_stamp[ch_opll].valid_2n ? g_stamp[ch_opll].last_2n : 0xFF);
+        opll_ymfm_trace_log_real_ko(ch_opll, 0, reg2n);
+        if (s_dura_enabled) {
+            s_dura.ch[ch_opll].active = 0;        /* ← 追加 */
+        }
+    }
+
+    if (use_tl_mute) {
+        uint8_t car_slot = opl3_local_car_slot((uint8_t)ch_opll);
+        uint16_t tl_addr = (uint16_t)(0x40 + car_slot);
+        uint8_t  tl_old  = p_state->reg[tl_addr];
+        uint8_t  tl_new  = (uint8_t)((tl_old & 0xC0) | 0x3F);
+        if (tl_new != tl_old) {
+            duplicate_write_opl3(p_music_data, p_vstat, p_state, tl_addr, tl_new, p_opts, 0);
+        }
+    }
+}
 
 /** Calculate OPLL frequency for debugging */
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
@@ -196,7 +258,11 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
     opll_ymfm_trace_init();
     /* ensure cleanup at process end even if caller forgets */
     atexit(opll_ymfm_trace_shutdown);
-if (!p_state) return;
+    if (!p_state) return;
+
+    /* 追加: A/Bペアリングを有効化（A0→B0の原子的更新を強制） */
+    p_state->pair_an_bn_enabled = 1;
+
 
     // Read frequency mapping mode
     const char *fm = getenv("ESEOPL3_FREQMAP");
@@ -749,7 +815,11 @@ static inline void opll_tick_pending_on_elapsed(
             uint8_t opl3_bn = opll_to_opl3_bn(v2n); // v2n は KO=0 にクリア済みを想定
             duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                                  0xB0 + ch, opl3_bn, p_opts, 0);
-
+            /* NEW: 実エッジをCSV（reg2nは保留していた v2n） */                  
+            opll_ymfm_trace_log_real_ko(ch, 0, v2n);
+            if (s_dura_enabled) {
+                s_dura.ch[ch].active = 0;                /* ← 追加 */
+            }
             // stamp と状態更新
             g_stamp[ch].last_2n = v2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
             p_state->last_key[ch] = 0;
@@ -879,6 +949,11 @@ static inline void acc_maybe_flush_triple(
         uint8_t opl3_bn = opll_to_opl3_bn(ko_val2n);
         duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
                              0xB0 + ch, opl3_bn, p_opts, 0);
+        /*  実エッジ(OFF)をCSVに */
+        opll_ymfm_trace_log_real_ko(ch, 0, ko_val2n);
+        if (s_dura_enabled) {
+            s_dura.ch[ch].active = 0;                /* ← 追加 */
+        }
         g_stamp[ch].last_2n = ko_val2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
         p_state->last_key[ch] = 0;
         g_has_pending_keyoff[ch] = 0;
@@ -1021,17 +1096,35 @@ static inline void flush_channel_ch(
         }
     }
 #endif
+#if 1
+        // ここで B0=ON の直前に最小待ちを常時挿入（安全策）
+        {
+            uint16_t min_keyon_wait = 1; // 既定1サンプル
+            const char* env_w = getenv("ESEOPL3_MIN_KEYON_WAIT");
+            if (env_w && env_w[0]) {
+                int v = atoi(env_w);
+                if (v >= 0) min_keyon_wait = (uint16_t)v;
+            }
+            if (min_keyon_wait > 0) {
+                vgm_wait_samples(p_music_data, p_vstat, min_keyon_wait);
+                // 後続のWAITで返済させる
+                g_gate_comp_debt_samples += min_keyon_wait;
+                if (p_opts && p_opts->debug.verbose) {
+                    fprintf(stderr,"[SAFE_PRE_KEYON_WAIT] ch=%d samples=%u\n",
+                            ch, (unsigned)min_keyon_wait);
+                }
+            }
+        }
+#endif
         // ここで B0=ON
-        // if (!key_state_already(p_state, ch, true)) {
-        //     duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, b0_val, p_opts, 0);
-        //     // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opll_to_opl3_bn(reg2n_eff), p_opts);
-        //     opl3_metrics_note_on(ch,
-        //         (uint16_t)b0_val | ((b0_val & 0x01) << 8),
-        //         (b0_val >> 1) & 0x07);
-        // }
-        // 修正: flush_channel_ch 内の「ノートON確定」直後にアキュムレータをクリアして二重発火を防止
         if (!key_state_already(p_state, ch, true)) {
             duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, b0_val, p_opts, 0);
+            opll_ymfm_trace_log_real_ko(ch, 1, p->reg2n);
+            if (s_dura_enabled) {
+                s_dura.ch[ch].active = 1;
+                s_dura.ch[ch].since_on = 0;
+                s_dura.ch[ch].below_cnt = 0;
+            }
 
             uint16_t fnum10 = (uint16_t)(((b0_val & 0x03) << 8) | a0_val);
             uint8_t  blk3   = (uint8_t)((b0_val >> 2) & 0x07);
@@ -1086,9 +1179,15 @@ static inline void flush_channel_ch(
             }
         } else {
             // 閾値以上なら即時 KeyOff
-            uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
+            uint8_t v2n0   = opll_make_keyoff(p->reg2n);
+            uint8_t opl3_bn = opll_to_opl3_bn(v2n0);
             duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts, 0);
             p_state->last_key[ch] = 0;
+            /* NEW: 実エッジ(OFF)をCSVに */
+            opll_ymfm_trace_log_real_ko(ch, 0, v2n0);
+            if (s_dura_enabled) {
+                s_dura.ch[ch].active = 0;                    /* ← 追加 */
+            }
             if (p_opts && p_opts->debug.verbose)
                 fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (elapsed=%u)\n", ch, p->reg2n, g_gate_elapsed[ch]);
 
@@ -1151,11 +1250,13 @@ int opll_write_register(
     const CommandOptions *p_opts)
 {
     
+    g_last_ctx = p_vgm_context;
+    duration_try_init(); /* ← 追加 */
+
     /* Mirror YM2413 write into YMFM analyzer first (no-op if disabled) */
     if (opll_ymfm_trace_enabled()) {
         opll_ymfm_trace_write(addr, val);
     }
-g_last_ctx = p_vgm_context;
     // Handle global registers (0x00 - 0x07)
     // グローバルレジスタ(<=0x07)での保留フラッシュを厳格化（inst+fresh fnum が必須）
     if (addr <= 0x07) {
@@ -1310,6 +1411,11 @@ g_last_ctx = p_vgm_context;
                                             0xB0 + ch, opl3_bn, p_opts, 0);
                         g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
                         p_state->last_key[ch] = 0;
+                        /* 実エッジをCSV（reg2nはvalでOK） */
+                        opll_ymfm_trace_log_real_ko(ch, 0, val);
+                        if (s_dura_enabled) {
+                            s_dura.ch[ch].active = 0;                    /* ← 追加 */
+                        }
                         if (p_opts->debug.verbose) {
                             fprintf(stderr,"[KEYOFF][B0] ch=%d reg2n=%02X (after inject wait)\n",
                                     ch, val);
@@ -1354,22 +1460,104 @@ g_last_ctx = p_vgm_context;
             }
         }
      }
-    // Handle waits
+    /* Handle waits */
     if (is_wait_samples_done == 0 && next_wait_samples > 0) {
-        opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, p_opts, next_wait_samples);
-        vgm_wait_samples(p_music_data, &p_vgm_context->status, next_wait_samples);
+        /* 1) 前段で注入したゲート待ちの負債を返済 */
+        uint16_t emit_wait = next_wait_samples;
+        if (g_gate_comp_debt_samples) {
+            uint32_t d = g_gate_comp_debt_samples;
+            if (emit_wait >= d) {
+                emit_wait -= (uint16_t)d;
+                g_gate_comp_debt_samples = 0;
+            } else {
+                g_gate_comp_debt_samples = d - emit_wait;
+                emit_wait = 0;
+            }
+#if 1
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr, "[DEBT] repay=%u remain=%u next=%u -> emit=%u\n",
+                        (unsigned)(next_wait_samples - emit_wait),
+                        (unsigned)g_gate_comp_debt_samples,
+                        (unsigned)next_wait_samples,
+                        (unsigned)emit_wait);
+            }
+#endif
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr, "[DEBT][emit_wait] #1. ch=%d  repay=%u remain=%u next=%u -> emit=%u\n",
+                        ch,
+                        (unsigned)(next_wait_samples - emit_wait),
+                        (unsigned)g_gate_comp_debt_samples,
+                        (unsigned)next_wait_samples,
+                        (unsigned)emit_wait);
+            }
+        }
+
+        /* 2) Durationフォロワは実際に吐く待ち（emit_wait）で進める */
+        if (s_dura_enabled && emit_wait > 0) {
+            for (int ch2 = 0; ch2 < 9; ++ch2) {
+                if (!s_dura.ch[ch2].active) continue;
+                uint32_t act = opll_duration_follow_on_wait(&s_dura, ch2, emit_wait);
+                if (p_opts && p_opts->debug.verbose) {
+                    fprintf(stderr, "[DEBT][emit_wait] #2. ch=%d  repay=%u remain=%u next=%u -> emit=%u\n",
+                            ch,
+                            (unsigned)(next_wait_samples - emit_wait),
+                            (unsigned)g_gate_comp_debt_samples,
+                            (unsigned)next_wait_samples,
+                            (unsigned)emit_wait);
+                }
+                if (act & DURA_ACT_KEYOFF) {
+                    uint8_t reg2n = (g_stamp[ch2].valid_2n ? g_stamp[ch2].last_2n : 0xFF);
+                    int gate_ok = (int)(s_dura.ch[ch2].since_on >= s_dura.cfg.min_gate_samples);
+                    int settled = (int)(s_dura.ch[ch2].below_cnt >= s_dura.cfg.end_hold_samples);
+                    opll_ymfm_trace_log_reco_off(
+                        ch2,
+                        s_dura.cfg.end_db,
+                        s_dura.cfg.end_hold_samples,
+                        s_dura.cfg.min_gate_samples,
+                        s_dura.cfg.start_grace_samples,
+                        s_dura.ch[ch2].since_on,
+                        s_dura.ch[ch2].below_cnt,
+                        gate_ok, settled,
+                        reg2n
+                    );
+                    duration_inject_keyoff_and_maybe_mute(
+                        p_music_data, &p_vgm_context->status, p_state, p_opts,
+                        ch2, (act & DURA_ACT_TL_MUTE) ? 1 : 0
+                    );
+                }
+            }
+        }
+
+        /* 3) 既存のペンディング処理＋VGM待ちも emit_wait で */
+        if (emit_wait > 0) {
+            opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, p_opts, emit_wait);
+            vgm_wait_samples(p_music_data, &p_vgm_context->status, emit_wait);
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr, "[DEBT][emit_wait] #3. ch=%d  repay=%u remain=%u next=%u -> emit=%u\n",
+                        ch,
+                        (unsigned)(next_wait_samples - emit_wait),
+                        (unsigned)g_gate_comp_debt_samples,
+                        (unsigned)next_wait_samples,
+                        (unsigned)emit_wait);
+            }
+        }
         is_wait_samples_done = 1;
-    }
 
-    // 追加: 最後に「3つ揃っていたら即フラッシュ」を試みる（順不同対応）
-    if (ch >= 0) {
-        acc_maybe_flush_triple(p_music_data, p_vgm_context, p_state, p_opts, ch);
+        /* 4) YMFM trace（有効時）も emit_wait で進める */
+        if (opll_ymfm_trace_enabled() && emit_wait > 0) {
+            opll_ymfm_trace_advance((uint32_t)emit_wait);
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr, "[DEBT][emit_wait] #4. ch=%d  repay=%u remain=%u next=%u -> emit=%u\n",
+                        ch,
+                        (unsigned)(next_wait_samples - emit_wait),
+                        (unsigned)g_gate_comp_debt_samples,
+                        (unsigned)next_wait_samples,
+                        (unsigned)emit_wait);
+            }
+        }
     }
-
-    
-    /* Before returning, advance YMFM by the wait to next event (if any) */
-    if (opll_ymfm_trace_enabled() && next_wait_samples > 0) {
-        opll_ymfm_trace_advance((uint32_t)next_wait_samples);
-    }
-return additional_bytes;
 }
+/* ……関数末尾の「YMFM traceをnext_wait_samplesで進める」行は削除してください（emit_waitで進めるため） */
+// if (opll_ymfm_trace_enabled() && next_wait_samples > 0) {
+//     opll_ymfm_trace_advance((uint32_t)next_wait_samples);
+// }

@@ -17,7 +17,7 @@ static void csv_write_header(void) {
     fprintf(s_csv,
         "session_id,ch,t_samples,t_ms,wait_samples,mean_abs,rms_db,nz,"
         "phase_mod,att_mod,att_mod_db,phase_car,att_car,att_car_db,"
-        "event,reg2n_hex\n");
+        "event,reg2n_hex,reco_end_db, reco_hold, reco_min_gate, reco_start_grace, reco_since_on, reco_below_cnt, reco_gate_ok, reco_settled\n");
     fflush(s_csv);
 }
 

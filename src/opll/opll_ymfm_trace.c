@@ -12,7 +12,7 @@
 /* 環境変数
    - ESEOPL3_YMFM_TRACE: 1/true で有効
    - ESEOPL3_YMFM_TRACE_MIN_WAIT: このサンプル数未満の待ちはログ抑制（測定は実施）(例: 512)
-   - ESEOPL3_YMFM_TRACE_VERBOSE: 1 で全待ちを出力（抑制しない）
+   - ESEOPL3_YMFM_TRACE_VERBOSE: 1 で全待ち/イベントを出力（抑制しない）
 */
 
 static int s_enabled = 0;
@@ -63,6 +63,33 @@ void opll_ymfm_trace_init(void) {
 #endif
 }
 
+#ifdef __GNUC__
+__attribute__((weak))
+#endif
+void ymfm_trace_csv_on_reco_off(
+    int ch,
+    float end_db, uint32_t hold, uint32_t min_gate, uint32_t start_grace,
+    uint32_t since_on, uint32_t below_cnt, int gate_ok, int settled,
+    uint8_t reg2n_hex)
+{
+    (void)ch; (void)end_db; (void)hold; (void)min_gate; (void)start_grace;
+    (void)since_on; (void)below_cnt; (void)gate_ok; (void)settled; (void)reg2n_hex;
+    /* 応急処置: 何もしない（CSVは未出力）。本実装が入ると自動で置き換わる */
+}
+
+#ifdef __GNUC__
+__attribute__((weak))
+#endif
+void ymfm_trace_csv_on_real_ko(int ch, int ko_on, uint8_t reg2n_hex)
+{
+    (void)ch; (void)ko_on; (void)reg2n_hex;
+    /* 応急処置: 何もしない（CSVは未出力）。本実装が入ると自動で置き換わる */
+}
+
+ymfm_ctx_t* opll_ymfm_trace_get_ctx(void) {
+    return s_ctx;
+}
+
 void opll_ymfm_trace_shutdown(void) {
     if (s_ctx) ymfm_destroy(s_ctx);
     s_ctx = NULL;
@@ -92,10 +119,10 @@ void opll_ymfm_trace_write(uint8_t addr, uint8_t data) {
         } else {
             if (ko != s_prev_ko[ch]) {
                 if (ko) {
-                    printf("[YMFM][KO-ON ] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
+                    if (s_verbose) printf("[YMFM][KO-ON ] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
                     ymfm_trace_csv_on_ko_edge(ch, 1, data);
                 } else {
-                    printf("[YMFM][KO-OFF] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
+                    if (s_verbose) printf("[YMFM][KO-OFF] ch=%d reg2n=%02X -> %02X\n", ch, s_prev_reg2n[ch], data);
                     ymfm_trace_csv_on_ko_edge(ch, 0, data);
                 }
                 s_prev_ko[ch] = ko;
@@ -148,5 +175,38 @@ void opll_ymfm_trace_advance(uint32_t wait_samples) {
         printf("[YMFM][S] wait=%u mean_abs=%.6f rms_db=%.2f nz=%u\n",
                (unsigned)wait_samples, (double)mean_abs, (double)rms_db, (unsigned)nz);
         ymfm_debug_print(s_ctx, "acc");
+    }
+}
+
+/* ===== NEW: 勧告KeyOffと実B0エッジをCSVへ ===== */
+
+/* 推奨KeyOff（RECO_OFF）をCSVに1行書く */
+void opll_ymfm_trace_log_reco_off(
+    int ch,
+    float end_db, uint32_t hold, uint32_t min_gate, uint32_t start_grace,
+    uint32_t since_on, uint32_t below_cnt, int gate_ok, int settled,
+    uint8_t reg2n_hex)
+{
+    if (!s_enabled) return;
+    /* CSVに拡張列付きで出力（ヘッダは ymfm_trace_csv_init 側で拡張） */
+    ymfm_trace_csv_on_reco_off(
+        ch, end_db, hold, min_gate, start_grace,
+        since_on, below_cnt, gate_ok, settled, reg2n_hex
+    );
+    if (s_verbose) {
+        printf("[YMFM][RECO-OFF] ch=%d end_db=%.2f hold=%u min_gate=%u grace=%u since_on=%u below=%u gate_ok=%d settled=%d reg2n=%02X\n",
+               ch, (double)end_db, hold, min_gate, start_grace,
+               since_on, below_cnt, gate_ok, settled, reg2n_hex);
+    }
+}
+
+/* 実際にOPL3へ書いたB0エッジ（REAL_KO_ON/OFF）をCSVに1行書く */
+void opll_ymfm_trace_log_real_ko(int ch, int ko_on, uint8_t reg2n_hex) {
+    if (!s_enabled) return;
+    ymfm_trace_csv_on_real_ko(ch, ko_on ? 1 : 0, reg2n_hex);
+    if (s_verbose) {
+        printf(ko_on ? "[YMFM][REAL-KO-ON ] ch=%d reg2n=%02X\n"
+                     : "[YMFM][REAL-KO-OFF] ch=%d reg2n=%02X\n",
+               ch, reg2n_hex);
     }
 }
