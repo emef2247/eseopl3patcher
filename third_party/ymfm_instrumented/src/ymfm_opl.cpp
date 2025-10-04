@@ -31,6 +31,62 @@
 #include "ymfm_opl.h"
 #include "ymfm_fm.ipp"
 
+// >>> OPLL TRACE: BEGIN
+#ifdef ESEOPL3_OPLL_TRACE
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+static FILE* g_opll_trace_fp = nullptr;
+static bool g_opll_trace_init = false;
+static uint64_t g_opll_trace_samples = 0;
+static int g_opll_trace_session = 0;
+static uint8_t g_opll_prev_reg2n[9];
+
+static void opll_trace_init() {
+    if (g_opll_trace_init) return;
+    g_opll_trace_init = true;
+    const char* path = std::getenv("OPLL_TRACE_CSV");
+    if (!path) path = "opll_trace.csv";
+    g_opll_trace_fp = std::fopen(path, "w");
+    if (g_opll_trace_fp) {
+        std::fprintf(g_opll_trace_fp, "session_id,ch,t_samples,event,reg2n_hex\n");
+        std::memset(g_opll_prev_reg2n, 0, sizeof(g_opll_prev_reg2n));
+    }
+}
+
+static void opll_trace_output_wait(uint32_t advanced) {
+    if (!g_opll_trace_fp || advanced == 0) return;
+    g_opll_trace_samples += advanced;
+    std::fprintf(g_opll_trace_fp, "%d,%d,%llu,WAIT,\n",
+        g_opll_trace_session,
+        -1,
+        (unsigned long long)g_opll_trace_samples
+    );
+}
+
+static void opll_trace_key(int ch, uint8_t newv) {
+    if (!g_opll_trace_fp) return;
+    uint8_t oldv = g_opll_prev_reg2n[ch];
+    bool was_on = (oldv & 0x10) != 0;
+    bool now_on = (newv & 0x10) != 0;
+    if (now_on && !was_on) {
+        g_opll_trace_session++;
+        std::fprintf(g_opll_trace_fp, "%d,%d,%llu,KO_ON,%02X\n",
+            g_opll_trace_session, ch,
+            (unsigned long long)g_opll_trace_samples,
+            newv);
+    } else if (!now_on && was_on) {
+        std::fprintf(g_opll_trace_fp, "%d,%d,%llu,KO_OFF,%02X\n",
+            g_opll_trace_session, ch,
+            (unsigned long long)g_opll_trace_samples,
+            newv);
+    }
+    g_opll_prev_reg2n[ch] = newv;
+}
+#endif
+// >>> OPLL TRACE: END
+
 namespace ymfm
 {
 
@@ -538,6 +594,10 @@ bool opll_registers::write(uint16_t index, uint8_t data, uint32_t &channel, uint
 		channel = index & 0x0f;
 		if (channel < CHANNELS)
 		{
+#ifdef ESEOPL3_OPLL_TRACE
+            opll_trace_init();
+            opll_trace_key((int)channel, data);
+#endif
 			opmask = bitfield(data, 4) ? 3 : 0;
 			return true;
 		}
@@ -2036,6 +2096,10 @@ void opll_base::write(uint32_t offset, uint8_t data)
 
 void opll_base::generate(output_data *output, uint32_t numsamples)
 {
+#ifdef ESEOPL3_OPLL_TRACE
+    opll_trace_init();
+    uint32_t traced = 0;
+#endif
 	for (uint32_t samp = 0; samp < numsamples; samp++, output++)
 	{
 		// clock the system
@@ -2048,7 +2112,13 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 		// to average over everything
 		output->data[0] = (output->data[0] * 128) / 9;
 		output->data[1] = (output->data[1] * 128) / 9;
-	}
+#ifdef ESEOPL3_OPLL_TRACE
+        traced++;
+#endif
+    }
+#ifdef ESEOPL3_OPLL_TRACE
+    if (traced) opll_trace_output_wait(traced);
+#endif
 }
 
 
