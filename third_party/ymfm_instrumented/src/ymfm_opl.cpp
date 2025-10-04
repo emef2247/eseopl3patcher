@@ -87,6 +87,143 @@ static void opll_trace_key(int ch, uint8_t newv) {
 #endif
 // >>> OPLL TRACE: END
 
+// >>> OPLL VCD: BEGIN
+#ifdef ESEOPL3_OPLL_VCD
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+class VcdWriter
+{
+public:
+    VcdWriter() : m_fp(nullptr), m_initialized(false), m_time(0) {}
+    
+    ~VcdWriter() {
+        if (m_fp) {
+            std::fclose(m_fp);
+        }
+    }
+    
+    void init() {
+        if (m_initialized) return;
+        m_initialized = true;
+        
+        const char* path = std::getenv("OPLL_VCD");
+        if (!path) path = "opll_dump.vcd";
+        
+        m_fp = std::fopen(path, "w");
+        if (!m_fp) return;
+        
+        // Write VCD header
+        std::fprintf(m_fp, "$date\n");
+        std::fprintf(m_fp, "  OPLL VCD trace\n");
+        std::fprintf(m_fp, "$end\n");
+        std::fprintf(m_fp, "$version\n");
+        std::fprintf(m_fp, "  YMFM OPLL Tracer\n");
+        std::fprintf(m_fp, "$end\n");
+        std::fprintf(m_fp, "$timescale 1us $end\n");
+        std::fprintf(m_fp, "$scope module opll $end\n");
+        
+        // Declare signals
+        // LFO
+        std::fprintf(m_fp, "$var wire 8 lfo lfo_am_counter $end\n");
+        
+        // Outputs
+        std::fprintf(m_fp, "$var wire 32 outl out_l $end\n");
+        std::fprintf(m_fp, "$var wire 32 outr out_r $end\n");
+        
+        // Channel 0 signals
+        std::fprintf(m_fp, "$var wire 1 c0k ch0_key $end\n");
+        std::fprintf(m_fp, "$var wire 16 c0f ch0_freq $end\n");
+        std::fprintf(m_fp, "$var wire 8 c0i ch0_instr $end\n");
+        std::fprintf(m_fp, "$var wire 8 c0v ch0_vol $end\n");
+        
+        // Channel 0 modulator (op0)
+        std::fprintf(m_fp, "$var wire 32 c0mp ch0_mod_phase $end\n");
+        std::fprintf(m_fp, "$var wire 16 c0me ch0_mod_env $end\n");
+        std::fprintf(m_fp, "$var wire 8 c0ms ch0_mod_eg_state $end\n");
+        
+        // Channel 0 carrier (op1)
+        std::fprintf(m_fp, "$var wire 32 c0cp ch0_car_phase $end\n");
+        std::fprintf(m_fp, "$var wire 16 c0ce ch0_car_env $end\n");
+        std::fprintf(m_fp, "$var wire 8 c0cs ch0_car_eg_state $end\n");
+        
+        std::fprintf(m_fp, "$upscope $end\n");
+        std::fprintf(m_fp, "$enddefinitions $end\n");
+        std::fprintf(m_fp, "$dumpvars\n");
+        std::fprintf(m_fp, "$end\n");
+    }
+    
+    void write_snapshot(const ymfm::fm_debug_snapshot &snap) {
+        if (!m_fp) return;
+        
+        // Write timestamp
+        std::fprintf(m_fp, "#%llu\n", (unsigned long long)m_time);
+        
+        // Write values (binary format for VCD)
+        write_bin(m_fp, "lfo", snap.lfo_am_counter, 8);
+        write_bin(m_fp, "outl", snap.out_l, 32);
+        write_bin(m_fp, "outr", snap.out_r, 32);
+        
+        // Channel 0
+        if (snap.ch[0].key_on) {
+            std::fprintf(m_fp, "1c0k\n");
+        } else {
+            std::fprintf(m_fp, "0c0k\n");
+        }
+        write_bin(m_fp, "c0f", snap.ch[0].block_freq, 16);
+        write_bin(m_fp, "c0i", snap.ch[0].instrument, 8);
+        write_bin(m_fp, "c0v", snap.ch[0].volume, 8);
+        
+        // Modulator
+        write_bin(m_fp, "c0mp", snap.ch[0].op[0].phase, 32);
+        write_bin(m_fp, "c0me", snap.ch[0].op[0].envelope, 16);
+        write_bin(m_fp, "c0ms", snap.ch[0].op[0].eg_state, 8);
+        
+        // Carrier
+        write_bin(m_fp, "c0cp", snap.ch[0].op[1].phase, 32);
+        write_bin(m_fp, "c0ce", snap.ch[0].op[1].envelope, 16);
+        write_bin(m_fp, "c0cs", snap.ch[0].op[1].eg_state, 8);
+    }
+    
+    void advance_time(uint32_t samples) {
+        m_time += samples;
+    }
+    
+private:
+    void write_bin(FILE* fp, const char* id, uint32_t value, int bits) {
+        std::fprintf(fp, "b");
+        for (int i = bits - 1; i >= 0; i--) {
+            std::fprintf(fp, "%d", (value >> i) & 1);
+        }
+        std::fprintf(fp, " %s\n", id);
+    }
+    
+    FILE* m_fp;
+    bool m_initialized;
+    uint64_t m_time;
+};
+
+static VcdWriter* g_vcd_writer = nullptr;
+
+static void opll_vcd_init() {
+    if (!g_vcd_writer) {
+        g_vcd_writer = new VcdWriter();
+        g_vcd_writer->init();
+    }
+}
+
+static void opll_vcd_cleanup() {
+    if (g_vcd_writer) {
+        delete g_vcd_writer;
+        g_vcd_writer = nullptr;
+    }
+}
+#endif
+// >>> OPLL VCD: END
+
 namespace ymfm
 {
 
@@ -2100,6 +2237,9 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
     opll_trace_init();
     uint32_t traced = 0;
 #endif
+#ifdef ESEOPL3_OPLL_VCD
+    opll_vcd_init();
+#endif
 	for (uint32_t samp = 0; samp < numsamples; samp++, output++)
 	{
 		// clock the system
@@ -2112,6 +2252,18 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 		// to average over everything
 		output->data[0] = (output->data[0] * 128) / 9;
 		output->data[1] = (output->data[1] * 128) / 9;
+		
+#ifdef ESEOPL3_OPLL_VCD
+		// Capture state for VCD
+		if (g_vcd_writer) {
+			ymfm::fm_debug_snapshot snap;
+			m_fm.debug_snapshot(snap);
+			snap.out_l = output->data[0];
+			snap.out_r = output->data[1];
+			g_vcd_writer->write_snapshot(snap);
+			g_vcd_writer->advance_time(1);
+		}
+#endif
 #ifdef ESEOPL3_OPLL_TRACE
         traced++;
 #endif

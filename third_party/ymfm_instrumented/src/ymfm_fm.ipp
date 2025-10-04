@@ -1589,4 +1589,74 @@ void fm_engine_base<RegisterType>::engine_mode_write(uint8_t data)
 	}
 }
 
+
+#ifdef ESEOPL3_OPLL_VCD
+//-------------------------------------------------
+//  debug_snapshot - capture current engine state
+//  for VCD tracing (OPLL-specific)
+//-------------------------------------------------
+
+template<class RegisterType>
+void fm_engine_base<RegisterType>::debug_snapshot(fm_debug_snapshot &snap) const
+{
+	// Capture LFO AM counter (low 8 bits of envelope counter)
+	snap.lfo_am_counter = m_env_counter & 0xff;
+	
+	// Initialize outputs to 0
+	snap.out_l = 0;
+	snap.out_r = 0;
+	
+	// Capture per-channel state
+	for (uint32_t chnum = 0; chnum < std::min<uint32_t>(CHANNELS, 9); chnum++)
+	{
+		auto *ch = m_channel[chnum].get();
+		if (ch == nullptr)
+			continue;
+			
+		auto &ch_snap = snap.ch[chnum];
+		uint32_t choffs = ch->choffs();
+		
+		// Capture channel key state - read register 0x20+ch, bit 4
+		uint8_t reg20 = m_regs.read(0x20 + choffs);
+		ch_snap.key_on = (reg20 & 0x10) != 0;
+		
+		// Capture block and frequency
+		ch_snap.block_freq = m_regs.ch_block_freq(choffs);
+		
+		// For OPLL: instrument is in reg 0x30+ch, high 4 bits
+		uint8_t reg30 = m_regs.read(0x30 + choffs);
+		ch_snap.instrument = (reg30 >> 4) & 0x0f;
+		
+		// Volume/TL - for OPLL, low 4 bits of reg 0x30+ch
+		ch_snap.volume = reg30 & 0x0f;
+		
+		// Capture operator state (modulator and carrier for 2-op)
+		for (uint32_t opnum = 0; opnum < 2 && opnum < 4; opnum++)
+		{
+			uint32_t opindex = chnum * 2 + opnum;
+			if (opindex >= OPERATORS)
+				break;
+				
+			auto *op = m_operator[opindex].get();
+			if (op == nullptr)
+				continue;
+				
+			auto &op_snap = ch_snap.op[opnum];
+			
+			// Capture phase
+			op_snap.phase = op->phase();
+			
+			// Capture envelope
+			op_snap.envelope = op->debug_eg_attenuation();
+			
+			// Capture EG state
+			op_snap.eg_state = static_cast<uint8_t>(op->debug_eg_state());
+			
+			// No direct output member - set to 0 for now
+			op_snap.output = 0;
+		}
+	}
+}
+#endif
+
 }

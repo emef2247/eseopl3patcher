@@ -51,6 +51,34 @@ enum keyon_type : uint32_t
 };
 
 
+#ifdef ESEOPL3_OPLL_VCD
+// Debug snapshot structures for VCD tracing
+struct fm_operator_snapshot
+{
+	uint32_t phase;           // Current phase
+	uint32_t envelope;        // Current envelope level
+	uint8_t eg_state;         // EG state (attack/decay/sustain/release)
+	int16_t output;           // Last output value
+};
+
+struct fm_channel_snapshot
+{
+	bool key_on;              // Key on state
+	uint16_t block_freq;      // Block and frequency
+	uint8_t instrument;       // Instrument/patch number
+	uint8_t volume;           // Volume/TL
+	fm_operator_snapshot op[2]; // Modulator and carrier
+};
+
+struct fm_debug_snapshot
+{
+	uint32_t lfo_am_counter;  // LFO AM counter
+	int32_t out_l;            // Left output
+	int32_t out_r;            // Right output
+	fm_channel_snapshot ch[9]; // OPLL has 9 channels
+};
+#endif
+
 
 //*********************************************************
 //  CORE IMPLEMENTATION
@@ -420,6 +448,11 @@ public:
 	// simple getters for debugging
 	fm_channel<RegisterType> *debug_channel(uint32_t index) const { return m_channel[index].get(); }
 	fm_operator<RegisterType> *debug_operator(uint32_t index) const { return m_operator[index].get(); }
+
+#ifdef ESEOPL3_OPLL_VCD
+	// snapshot current state for VCD tracing
+	void debug_snapshot(fm_debug_snapshot &snap) const;
+#endif
 
 public:
 	// timer callback; called by the interface when a timer fires
