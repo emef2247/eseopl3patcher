@@ -14,8 +14,115 @@
 #include "../compat_bool.h"
 #include "../compat_string.h"
 
+#ifdef ESEOPL3_OPLL_CSV
+#include "../../third_party/ymfm_instrumented/src/ymfm_csv_writer.h"
+#endif
+
 static VGMContext *g_last_ctx = NULL;
 static int g_triple_force_retrigger = 0;
+
+#ifdef ESEOPL3_OPLL_CSV
+/* CSV logging infrastructure */
+static csv_writer_t g_csv_writer;
+static bool g_csv_initialized = false;
+static double g_sample_rate = 49716.0; /* Default OPLL-derived sample rate */
+
+/* State tracking for full fnum/block/inst/vol reconstruction */
+static uint8_t g_csv_reg1n[9] = {0}; /* F-number low 8 bits per channel */
+static uint8_t g_csv_reg2n[9] = {0}; /* F-number MSB + block + key per channel */
+static uint8_t g_csv_reg3n[9] = {0}; /* Instrument + volume per channel */
+
+/* Check if CSV logging is enabled via environment variable */
+static bool csv_logging_enabled(void) {
+    const char *env = getenv("OPLL_CSV_EVENTS");
+    /* If not set, default to enabled. If set to "0", disable. */
+    if (env && strcmp(env, "0") == 0) {
+        return false;
+    }
+    return true;
+}
+
+/* Initialize CSV writer on first use */
+static void csv_ensure_initialized(void) {
+    if (g_csv_initialized) return;
+    if (!csv_logging_enabled()) return;
+    
+    if (csv_writer_init(&g_csv_writer, "opll_events.csv", g_sample_rate)) {
+        csv_writer_write_header(&g_csv_writer);
+        g_csv_initialized = true;
+        fprintf(stderr, "[OPLL_CSV] Initialized event logging to opll_events.csv (rate=%.1f Hz)\n", 
+                g_sample_rate);
+    } else {
+        fprintf(stderr, "[OPLL_CSV] Failed to initialize CSV writer\n");
+    }
+}
+
+/* Cleanup CSV writer */
+static void csv_cleanup(void) {
+    if (g_csv_initialized) {
+        csv_writer_close(&g_csv_writer);
+        fprintf(stderr, "[OPLL_CSV] Closed event log\n");
+        g_csv_initialized = false;
+    }
+}
+
+/* Log a register write event */
+static void csv_log_register_write(uint64_t sample_index, uint8_t addr, uint8_t data) {
+    if (!g_csv_initialized || !csv_logging_enabled()) return;
+    
+    /* Determine event type and extract fields based on address range */
+    const char *type_str = "";
+    int ch = -1;
+    int ko = 0;
+    int blk = 0;
+    int fnum = 0;
+    int fnumL = 0;
+    int inst = 0;
+    int vol = 0;
+    
+    /* Channel number from address */
+    if (addr >= 0x10 && addr <= 0x18) {
+        ch = addr - 0x10;
+        type_str = "fL";
+        g_csv_reg1n[ch] = data;
+        fnumL = data;
+        /* Reconstruct full fnum from stored reg2n */
+        fnum = ((g_csv_reg2n[ch] & 0x01) << 8) | data;
+        /* Get current ko, blk, inst, vol from state */
+        ko = (g_csv_reg2n[ch] >> 4) & 0x01;
+        blk = (g_csv_reg2n[ch] >> 1) & 0x07;
+        inst = (g_csv_reg3n[ch] >> 4) & 0x0F;
+        vol = g_csv_reg3n[ch] & 0x0F;
+    } else if (addr >= 0x20 && addr <= 0x28) {
+        ch = addr - 0x20;
+        type_str = "fHBK";
+        g_csv_reg2n[ch] = data;
+        ko = (data >> 4) & 0x01;
+        blk = (data >> 1) & 0x07;
+        fnumL = g_csv_reg1n[ch];
+        fnum = ((data & 0x01) << 8) | fnumL;
+        inst = (g_csv_reg3n[ch] >> 4) & 0x0F;
+        vol = g_csv_reg3n[ch] & 0x0F;
+    } else if (addr >= 0x30 && addr <= 0x38) {
+        ch = addr - 0x30;
+        type_str = "iv";
+        g_csv_reg3n[ch] = data;
+        inst = (data >> 4) & 0x0F;
+        vol = data & 0x0F;
+        /* Get current ko, blk, fnum from state */
+        ko = (g_csv_reg2n[ch] >> 4) & 0x01;
+        blk = (g_csv_reg2n[ch] >> 1) & 0x07;
+        fnumL = g_csv_reg1n[ch];
+        fnum = ((g_csv_reg2n[ch] & 0x01) << 8) | fnumL;
+    } else {
+        /* Out of scope for Phase 1 */
+        return;
+    }
+    
+    csv_writer_write_event(&g_csv_writer, sample_index, addr, data,
+                          type_str, ch, ko, blk, fnum, fnumL, inst, vol);
+}
+#endif /* ESEOPL3_OPLL_CSV */
 
 /** Calculate OPLL frequency for debugging */
 double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
@@ -1080,6 +1187,16 @@ int opll_write_register(
 
     g_ym2413_regs[addr] = val;
 
+#ifdef ESEOPL3_OPLL_CSV
+    /* Initialize CSV writer on first relevant register write */
+    if ((addr >= 0x10 && addr <= 0x18) || 
+        (addr >= 0x20 && addr <= 0x28) || 
+        (addr >= 0x30 && addr <= 0x38)) {
+        csv_ensure_initialized();
+        csv_log_register_write(p_vgm_context->status.total_samples, addr, val);
+    }
+#endif
+
     int additional_bytes = 0;
     int is_wait_samples_done = (next_wait_samples == 0) ? 1 : 0;
 
@@ -1267,3 +1384,10 @@ int opll_write_register(
 
     return additional_bytes;
 }
+
+#ifdef ESEOPL3_OPLL_CSV
+/** Public cleanup function for CSV logging */
+void opll_csv_cleanup(void) {
+    csv_cleanup();
+}
+#endif

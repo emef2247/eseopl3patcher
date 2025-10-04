@@ -42,4 +42,8 @@ int opll_write_register(
 
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db, CommandOptions* opts);
 
+#ifdef ESEOPL3_OPLL_CSV
+void opll_csv_cleanup(void);
+#endif
+
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */

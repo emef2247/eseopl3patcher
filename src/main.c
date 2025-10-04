@@ -731,6 +731,10 @@ int main(int argc, char *argv[]) {
         printf("[OPL3] Total voices in DB: %d\n", state.voice_db.count);
     }
 
+#ifdef ESEOPL3_OPLL_CSV
+    opll_csv_cleanup();
+#endif
+
     vgm_buffer_free(&vgmctx.buffer);
     vgm_buffer_free(&gd3);
     free(p_vgm_data);
