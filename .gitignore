@@ -143,3 +143,8 @@ third_party/*/Makefile
 third_party/*/.vs/
 third_party/*/.vscode/
 third_party/*/compile_commands.json
+
+tools/ym2413_vgm_trace/*.o
+tools/ym2413_vgm_trace/*.csv
+tools/ym2413_vgm_trace/*.log
+tools/ym2413_vgm_trace/ym2413_vgm_trace

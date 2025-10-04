@@ -31,6 +31,264 @@
 #include "ymfm_opl.h"
 #include "ymfm_fm.ipp"
 
+#ifdef ESEOPL3_OPLL_VCD
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+#include <string>
+#include <cstring>
+
+namespace {
+
+// ----------- Simple VCD Writer -------------
+class VcdWriter {
+public:
+    void init_if_needed() {
+        if (initialized_) return;
+        initialized_ = true;
+        const char* path = std::getenv("OPLL_VCD");
+        if (!path) path = "opll_dump.vcd";
+        fp_ = std::fopen(path, "w");
+        if (!fp_) return;
+        write_header();
+        declare_signals();
+		for (auto &v : scalar_prev_) v = -1;
+
+    }
+
+    bool good() const { return fp_ != nullptr; }
+
+    void set_sample(uint64_t s) {
+        // decimation & forced full-phase
+        if (!fp_) return;
+        uint32_t dec = decimate_;
+        if (sample_ < force_full_) dec = 1;
+        if (dec == 0) dec = 1;
+        sample_ = s;
+        decimated_output_ = ((s % dec) == 0);
+        if (decimated_output_) {
+            std::fprintf(fp_, "#%llu\n", (unsigned long long)sample_);
+            flush_count_++;
+            if (flush_interval_ && flush_count_ >= flush_interval_) {
+                std::fflush(fp_);
+                flush_count_ = 0;
+            }
+        }
+    }
+
+    void update_scalar(const char* name, char id, int value) {
+        if (!fp_ || !decimated_output_) return;
+        //int prev = scalar_prev_[id];
+		int prev = scalar_prev_[(unsigned char)id];
+        if (prev == value) return;
+        //scalar_prev_[id] = value;
+		scalar_prev_[(unsigned char)id] = value;
+        // 1-bit
+        std::fprintf(fp_, "%c%c\n", value ? '1' : '0', id);
+    }
+
+    void update_vector(const char* name, const std::string& id, uint64_t value, int bits) {
+        if (!fp_ || !decimated_output_) return;
+        auto it = vector_prev_.find(id);
+        if (it != vector_prev_.end() && it->second == value) return;
+        vector_prev_[id] = value;
+        // Produce binary
+        std::string bin(bits, '0');
+        for (int i=0;i<bits;i++) {
+            if (value & (1ULL << i)) bin[bits-1-i] = '1';
+        }
+        std::fprintf(fp_, "b%s %s\n", bin.c_str(), id.c_str());
+    }
+
+	void event_regwrite(uint8_t /*addr*/, uint8_t /*data*/) { /* optional: implement later */ }
+    // void event_regwrite(uint8_t addr, uint8_t data) {
+    //     if (!fp_) return;
+    //     // イベントタイムスタンプを強制（現在 sample_ の行を既に出している保証が無い場合）
+    //     std::fprintf(fp_, "#%llu\n", (unsigned long long)sample_);
+    //     std::fprintf(fp_, "b");
+    //     std::fprintf(fp_, "%08b", addr); // 古い gcc では %b 不可 -> 変換下で簡易出力
+    //     // -> シンプルに 8bit 2回別シグナルにする方が確実:
+    //     char idA[] = "rA"; char idD[] = "rD";
+    //     // ここでは vector update のショートカット (再宣言不要)
+    //     std::fprintf(fp_, ""); // no-op placeholder
+    // }
+
+    void finalize() {
+        if (fp_) { std::fflush(fp_); std::fclose(fp_); fp_ = nullptr; }
+    }
+
+    // Called once per sample with snapshot
+    void dump_opll_sample(
+        const ymfm::opll_registers &regs,
+        const ymfm::fm_debug_snapshot *snap,
+        int32_t out_l, int32_t out_r)
+    {
+        if (!fp_) return;
+        init_if_needed();
+
+        // timestamp handled outside via set_sample()
+
+        // LFO/Noise
+		update_vector("lfo_am_counter", id_lfo_am_counter_, regs.dbg_lfo_am_counter(), 16);
+		update_vector("lfo_pm_counter", id_lfo_pm_counter_, regs.dbg_lfo_pm_counter(), 16);
+		update_vector("lfo_am",         id_lfo_am_,         regs.dbg_lfo_am(),        8);
+		update_vector("noise_lfsr",     id_noise_lfsr_,     regs.dbg_noise_lfsr() & 0x7FFFFF, 23);
+
+        // Channels
+        for (int ch=0; ch<9; ++ch) {
+            uint8_t reg20 = regs.read(0x20 + ch);
+            uint8_t reg10 = regs.read(0x10 + ch);
+            uint8_t reg30 = regs.read(0x30 + ch);
+            // Key bit at reg20 bit4
+            int key = (reg20 & 0x10) ? 1 : 0;
+            update_scalar("ch.key", ch_key_id_[ch], key);
+            // freq (block+fnum) assemble: reg10 (low 8 bits) + reg20 bits0 + block bits (reg20 bits 1..3)
+            uint32_t fnum = ((reg20 & 0x01) << 8) | reg10;
+            uint32_t block = (reg20 >> 1) & 0x07;
+            uint32_t freq_combined = (block << 9) | fnum;
+            update_vector("ch.freq", ch_freq_id_[ch], freq_combined, 12);
+            // instrument (upper 4 bits)
+            uint32_t instr = (reg30 >> 4) & 0x0F;
+            update_vector("ch.instr", ch_instr_id_[ch], instr, 4);
+            // volume (lower 4 bits)
+            uint32_t vol = reg30 & 0x0F;
+            update_vector("ch.vol", ch_vol_id_[ch], vol, 4);
+        }
+
+        // Operators snapshot (if available)
+        if (snap) {
+            // In OPLL: op index mapping: channel*2 + (0=mod,1=car)
+            for (int op=0; op<18; ++op) {
+                auto const &o = snap->ops[op];
+                // phase 20bits程度かもしれない—内部ビット数不明なら 24 仮定
+                update_vector("op.phase", op_phase_id_[op], o.phase & 0xFFFFFF, 24);
+                update_vector("op.env", op_env_id_[op], o.env & 0x3FF, 10);
+                update_vector("op.eg_state", op_state_id_[op], o.eg_state, 3);
+            }
+        }
+
+        // Output
+        update_vector("out.l", out_l_id_, (uint32_t)(out_l & 0xFFFF), 16);
+        update_vector("out.r", out_r_id_, (uint32_t)(out_r & 0xFFFF), 16);
+    }
+
+private:
+    void write_header() {
+        std::fprintf(fp_, "$date\n    (generated by opll vcd)\n$end\n");
+        std::fprintf(fp_, "$version\n    ymfm instrumented\n$end\n");
+        std::fprintf(fp_, "$timescale 1ns $end\n");
+    }
+
+    void declare_signals() {
+        // assign IDs (simple scheme)
+        char c='!';
+
+        auto next_id = [&](){
+            std::string s;
+            s.push_back(c);
+            c++;
+            if (c == '~') c='!'; // wrap (very large run improbable here)
+            return s;
+        };
+
+        id_lfo_am_counter_ = next_id();
+        id_lfo_pm_counter_ = next_id();
+        id_lfo_am_         = next_id();
+        id_noise_lfsr_     = next_id();
+
+        for (int ch=0; ch<9; ++ch) {
+            ch_key_id_[ch]  = next_id()[0];   // scalar
+            ch_freq_id_[ch] = next_id();
+            ch_instr_id_[ch]= next_id();
+            ch_vol_id_[ch]  = next_id();
+        }
+        for (int op=0; op<18; ++op) {
+            op_phase_id_[op] = next_id();
+            op_env_id_[op]   = next_id();
+            op_state_id_[op] = next_id();
+        }
+        out_l_id_ = next_id();
+        out_r_id_ = next_id();
+
+        // Dump declarations
+        std::fprintf(fp_, "$scope module top $end\n");
+        declare_vector(id_lfo_am_counter_, 16, "lfo_am_counter");
+        declare_vector(id_lfo_pm_counter_, 16, "lfo_pm_counter");
+        declare_vector(id_lfo_am_,         8, "lfo_am");
+        declare_vector(id_noise_lfsr_,     23, "noise_lfsr");
+
+        for (int ch=0; ch<9; ++ch) {
+            std::fprintf(fp_, "$scope module ch%d $end\n", ch);
+            declare_bit(ch_key_id_[ch], "key");
+            declare_vector(ch_freq_id_[ch], 12, "freq");
+            declare_vector(ch_instr_id_[ch],4, "instr");
+            declare_vector(ch_vol_id_[ch],  4, "vol");
+            for (int s=0; s<2; ++s) {
+                int opIndex = ch*2+s;
+                std::fprintf(fp_, "$scope module op%d $end\n", s);
+                declare_vector(op_phase_id_[opIndex], 24, "phase");
+                declare_vector(op_env_id_[opIndex],   10, "env");
+                declare_vector(op_state_id_[opIndex], 3,  "eg_state");
+                std::fprintf(fp_, "$upscope $end\n");
+            }
+            std::fprintf(fp_, "$upscope $end\n");
+        }
+        declare_vector(out_l_id_,16,"out_l");
+        declare_vector(out_r_id_,16,"out_r");
+        std::fprintf(fp_, "$upscope $end\n$enddefinitions $end\n");
+    }
+
+    // helper macros
+    void declare_vector(const std::string& id, int width, const char* name) {
+        std::fprintf(fp_, "$var wire %d %s %s $end\n", width, id.c_str(), name);
+    }
+    void declare_bit(char id, const char* name) {
+        std::fprintf(fp_, "$var wire 1 %c %s $end\n", id, name);
+    }
+
+#define DECL_VEC(ID,W,NAME) declare_vector(ID, W, NAME)
+#define DECL_BIT(ID,NAME)   declare_bit(ID, NAME)
+
+    // State
+    FILE* fp_ = nullptr;
+    bool initialized_ = false;
+    uint64_t sample_ = 0;
+    bool decimated_output_ = false;
+    uint32_t flush_interval_ = [](){
+        const char* e = std::getenv("OPLL_VCD_FLUSH_INTERVAL");
+        return e? (uint32_t)std::strtoul(e,nullptr,10): (uint32_t)10000;
+    }();
+    uint32_t flush_count_ = 0;
+    uint32_t decimate_ = [](){
+        const char* e = std::getenv("OPLL_VCD_DECIMATE");
+        return e? (uint32_t)std::strtoul(e,nullptr,10): (uint32_t)1;
+    }();
+    uint32_t force_full_ = [](){
+        const char* e = std::getenv("OPLL_VCD_FORCE_FULL");
+        return e? (uint32_t)std::strtoul(e,nullptr,10): (uint32_t)0;
+    }();
+
+    // IDs
+    std::string id_lfo_am_counter_, id_lfo_pm_counter_, id_lfo_am_, id_noise_lfsr_;
+    char        ch_key_id_[9];
+    std::string ch_freq_id_[9], ch_instr_id_[9], ch_vol_id_[9];
+    std::string op_phase_id_[18], op_env_id_[18], op_state_id_[18];
+    std::string out_l_id_, out_r_id_;
+
+    // Previous value caches
+    int scalar_prev_[128]; // indexed by char id
+    std::unordered_map<std::string,uint64_t> vector_prev_;
+
+} ; // class
+
+static VcdWriter g_vcd;
+
+#undef DECL_VEC
+#undef DECL_BIT
+
+} // anonymous namespace
+#endif // ESEOPL3_OPLL_VCD
+
 // >>> OPLL TRACE: BEGIN
 #ifdef ESEOPL3_OPLL_TRACE
 #include <cstdio>
@@ -602,6 +860,11 @@ bool opll_registers::write(uint16_t index, uint8_t data, uint32_t &channel, uint
 			return true;
 		}
 	}
+
+#ifdef ESEOPL3_OPLL_VCD
+// 簡易：サンプル境界で表示済み timestamp を再利用する形 (正確なサイクル精度が不要ならこれで十分)
+// もし addr/data の VCD 変数を宣言していれば update_vector 呼び出しを追加
+#endif
 	return false;
 }
 
@@ -1339,7 +1602,6 @@ void ymf262::save_restore(ymfm_saved_state &state)
 	state.save_restore(m_address);
 	m_fm.save_restore(state);
 }
-
 
 //-------------------------------------------------
 //  read_status - read the status register
@@ -2100,27 +2362,36 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
     opll_trace_init();
     uint32_t traced = 0;
 #endif
-	for (uint32_t samp = 0; samp < numsamples; samp++, output++)
-	{
-		// clock the system
-		m_fm.clock(fm_engine::ALL_CHANNELS);
+#ifdef ESEOPL3_OPLL_VCD
+    // snapshot 用構造体
+    ymfm::fm_debug_snapshot snap;
+#endif
+    for (uint32_t samp = 0; samp < numsamples; samp++, output++)
+    {
+        m_fm.clock(fm_engine::ALL_CHANNELS);
+        m_fm.output(output->clear(), 5, 256, fm_engine::ALL_CHANNELS);
+        output->data[0] = (output->data[0] * 128) / 9;
+        output->data[1] = (output->data[1] * 128) / 9;
 
-		// update the FM content; OPLL has a built-in 9-bit DAC
-		m_fm.output(output->clear(), 5, 256, fm_engine::ALL_CHANNELS);
-
-		// final output is multiplexed; we don't simulate that here except
-		// to average over everything
-		output->data[0] = (output->data[0] * 128) / 9;
-		output->data[1] = (output->data[1] * 128) / 9;
 #ifdef ESEOPL3_OPLL_TRACE
         traced++;
+#endif
+#ifdef ESEOPL3_OPLL_VCD
+        g_vcd.init_if_needed();
+        if (g_vcd.good()) {
+            // サンプルインデックス（累積）: 別途 total_samples を保持しているならそれを使う
+            static uint64_t global_sample = 0;
+            g_vcd.set_sample(global_sample++);
+            // operator snapshot
+            m_fm.debug_snapshot(snap);
+            g_vcd.dump_opll_sample(m_fm.regs(), &snap, output->data[0], output->data[1]);
+        }
 #endif
     }
 #ifdef ESEOPL3_OPLL_TRACE
     if (traced) opll_trace_output_wait(traced);
 #endif
 }
-
 
 
 //*********************************************************

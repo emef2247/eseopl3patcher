@@ -454,6 +454,13 @@ public:
 	uint32_t op_release_rate(uint32_t opoffs) const  { return instopbyte(0x06, 0, 4, opoffs); }
 	uint32_t op_volume(uint32_t opoffs) const        { return byte(0x30, 4 * bitfield(~opoffs, 0), 4, opoffs >> 1); }
 
+#ifdef ESEOPL3_OPLL_VCD
+public:
+    uint16_t dbg_lfo_am_counter() const { return m_lfo_am_counter; }
+    uint16_t dbg_lfo_pm_counter() const { return m_lfo_pm_counter; }
+    uint32_t dbg_noise_lfsr() const     { return m_noise_lfsr; }
+    uint8_t  dbg_lfo_am() const         { return m_lfo_am; }
+#endif
 private:
 	// return a bitfield extracted from a byte
 	uint32_t byte(uint32_t offset, uint32_t start, uint32_t count, uint32_t extra_offset = 0) const

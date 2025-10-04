@@ -1589,4 +1589,29 @@ void fm_engine_base<RegisterType>::engine_mode_write(uint8_t data)
 	}
 }
 
+#ifdef ESEOPL3_OPLL_VCD
+template<typename RegisterType>
+void fm_engine_base<RegisterType>::debug_snapshot(fm_debug_snapshot &snap) const {
+    uint32_t count = RegisterType::OPERATORS;
+    if (count > 64) count = 64;
+    for (uint32_t i = 0; i < count; ++i) {
+        auto *op = m_operator[i].get();
+        if (op) {
+            snap.ops[i].phase    = op->phase();
+            snap.ops[i].env      = op->debug_eg_attenuation();
+            snap.ops[i].eg_state = (uint8_t)op->debug_eg_state();
+        } else {
+            snap.ops[i].phase = 0;
+            snap.ops[i].env = 0;
+            snap.ops[i].eg_state = 0;
+        }
+    }
+    for (uint32_t i = count; i < 64; ++i) {
+        snap.ops[i].phase = 0;
+        snap.ops[i].env = 0;
+        snap.ops[i].eg_state = 0;
+    }
+}
+#endif
+
 }

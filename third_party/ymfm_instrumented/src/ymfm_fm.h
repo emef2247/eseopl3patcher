@@ -38,6 +38,16 @@
 namespace ymfm
 {
 
+#ifdef ESEOPL3_OPLL_VCD
+struct fm_debug_operator {
+    uint32_t phase = 0;
+    uint16_t env   = 0;
+    uint8_t  eg_state = 0;
+};
+struct fm_debug_snapshot {
+    fm_debug_operator ops[64];
+};
+#endif
 //*********************************************************
 //  GLOBAL ENUMERATORS
 //*********************************************************
@@ -430,6 +440,11 @@ public:
 
 	// mode register write; called by the interface after synchronization
 	virtual void engine_mode_write(uint8_t data) override;
+
+#ifdef ESEOPL3_OPLL_VCD
+public:
+    void debug_snapshot(ymfm::fm_debug_snapshot &snap) const;
+#endif
 
 protected:
 	// assign the current set of operators to channels
