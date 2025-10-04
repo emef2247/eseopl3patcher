@@ -784,6 +784,10 @@ bool opll_registers::write(uint16_t index, uint8_t data, uint32_t &channel, uint
 
 #ifdef ESEOPL3_OPLL_CSV
 	// CSV event logging for OPLL register writes
+	// Initialize CSV writer on first write if needed
+	if (g_csv_enabled && !g_csv_initialized) {
+		opll_csv_init();
+	}
 	if (g_csv_enabled && g_csv_writer && g_csv_writer->is_open()) {
 		uint8_t addr = (uint8_t)index;
 		bool log_event = false;
