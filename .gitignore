@@ -143,3 +143,5 @@ third_party/*/Makefile
 third_party/*/.vs/
 third_party/*/.vscode/
 third_party/*/compile_commands.jsontools/opll_trace/vgmrender_opll_trace
+tools/opll_trace/opll_trace.csv
+tools/opll_trace/opll_dump.vcd
