@@ -215,7 +215,7 @@ static void opll_vcd_init() {
     }
 }
 
-static void opll_vcd_cleanup() {
+[[maybe_unused]] static void opll_vcd_cleanup() {
     if (g_vcd_writer) {
         delete g_vcd_writer;
         g_vcd_writer = nullptr;
