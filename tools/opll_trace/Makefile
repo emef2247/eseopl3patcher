@@ -1,6 +1,7 @@
 CXX      := g++
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
             -DESEOPL3_OPLL_TRACE \
+            -DESEOPL3_OPLL_VCD \
             -I../../third_party/ymfm_instrumented/src \
             -I../../third_party/ymfm_instrumented/examples/vgmrender
 
