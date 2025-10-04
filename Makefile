@@ -22,7 +22,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 ifeq ($(USE_YMFM),1)
   CPPFLAGS  += -DUSE_YMFM=1
-  CXXFLAGS  += -Ithird_party/ymfm/src
+  CXXFLAGS  += -Ithird_party/ymfm_instrumented/src
   INC_FLAGS += -Iinclude
 else
   CPPFLAGS  += -DUSE_YMFM=0
@@ -47,11 +47,11 @@ ifeq ($(USE_YMFM),1)
   # YMFM C bridge
   SRCS_CPP += src/ymfm_bridge/ymfm_c_api.cpp
   # YMFM core sources (ymfm_fm.cpp は該当リビジョンに無いため含めない)
-  SRCS_CPP += third_party/ymfm/src/ymfm_opl.cpp \
-              third_party/ymfm/src/ymfm_pcm.cpp \
-              third_party/ymfm/src/ymfm_ssg.cpp \
-              third_party/ymfm/src/ymfm_misc.cpp \
-              third_party/ymfm/src/ymfm_adpcm.cpp
+  SRCS_CPP += third_party/ymfm_instrumented/src/ymfm_opl.cpp \
+              third_party/ymfm_instrumented/src/ymfm_pcm.cpp \
+              third_party/ymfm_instrumented/src/ymfm_ssg.cpp \
+              third_party/ymfm_instrumented/src/ymfm_misc.cpp \
+              third_party/ymfm_instrumented/src/ymfm_adpcm.cpp
 endif
 
 # Objects (dedup just in case)
@@ -77,9 +77,9 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INC_FLAGS) -c $< -o $@
 
 # YMFM third_party explicit rule (robust)
-$(OBJ_DIR)/third_party/ymfm/src/%.o: third_party/ymfm/src/%.cpp | $(OBJ_DIR)
+$(OBJ_DIR)/third_party/ymfm_instrumented/src/%.o: third_party/ymfm_instrumented/src/%.cpp | $(OBJ_DIR)
 	@mkdir -p "$(dir $@)"
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Ithird_party/ymfm/src $(INC_FLAGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Ithird_party/ymfm_instrumented/src $(INC_FLAGS) -c $< -o $@
 
 $(TARGET): $(BIN_DIR) $(OBJS_C) $(OBJS_CPP)
 ifeq ($(USE_YMFM),1)

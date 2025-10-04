@@ -224,6 +224,71 @@ static void opll_vcd_init() {
 #endif
 // >>> OPLL VCD: END
 
+// >>> OPLL CSV: BEGIN
+#ifdef ESEOPL3_OPLL_CSV
+#include "ymfm_csv_writer.h"
+#include <cstdlib>
+#include <cstring>
+
+static ymfm::CsvWriter* g_csv_writer = nullptr;
+static bool g_csv_initialized = false;
+static bool g_csv_enabled = true;
+static uint64_t g_csv_sample_counter = 0;
+static double g_csv_sample_rate = 49716.0;  // TODO: integrate via interface
+
+static void opll_csv_init() {
+    if (g_csv_initialized) return;
+    g_csv_initialized = true;
+    
+    // Check environment variable OPLL_CSV_EVENTS
+    const char* env = std::getenv("OPLL_CSV_EVENTS");
+    if (env && std::strcmp(env, "0") == 0) {
+        g_csv_enabled = false;
+        return;
+    }
+    
+    g_csv_writer = new ymfm::CsvWriter();
+    if (g_csv_writer->open("opll_events.csv")) {
+        // Write header
+        g_csv_writer->write_field("time_s");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("sample");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("chip");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("addr");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("data");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("#type");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("ch");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("ko");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("blk");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("fnum");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("fnumL");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("inst");
+        g_csv_writer->write_comma();
+        g_csv_writer->write_field("vol");
+        g_csv_writer->write_newline();
+        g_csv_writer->flush();
+    }
+}
+
+[[maybe_unused]] static void opll_csv_cleanup() {
+    if (g_csv_writer) {
+        delete g_csv_writer;
+        g_csv_writer = nullptr;
+    }
+}
+#endif
+// >>> OPLL CSV: END
+
 namespace ymfm
 {
 
@@ -716,6 +781,112 @@ bool opll_registers::write(uint16_t index, uint8_t data, uint32_t &channel, uint
 
 	// write the new data
 	m_regdata[index] = data;
+
+#ifdef ESEOPL3_OPLL_CSV
+	// CSV event logging for OPLL register writes
+	// Initialize CSV writer on first write if needed
+	if (g_csv_enabled && !g_csv_initialized) {
+		opll_csv_init();
+	}
+	if (g_csv_enabled && g_csv_writer && g_csv_writer->is_open()) {
+		uint8_t addr = (uint8_t)index;
+		bool log_event = false;
+		const char* event_type = nullptr;
+		int ch = -1;
+		
+		// Check if this is a register we want to log
+		if (addr >= 0x10 && addr <= 0x18) {
+			log_event = true;
+			event_type = "fL";
+			ch = addr - 0x10;
+		} else if (addr >= 0x20 && addr <= 0x28) {
+			log_event = true;
+			event_type = "fHBK";
+			ch = addr - 0x20;
+		} else if (addr >= 0x30 && addr <= 0x38) {
+			log_event = true;
+			event_type = "iv";
+			ch = addr - 0x30;
+		}
+		
+		if (log_event) {
+			// Calculate time_s from sample counter
+			double time_s = (double)g_csv_sample_counter / g_csv_sample_rate;
+			
+			// Get related register values for this channel
+			uint8_t reg1n = (ch >= 0 && ch < 9) ? m_regdata[0x10 + ch] : 0;
+			uint8_t reg2n = (ch >= 0 && ch < 9) ? m_regdata[0x20 + ch] : 0;
+			uint8_t reg3n = (ch >= 0 && ch < 9) ? m_regdata[0x30 + ch] : 0;
+			
+			// Extract fields from registers
+			uint8_t ko = (reg2n >> 4) & 0x01;
+			uint8_t blk = (reg2n >> 1) & 0x07;
+			uint16_t fnum = ((reg2n & 0x01) << 8) | reg1n;
+			uint8_t inst = (reg3n >> 4) & 0x0F;
+			uint8_t vol = reg3n & 0x0F;
+			
+			// Write CSV row: time_s,sample,chip,addr,data,#type,ch,ko,blk,fnum,fnumL,inst,vol
+			g_csv_writer->write_field(time_s);
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field(g_csv_sample_counter);
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field("YM2413");
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field((int)addr);
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field((int)data);
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field(event_type);
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field(ch);
+			g_csv_writer->write_comma();
+			
+			// Type-specific fields
+			if (addr >= 0x10 && addr <= 0x18) {
+				// fL: ko, blk, fnum are empty, fnumL is filled
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)reg1n);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+			} else if (addr >= 0x20 && addr <= 0x28) {
+				// fHBK: ko, blk, fnum are filled, fnumL is empty
+				g_csv_writer->write_field((int)ko);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)blk);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)fnum);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)reg1n);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+			} else if (addr >= 0x30 && addr <= 0x38) {
+				// iv: inst and vol are filled, others empty
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_empty();
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)inst);
+				g_csv_writer->write_comma();
+				g_csv_writer->write_field((int)vol);
+			}
+			
+			g_csv_writer->write_newline();
+		}
+	}
+#endif
 
 	// handle writes to the rhythm keyons
 	if (index == 0x0e)
@@ -2240,6 +2411,9 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 #ifdef ESEOPL3_OPLL_VCD
     opll_vcd_init();
 #endif
+#ifdef ESEOPL3_OPLL_CSV
+    opll_csv_init();
+#endif
 	for (uint32_t samp = 0; samp < numsamples; samp++, output++)
 	{
 		// clock the system
@@ -2263,6 +2437,10 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 			g_vcd_writer->write_snapshot(snap);
 			g_vcd_writer->advance_time(1);
 		}
+#endif
+#ifdef ESEOPL3_OPLL_CSV
+		// Increment sample counter for CSV logging
+		g_csv_sample_counter++;
 #endif
 #ifdef ESEOPL3_OPLL_TRACE
         traced++;

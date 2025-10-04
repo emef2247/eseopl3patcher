@@ -13,7 +13,7 @@ extern "C" {
 }
 
 #if defined(USE_YMFM) && USE_YMFM
-  #include "../../third_party/ymfm/src/ymfm_opl.h"
+  #include "../../third_party/ymfm_instrumented/src/ymfm_opl.h"
 
 // YMFM interface host (timers/irq/busy are no-op for analysis)
 class OpllHost : public ymfm::ymfm_interface {
