@@ -83,7 +83,8 @@ This row indicates:
 | `ESEOPL3_OPLL_CSV` | Compile-time macro | Enable CSV logging code. Add `-DESEOPL3_OPLL_CSV` to `USER_DEFINES` when building. |
 | `ESEOPL3_OPLL_VCD` | Compile-time macro | Enable VCD logging (separate feature, unaffected by CSV logging). |
 | `ESEOPL3_OPLL_TRACE` | Compile-time macro | Enable TRACE logging (separate feature, unaffected by CSV logging). |
-| `OPLL_CSV_EVENTS` | Environment variable | Runtime control for CSV logging. Set to `0` to disable CSV output at runtime. Default is ON if macro is enabled. |
+| `ESEOPL3_YMFM_TRACE` | Environment variable | **Required** to activate YMFM emulation layer and enable CSV/VCD/TRACE features. Set to `1` to enable. |
+| `OPLL_CSV_EVENTS` | Environment variable | Runtime control for CSV logging. Set to `0` to disable CSV output at runtime. Default is ON if macro is enabled. Only effective when `ESEOPL3_YMFM_TRACE=1`. |
 
 ### Building with CSV Support
 
@@ -94,18 +95,21 @@ make USE_YMFM=1 USER_DEFINES="-DESEOPL3_OPLL_CSV" -j4
 
 ### Runtime Usage
 
-By default (if compiled with `-DESEOPL3_OPLL_CSV`), the logger will create `opll_events.csv` in the current directory.
+**Important**: The CSV logger requires YMFM trace to be enabled at runtime via the `ESEOPL3_YMFM_TRACE` environment variable. This is because the CSV logging is integrated into the YMFM emulation layer.
 
-To disable CSV logging at runtime:
+By default (if compiled with `-DESEOPL3_OPLL_CSV`), the logger will create `opll_events.csv` in the current directory when YMFM trace is active.
+
+To enable CSV logging:
 ```bash
-export OPLL_CSV_EVENTS=0
-./build/bin/eseopl3patcher input.vgm ...
+export ESEOPL3_YMFM_TRACE=1
+./build/bin/eseopl3patcher input.vgm 0 --convert-ym2413 -o output.vgm
 ```
 
-To enable (default when macro is defined):
+To disable CSV logging at runtime (while still using YMFM trace):
 ```bash
-# OPLL_CSV_EVENTS is not set or set to any value other than "0"
-./build/bin/eseopl3patcher input.vgm ...
+export ESEOPL3_YMFM_TRACE=1
+export OPLL_CSV_EVENTS=0
+./build/bin/eseopl3patcher input.vgm 0 --convert-ym2413 -o output.vgm
 ```
 
 ## Phase 2 and Beyond (Planned)
@@ -149,8 +153,9 @@ make USE_YMFM=1 USER_DEFINES="-DESEOPL3_OPLL_CSV" -j4
 ```
 
 ### Test with Existing OPLL VGM Files
-Run the converter on short OPLL-only VGM inputs:
+Run the converter on short OPLL-only VGM inputs with YMFM trace enabled:
 ```bash
+export ESEOPL3_YMFM_TRACE=1
 ./build/bin/eseopl3patcher input_opll.vgm 0 --convert-ym2413 -o output.vgm
 ```
 
@@ -163,6 +168,7 @@ Run the converter on short OPLL-only VGM inputs:
 
 ### Disable CSV Logging
 ```bash
+export ESEOPL3_YMFM_TRACE=1
 export OPLL_CSV_EVENTS=0
 ./build/bin/eseopl3patcher input_opll.vgm 0 --convert-ym2413 -o output.vgm
 # opll_events.csv should NOT be created
