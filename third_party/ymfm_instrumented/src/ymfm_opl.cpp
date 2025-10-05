@@ -43,6 +43,62 @@ static uint64_t g_opll_trace_samples = 0;
 static int g_opll_trace_session = 0;
 static uint8_t g_opll_prev_reg2n[9];
 
+// --- Silence detection config ---
+static int g_silence_env_threshold = 0x3A0;
+static int g_silence_output_threshold = 2;
+static int g_silence_window_size = 256;
+
+static const int OPLL_CHANNELS = 9;
+struct ActiveState {
+    bool active = false;         // 現在activeか
+    uint64_t start_sample = 0;   // active=1に遷移した時点のサンプル
+    uint64_t duration = 0;       // 現在のactive継続長
+};
+
+static std::vector<ActiveState> g_ch_active_state(OPLL_CHANNELS);
+
+// 環境変数で上書き（起動時一度だけ呼ぶ）
+void init_silence_thresholds() {
+    static bool inited = false;
+    if (inited) return;
+    inited = true;
+    if (const char* s = std::getenv("OPLL_BURST_SILENCE_ENV")) g_silence_env_threshold = std::atoi(s);
+    if (const char* s = std::getenv("OPLL_BURST_SILENCE_OUTPUT")) g_silence_output_threshold = std::atoi(s);
+    if (const char* s = std::getenv("OPLL_BURST_SILENCE_HOLD")) g_silence_window_size = std::atoi(s);
+}
+
+// --- Silence ring buffer (per channel) ---
+#include <vector>
+#include <cmath>
+
+// 1chごとに保持するリングバッファ
+struct SilenceWindow {
+    std::vector<int> env;
+    std::vector<int> mix_l, mix_r;
+    size_t pos;
+    size_t size;
+
+    SilenceWindow(size_t n) : env(n, 0), mix_l(n, 0), mix_r(n, 0), pos(0), size(n) {}
+
+    void push(int e, int ml, int mr) {
+        env[pos] = e;
+        mix_l[pos] = ml;
+        mix_r[pos] = mr;
+        pos = (pos + 1) % size;
+    }
+
+    // 全部静寂ならtrue
+    bool is_silent(int env_th, int out_th) const {
+        for (size_t i = 0; i < size; ++i) {
+            if (env[i] < env_th) return false;
+            if (std::abs(mix_l[i]) >= out_th) return false;
+            if (std::abs(mix_r[i]) >= out_th) return false;
+        }
+        return true;
+    }
+};
+static std::vector<SilenceWindow> g_event_silence_windows;
+
 static void opll_trace_init() {
     if (g_opll_trace_init) return;
     g_opll_trace_init = true;
@@ -53,6 +109,8 @@ static void opll_trace_init() {
         std::fprintf(g_opll_trace_fp, "session_id,ch,t_samples,event,reg2n_hex\n");
         std::memset(g_opll_prev_reg2n, 0, sizeof(g_opll_prev_reg2n));
     }
+	g_event_silence_windows.clear();
+    g_event_silence_windows.resize(OPLL_CHANNELS, SilenceWindow(g_silence_window_size));
 }
 
 static void opll_trace_output_wait(uint32_t advanced) {
@@ -247,6 +305,15 @@ static void opll_csv_init() {
         return;
     }
     
+	// active状態管理の初期化（全ch inactive, duration=0, start_sample=0）
+	g_ch_active_state.clear();
+	g_ch_active_state.resize(OPLL_CHANNELS);
+	for (int ch = 0; ch < OPLL_CHANNELS; ++ch) {
+		g_ch_active_state[ch].active = false;
+		g_ch_active_state[ch].duration = 0;
+		g_ch_active_state[ch].start_sample = 0;
+	}
+
     g_csv_writer = new ymfm::CsvWriter();
     if (g_csv_writer->open("opll_events.csv")) {
         // Write header
@@ -275,6 +342,10 @@ static void opll_csv_init() {
         g_csv_writer->write_field("inst");
         g_csv_writer->write_comma();
         g_csv_writer->write_field("vol");
+		g_csv_writer->write_comma();
+		g_csv_writer->write_field("active");
+		g_csv_writer->write_comma();
+		g_csv_writer->write_field("active_duration");
         g_csv_writer->write_newline();
         g_csv_writer->flush();
     }
@@ -844,45 +915,69 @@ bool opll_registers::write(uint16_t index, uint8_t data, uint32_t &channel, uint
 			// Type-specific fields
 			if (addr >= 0x10 && addr <= 0x18) {
 				// fL: ko, blk, fnum are empty, fnumL is filled
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)ko); // ko
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)blk); //blk
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)fnum); //fnum
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)reg1n);
+				g_csv_writer->write_field((int)reg1n); //fnumL
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)inst);// inst 
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)vol);// vol
 			} else if (addr >= 0x20 && addr <= 0x28) {
 				// fHBK: ko, blk, fnum are filled, fnumL is empty
-				g_csv_writer->write_field((int)ko);
+				g_csv_writer->write_field((int)ko); // ko
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)blk);
+				g_csv_writer->write_field((int)blk); // blk
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)fnum);
+				g_csv_writer->write_field((int)fnum);  // fnum
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)reg1n);
-				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
-				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)reg1n); // fnumL
+				g_csv_writer->write_comma(); 
+				g_csv_writer->write_field((int)inst);// inst
+				g_csv_writer->write_comma(); 
+				g_csv_writer->write_field((int)vol);// vol 
 			} else if (addr >= 0x30 && addr <= 0x38) {
 				// iv: inst and vol are filled, others empty
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)ko); // ko
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)blk); // blk
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)fnum); // fnum
 				g_csv_writer->write_comma();
-				g_csv_writer->write_empty();
+				g_csv_writer->write_field((int)reg1n); // fnumL
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)inst);
+				g_csv_writer->write_field((int)inst); // inst
 				g_csv_writer->write_comma();
-				g_csv_writer->write_field((int)vol);
+				g_csv_writer->write_field((int)vol); // vol
 			}
-			
+
+			// silence判定
+			bool is_now_silent = g_event_silence_windows[ch].is_silent(g_silence_env_threshold, g_silence_output_threshold);
+			bool was_active = g_ch_active_state[ch].active;
+			g_csv_writer->write_comma();
+			g_csv_writer->write_field(!was_active); // active=1
+
+			g_csv_writer->write_comma();
+			if (was_active && is_now_silent) {
+				// active=1→0に遷移した（このwriteでサイレント到達）
+				uint64_t duration = g_csv_sample_counter - g_ch_active_state[ch].start_sample;
+				// 状態をサイレントへ
+				g_ch_active_state[ch].active = false;
+				g_ch_active_state[ch].duration = duration;
+				g_ch_active_state[ch].start_sample = g_csv_sample_counter;
+				g_csv_writer->write_field(duration); // active_duration確定
+			}  else if (!was_active && !is_now_silent) {
+				// サイレント→発音開始（active=1）への遷移だった場合、start_sampleを更新
+				g_ch_active_state[ch].active = true;
+				g_ch_active_state[ch].start_sample = g_csv_sample_counter;
+				// durationは未定なので空欄でOK
+				g_csv_writer->write_field("cont."); // active_duration確定
+			} else {
+				g_csv_writer->write_field("cont."); // active_duration確定
+			}
 			g_csv_writer->write_newline();
 		}
 	}
@@ -2413,6 +2508,8 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 #endif
 #ifdef ESEOPL3_OPLL_CSV
     opll_csv_init();
+	init_silence_thresholds(); // 1度だけ呼ぶ
+	std::vector<SilenceWindow> burst_windows(9, SilenceWindow(g_silence_window_size));
 #endif
 	for (uint32_t samp = 0; samp < numsamples; samp++, output++)
 	{
@@ -2426,7 +2523,7 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 		// to average over everything
 		output->data[0] = (output->data[0] * 128) / 9;
 		output->data[1] = (output->data[1] * 128) / 9;
-		
+	
 #ifdef ESEOPL3_OPLL_VCD
 		// Capture state for VCD
 		if (g_vcd_writer) {
@@ -2438,8 +2535,84 @@ void opll_base::generate(output_data *output, uint32_t numsamples)
 			g_vcd_writer->advance_time(1);
 		}
 #endif
+
+#ifdef ESEOPL3_OPLL_CSV
+    if (g_csv_writer && g_csv_writer->is_open()) {
+        for (int ch = 0; ch < OPLL_CHANNELS; ++ch) {
+            uint8_t reg1n = m_fm.regs().read(0x10 + ch);
+            uint8_t reg2n = m_fm.regs().read(0x20 + ch);
+            uint8_t reg3n = m_fm.regs().read(0x30 + ch);
+            uint8_t ko = (reg2n >> 4) & 0x01;
+            uint8_t blk = (reg2n >> 1) & 0x07;
+            uint16_t fnum = ((reg2n & 0x01) << 8) | reg1n;
+            uint8_t inst = (reg3n >> 4) & 0x0F;
+            uint8_t vol = reg3n & 0x0F;
+            double time_s = (double)g_csv_sample_counter / g_csv_sample_rate;
+
+            g_csv_writer->write_field(time_s); g_csv_writer->write_comma();
+            g_csv_writer->write_field(g_csv_sample_counter); g_csv_writer->write_comma();
+            g_csv_writer->write_field("YM2413"); g_csv_writer->write_comma();
+            g_csv_writer->write_field(-1); g_csv_writer->write_comma(); // addr
+            g_csv_writer->write_field(0); g_csv_writer->write_comma(); // data
+            g_csv_writer->write_field("snapshot"); g_csv_writer->write_comma();
+            g_csv_writer->write_field(ch); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)ko); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)blk); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)fnum); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)reg1n); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)inst); g_csv_writer->write_comma();
+            g_csv_writer->write_field((int)vol); g_csv_writer->write_comma();
+            g_csv_writer->write_field(g_ch_active_state[ch].active ? 1 : 0); g_csv_writer->write_comma();
+            g_csv_writer->write_field(g_ch_active_state[ch].duration);
+            g_csv_writer->write_newline();
+        }
+    }
+    g_csv_sample_counter++;
+#endif
+
 #ifdef ESEOPL3_OPLL_CSV
 		// Increment sample counter for CSV logging
+		// ループ内で各チャンネルについて
+for (int ch = 0; ch < OPLL_CHANNELS; ++ch) {
+    bool now_silent = g_event_silence_windows[ch].is_silent(g_silence_env_threshold, g_silence_output_threshold);
+    bool was_active = g_ch_active_state[ch].active;
+
+    // 発音→サイレント遷移
+    if (was_active && now_silent) {
+        uint64_t duration = g_csv_sample_counter - g_ch_active_state[ch].start_sample;
+        g_ch_active_state[ch].active = false;
+        g_ch_active_state[ch].duration = duration;
+        g_ch_active_state[ch].start_sample = g_csv_sample_counter;
+
+        // CSV出力: event_type=silent
+        g_csv_writer->write_field((double)g_csv_sample_counter / g_csv_sample_rate); g_csv_writer->write_comma();
+        g_csv_writer->write_field(g_csv_sample_counter); g_csv_writer->write_comma();
+        g_csv_writer->write_field("YM2413"); g_csv_writer->write_comma();
+        g_csv_writer->write_field(-1); g_csv_writer->write_comma(); // addr
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();  // data
+        g_csv_writer->write_field("silent"); g_csv_writer->write_comma();
+        g_csv_writer->write_field(ch); g_csv_writer->write_comma();
+        // ko, blk, fnum, fnumL, inst, vol: 空欄または0
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        // active=0
+        g_csv_writer->write_field(0); g_csv_writer->write_comma();
+        // active_duration
+        g_csv_writer->write_field(duration);
+        g_csv_writer->write_newline();
+    }
+    // サイレント→発音開始遷移
+    else if (!was_active && !now_silent) {
+        g_ch_active_state[ch].active = true;
+        g_ch_active_state[ch].start_sample = g_csv_sample_counter;
+        // 必要に応じて開始イベントも出力可能
+    }
+    // 継続状態は何もしない
+}
 		g_csv_sample_counter++;
 #endif
 #ifdef ESEOPL3_OPLL_TRACE
