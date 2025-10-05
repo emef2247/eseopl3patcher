@@ -6,7 +6,104 @@
 #include "../override_loader.h"
 #include "../compat_bool.h"
 #include "ym2413_patch_convert.h"
+#include <math.h>
+#include <stdint.h>
 
+static const uint8_t fnum_to_atten[16] = {0,24,32,37,40,43,45,47,48,50,51,52,53,54,55,56};
+static const float rate_to_attack_time[16] = {2826.24f,2260.99f,1888.43f,1577.74f,1318.52f,1102.96f,921.98f,770.38f,644.21f,539.54f,452.28f,379.99f,319.84f,269.51f,227.15f,191.20f};
+static const float rate_to_decay_time[16]  = {2260.99f,1888.43f,1577.74f,1318.52f,1102.96f,921.98f,770.38f,644.21f,539.54f,452.28f,379.99f,319.84f,269.51f,227.15f,191.20f,160.08f};
+
+// ...必要に応じてKSR/ksl補正も考慮
+
+// 3. AR/DR補正ロジックの流れ例
+// rate: 0～15, keycode, ksr等の補正を省略した簡易例
+// OPLL/OPL3のrate値から「実ms」をそれぞれ計算
+float get_attack_time_OPLL(int ar) { return rate_to_attack_time[ar & 0xF]; }
+float get_attack_time_OPL3(int ar) { return rate_to_attack_time[ar & 0xF]; }
+float get_decay_time_OPLL(int dr)  { return rate_to_decay_time[dr & 0xF]; }
+float get_decay_time_OPL3(int dr)  { return rate_to_decay_time[dr & 0xF]; }
+
+// OPLL値で得たmsに一番近いOPL3値を逆引き
+int find_best_rate_OPL3(float target_ms, const float* table) {
+    int best = 0;
+    float min_diff = 1e9;
+    for (int i = 0; i < 16; ++i) {
+        float diff = fabsf(table[i] - target_ms);
+        if (diff < min_diff) { min_diff = diff; best = i; }
+    }
+    return best;
+}
+
+// 4. 補正関数案（block/fnum4, ar/dr を引数で渡す）
+// --- ksl: dB算出 ---
+static int ksl_db(int ksl, int block, int fnum4) {
+    if (ksl == 0) return 0;
+    int atten = fnum_to_atten[fnum4 & 0xF] - 8 * (block ^ 7);
+    if (atten < 0) atten = 0;
+    return atten << ksl;
+}
+
+// --- AR/DR: ms算出 ---
+static float ar_ms(int ar) { return rate_to_attack_time[ar & 0xF]; }
+static float dr_ms(int dr) { return rate_to_decay_time[dr & 0xF]; }
+static int best_rate(float target_ms, const float* tbl) {
+    int best = 0; float min_diff = 1e9;
+    for (int i = 0; i < 16; ++i) {
+        float diff = fabsf(tbl[i] - target_ms);
+        if (diff < min_diff) { min_diff = diff; best = i; }
+    }
+    return best;
+}
+// ---- ksl補正 ----
+static int best_ksl_for_db(int db, int block, int fnum4) {
+    int best = 0, min_diff = 1e9;
+    for (int ksl=0; ksl<4; ++ksl) {
+        int db3 = ksl_db(ksl, block, fnum4);
+        int diff = abs(db - db3);
+        if (diff < min_diff) { min_diff = diff; best = ksl; }
+    }
+    return best;
+}
+
+// ---- TL補正（簡易: 0-15→0-63スケール） ----
+static uint8_t convert_tl(uint8_t tl_opll) {
+    return (uint8_t)((tl_opll * 63 + 7) / 15);
+}
+
+// ---- multiple補正 ----
+static const int mult_table[16] = {1,2,4,6,8,10,12,14,16,18,20,20,24,24,30,30}; // 実効値x2
+static int best_mult(int mult_opll) {
+    int v = mult_table[mult_opll & 0xF];
+    int best = 0, min_diff = 1e9;
+    for (int m=0; m<16; ++m) {
+        int v3 = mult_table[m];
+        int diff = abs(v - v3);
+        if (diff < min_diff) { min_diff = diff; best = m; }
+    }
+    return best;
+}
+
+// ---- 補正本体 ----
+void correct_opl3_voice_param(OPL3VoiceParam *p_vp, int block_opll, int fnum4_opll, int block_opl3, int fnum4_opl3) {
+    for (int op=0; op<2; ++op) {
+        // ksl補正
+        int db = ksl_db(p_vp->op[op].ksl, block_opll, fnum4_opll);
+        p_vp->op[op].ksl = best_ksl_for_db(db, block_opl3, fnum4_opl3);
+
+        // TL補正
+        p_vp->op[op].tl = convert_tl(p_vp->op[op].tl);
+
+        // multiple補正
+        p_vp->op[op].mult = best_mult(p_vp->op[op].mult);
+
+        // AR/DR補正
+        float ar_target = ar_ms(p_vp->op[op].ar);
+        float dr_target = dr_ms(p_vp->op[op].dr);
+        p_vp->op[op].ar = best_rate(ar_target, rate_to_attack_time);
+        p_vp->op[op].dr = best_rate(dr_target, rate_to_decay_time);
+    }
+}
+    
 static inline uint8_t rate_map_pick(uint8_t raw);          /* 前方宣言 */
 static inline uint8_t enforce_min_attack(uint8_t ar, const char* stage, int inst, int op_index);
 

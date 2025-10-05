@@ -19,6 +19,7 @@ void finalize_opl3_pair (OPL3VoiceParam *vp, const CommandOptions *opts);
 
 void opl3_apply_debug_adjust(OPL3VoiceParam *vp, const CommandOptions *opts);
 
+void correct_opl3_voice_param(OPL3VoiceParam *p_vp, int block_opll, int fnum4_opll, int block_opl3, int fnum4_opl3);
 
 /* YM2413 patch number -> OPL3VoiceParam (既存 static 実装を移植)
  * inst:
