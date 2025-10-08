@@ -836,7 +836,7 @@ static inline void acc_maybe_flush_triple(
 
 /** Flush pending channel state (KeyOn/KeyOff/param writes) */
 static inline void flush_channel_ch(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    VGMBuffer *p_music_data, VGMStatus *p_vstatus, OPL3State *p_state,
     int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
     OpllPendingCh* p, OpllStampCh* s)
 {
@@ -870,12 +870,12 @@ static inline void flush_channel_ch(
         uint8_t reg1n_eff = p->has_1n ? p->reg1n : s->last_1n;
 
         OPL3VoiceParam vp_cached;
-        apply_inst_before_keyon(p_music_data, p_vstat, p_state, ch, reg3n_eff, p_opts, &vp_cached);
+        apply_inst_before_keyon(p_music_data, p_vstatus, p_state, ch, reg3n_eff, p_opts, &vp_cached);
 
         // A0（バッファ対象）、TL、B0（KeyOn）を呼び出し順で投入
         // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
 
-        uint8_t car40 = make_carrier_40_from_vol(&vp_cached, reg3n_eff);
+        uint8_t car40 = make_carrier_40_from_vol(p_vstatus, &vp_cached, reg3n_eff, p_opts);
         car40 = emergency_boost_carrier_tl(car40, p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
         if (p_opts && p_opts->carrier_tl_clamp_enabled) {
             uint8_t tl = car40 & 0x3F;
@@ -916,15 +916,15 @@ static inline void flush_channel_ch(
         }
 
         // A0（周波数 LSB）
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, a0_val, p_opts);
+        duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xA0 + ch, a0_val, p_opts);
 
         // TL（既存どおり）
-        duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + car_slot, car40, p_opts);
+        duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0x40 + car_slot, car40, p_opts);
 
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
     if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, p_vstat, (uint16_t)get_pre_keyon_wait(p_opts));
+        vgm_wait_samples(p_music_data, p_vstatus, (uint16_t)get_pre_keyon_wait(p_opts));
         if (p_opts->debug.verbose) {
             fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n",
                     ch, (unsigned)get_pre_keyon_wait(p_opts));
@@ -941,7 +941,7 @@ static inline void flush_channel_ch(
         // }
         // 修正: flush_channel_ch 内の「ノートON確定」直後にアキュムレータをクリアして二重発火を防止
         if (!key_state_already(p_state, ch, true)) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, b0_val, p_opts);
+            duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, b0_val, p_opts);
 
             uint16_t fnum10 = (uint16_t)(((b0_val & 0x03) << 8) | a0_val);
             uint8_t  blk3   = (uint8_t)((b0_val >> 2) & 0x07);
@@ -966,14 +966,14 @@ static inline void flush_channel_ch(
                             ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                 }
                 // VGMに待ちを注入してからゲート経過を進める
-                vgm_wait_samples(p_music_data, p_vstat, need);
+                vgm_wait_samples(p_music_data, p_vstatus, need);
                 // saturate
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
 
                 // 直後に即時 KeyOff を発行
                 uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-                duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
+                duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, opl3_bn, p_opts);
                 p_state->last_key[ch] = 0;
                 if (p_opts && p_opts->debug.verbose)
                     fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (after inject wait)\n", ch, p->reg2n);
@@ -994,7 +994,7 @@ static inline void flush_channel_ch(
         } else {
             // 閾値以上なら即時 KeyOff
             uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-            duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, opl3_bn, p_opts);
+            duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, opl3_bn, p_opts);
             p_state->last_key[ch] = 0;
             if (p_opts && p_opts->debug.verbose)
                 fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (elapsed=%u)\n", ch, p->reg2n, g_gate_elapsed[ch]);
@@ -1006,7 +1006,7 @@ static inline void flush_channel_ch(
     else {
         // No edge; just flush any changed params
         if (need_1n) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
+            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
                                  0xA0 + ch, opll_to_opl3_an(p->reg1n), p_opts);
         }
         if (need_3n) {
@@ -1014,7 +1014,7 @@ static inline void flush_channel_ch(
             OPL3VoiceParam vp_tmp;
             ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
             opll_apply_all_debug(&vp_tmp, p_opts);
-            uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, p->reg3n);
+            uint8_t car40 = make_carrier_40_from_vol(p_vstatus, &vp_tmp, p->reg3n, p_opts);
             if (p_opts && p_opts->carrier_tl_clamp_enabled) {
                 uint8_t tl = car40 & 0x3F;
                 if (tl > p_opts->carrier_tl_clamp) {
@@ -1024,11 +1024,11 @@ static inline void flush_channel_ch(
                     car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
                 }
             }
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
+            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
                                  0x40 + car_slot, car40, p_opts);
         }
         if (need_2n) {
-            duplicate_write_opl3(p_music_data, p_vstat, p_state,
+            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
                                  0xB0 + ch, opll_to_opl3_bn(p->reg2n), p_opts);
         }
     }
@@ -1128,7 +1128,7 @@ int opll_write_register(
                 ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
                 opll_apply_all_debug(&vp_tmp, p_opts);
 
-                uint8_t car40 = make_carrier_40_from_vol(&vp_tmp, val);
+                uint8_t car40 = make_carrier_40_from_vol(&p_vgm_context->status, &vp_tmp, val, p_opts);
 
                 /* boost → clamp の順 (KeyOn 時と同一) */
                 car40 = emergency_boost_carrier_tl(car40,

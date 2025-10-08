@@ -70,6 +70,7 @@ typedef struct {
     // 追加: ヘッダ整形
     bool strip_unused_chip_clocks;      // 未使用チップのクロックを0化
     uint32_t override_opl3_clock;       // 0 以外なら OPL3 clock を上書き
+    double detune_limit; // detuneの絶対値
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -113,6 +114,7 @@ typedef struct {
 typedef struct {
     uint32_t  total_samples;   /**< Total samples written so far */
     VGMStats  stats;
+    bool is_adding_port1_bytes; // Flag to indicate whether to add Port1 bytes in the loop offset calculation
 } VGMStatus;
 
 /**

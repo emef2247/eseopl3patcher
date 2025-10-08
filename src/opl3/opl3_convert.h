@@ -10,11 +10,12 @@ extern "C" {
 #endif
 
 /* struct キーワードを外し、typedef 名をそのまま使用 */
-void opl3_init(
+int opl3_init(
     VGMBuffer *p_music_data,
-    int stereo_mode,
+    VGMStatus *p_vstat, 
     OPL3State *p_state,
-    FMChipType source_fmchip);
+    FMChipType source_fmchip,
+    const CommandOptions *opts);
 
 int duplicate_write_opl3(
     VGMBuffer *p_music_data,
@@ -22,7 +23,7 @@ int duplicate_write_opl3(
     OPL3State *p_state,
     uint8_t reg,
     uint8_t val,
-    const CommandOptions *opts);
+    const CommandOptions *p_opts);
 
 void opl3_write_reg(
     OPL3State *p_state,
@@ -38,7 +39,7 @@ double calc_fmchip_frequency(
     unsigned short fnum);
 
 // Carrier TL calculation (used during conversion)
-uint8_t make_carrier_40_from_vol(const OPL3VoiceParam *vp, uint8_t reg3n);
+uint8_t make_carrier_40_from_vol(VGMStatus *p_vstat,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts);
 
 /**
  * Find optimal FNUM and BLOCK values for a given frequency with error in cents.

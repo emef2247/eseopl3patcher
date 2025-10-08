@@ -8,17 +8,19 @@
 #define OPL3_CLOCK 14318182
 
 /**
- * Builds a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.
+ * Build a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.
  * The header and offsets are configured per the given parameters and VGM format specification.
  *
- * @param p_header                Output buffer for the VGM header (must be at least max(input_header_size, VGM_HEADER_SIZE) bytes)
- * @param p_orig_vgm_header       Input VGM header (at least up to input_header_size bytes)
- * @param total_samples           New total samples (0x18)
- * @param eof_offset              New EOF offset (0x04)
- * @param gd3_offset              New GD3 offset (relative to 0x14)
- * @param data_offset             New data offset (relative to 0x34, usually 0xCC for 0x100-byte header)
- * @param version                 New VGM version (0x08)
- * @param additional_data_bytes   Additional bytes for port 1 (if any)
+ * @param p_header                Output buffer for new VGM header.
+ * @param p_orig_vgm_header       Original VGM header. Can be NULL.
+ * @param total_samples           Total samples for VGM header (0x18).
+ * @param eof_offset              EOF offset for VGM header (0x04).
+ * @param gd3_offset              GD3 offset for VGM header (0x14).
+ * @param data_offset             Data offset for VGM header (0x34).
+ * @param version                 VGM version (0x08).
+ * @param additional_data_bytes   Extra bytes inserted before data (e.g., instrument blocks).
+ * @param is_adding_port1_bytes   Whether Port1 copy bytes should be included in loop offset.
+ * @param port1_bytes             Number of bytes to add for Port1 copy, if applicable.
  */
 void build_vgm_header(
     uint8_t *p_header,
@@ -28,7 +30,9 @@ void build_vgm_header(
     uint32_t gd3_offset,
     uint32_t data_offset,
     uint32_t version,
-    uint32_t additional_data_bytes
+    uint32_t additional_data_bytes,
+    bool is_adding_port1_bytes,
+    uint32_t port1_bytes
 );
 
 /**

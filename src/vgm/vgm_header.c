@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 /**
  * Write a 32-bit value as little-endian into the given buffer.
@@ -24,8 +25,53 @@ static uint32_t read_le32(const uint8_t *buf) {
 }
 
 /**
+ * Calculate the new loop offset for the output VGM.
+ * Adjusts for header size changes, inserted bytes, and Port1 data as needed.
+ */
+static uint32_t calculate_new_loop_offset(
+    uint32_t orig_loop_offset,
+    uint32_t orig_header_size,
+    uint32_t new_header_size,
+    uint32_t additional_data_bytes,
+    bool is_adding_port1_bytes,
+    uint32_t port1_bytes
+) {
+    // No loop
+    if (orig_loop_offset == 0xFFFFFFFF) {
+        return 0xFFFFFFFF;
+    }
+    uint32_t new_loop_offset = orig_loop_offset;
+    // Adjust for header size difference
+    if (new_header_size > orig_header_size) {
+        new_loop_offset += (new_header_size - orig_header_size);
+    } else if (new_header_size < orig_header_size) {
+        new_loop_offset -= (orig_header_size - new_header_size);
+    }
+    // Add additional data bytes before loop
+    if (additional_data_bytes > 0) {
+        new_loop_offset += additional_data_bytes;
+    }
+    // Add Port1 bytes if flagged
+    if (is_adding_port1_bytes && port1_bytes > 0) {
+        new_loop_offset += port1_bytes;
+    }
+    return new_loop_offset;
+}
+
+/**
  * Build a VGM header for OPL3/OPL2 output, preserving as much of the original as possible.
  * The header and offsets are configured per the given parameters and VGM format specification.
+ *
+ * @param p_header                Output buffer for new VGM header.
+ * @param p_orig_vgm_header       Original VGM header. Can be NULL.
+ * @param total_samples           Total samples for VGM header (0x18).
+ * @param eof_offset              EOF offset for VGM header (0x04).
+ * @param gd3_offset              GD3 offset for VGM header (0x14).
+ * @param data_offset             Data offset for VGM header (0x34).
+ * @param version                 VGM version (0x08).
+ * @param additional_data_bytes   Extra bytes inserted before data (e.g., instrument blocks).
+ * @param is_adding_port1_bytes   Whether Port1 copy bytes should be included in loop offset.
+ * @param port1_bytes             Number of bytes to add for Port1 copy, if applicable.
  */
 void build_vgm_header(
     uint8_t *p_header,
@@ -35,7 +81,9 @@ void build_vgm_header(
     uint32_t gd3_offset,
     uint32_t data_offset,
     uint32_t version,
-    uint32_t additional_data_bytes
+    uint32_t additional_data_bytes,
+    bool is_adding_port1_bytes,
+    uint32_t port1_bytes
 ) {
     uint32_t orig_data_offset = 0;
     uint32_t orig_header_size = VGM_HEADER_SIZE;
@@ -78,16 +126,17 @@ void build_vgm_header(
         loop_samples_orig = read_le32(p_orig_vgm_header + 0x20);
         rate_orig         = read_le32(p_orig_vgm_header + 0x24);
     }
-    uint32_t new_loop_offset = loop_offset_orig;
 
-    // If loop offset is valid, adjust by header size difference (new_header_size - orig_header_size)
-    if (loop_offset_orig != 0xFFFFFFFF) {
-        int32_t header_diff = (int32_t)new_header_size - (int32_t)orig_header_size;
-        new_loop_offset = loop_offset_orig + header_diff;
-        if (additional_data_bytes > 0) {
-            new_loop_offset += additional_data_bytes;
-        }
-    }
+    // Calculate new loop offset using the modular function
+    uint32_t new_loop_offset = calculate_new_loop_offset(
+        loop_offset_orig,
+        orig_header_size,
+        new_header_size,
+        additional_data_bytes,
+        is_adding_port1_bytes,
+        port1_bytes
+    );
+
     write_le32(p_header + 0x1C, new_loop_offset);    // Loop offset
     write_le32(p_header + 0x20, loop_samples_orig);  // Loop samples
     write_le32(p_header + 0x24, rate_orig);          // Rate

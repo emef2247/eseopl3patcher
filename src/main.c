@@ -17,9 +17,9 @@
 #define DEFAULT_CH_PANNING    0
 #define DEFAULT_VOLUME_RATIO0 1.0
 #define DEFAULT_VOLUME_RATIO1 0.8
+#define DEFAULT_DETUNE_LIMIT 4
 #define DEFAULT_CARRIER_TL_CLAMP_ENABLED 0
 #define DEFAULT_CARRIER_TL_CLAMP 63
-
 int verbose = 0;
 
 // DebugOpts g_dbg = {0}; ← deleted
@@ -118,61 +118,88 @@ static int copy_bytes_checked(VGMBuffer *dst, const unsigned char *src, long fil
 }
 
 /** Print usage and help message (fully English) */
-static void print_usage(const char *progname) {
-    printf(
-        "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
-        "          [-o <output.vgm>] [-ch_panning <val>] [-vr0 <val>] [-vr1 <val>] [-v | -verbose]\n"
-        "          [--convert-ymXXXX ...] [--override <overrides.json>]\n"
-        "          [--strip-non-opl] [--test-tone] [--fast-attack]\n"
-        "          [--no-post-keyon-tl] [--single-port]\n"
-        "          [--carrier-tl-clamp <val>] [--emergency-boost <val>] [--force-retrigger-each-note]\n"
-        "          [--audible-sanity] [--debug-verbose]\n"
-        "          [--min-gate-samples <val>] [--pre-keyon-wait <val>] [--min-off-on-wait <val>]\n"
-        "          [--strip-unused-chips] [--opl3-clock <val>]\n"
-        "\n"
-        "Options:\n"
-        "  --convert-ymXXXX           Explicit chip selection (YM2413, YM3812, YM3526, Y8950).\n"
-        "                             (Default: OPL group auto-detection; first OPL chip is converted unless specified)\n"
-        "  --strip-non-opl            Remove AY8910/K051649 (and similar) commands from output.\n"
-        "  --test-tone                Inject a simple OPL3 test tone at start for audibility check.\n"
-        "  --fast-attack              Force fast envelope (AR=15, DR>=4, Carrier TL=0).\n"
-        "  --no-post-keyon-tl         Suppress TL changes immediately after KeyOn.\n"
-        "  --single-port              Emit only port0 writes (suppress port1 duplicates).\n"
-        "  --carrier-tl-clamp <val>   Clamp final Carrier TL value (range: 0..63 or 0x00..0x3F).\n"
-        "  --emergency-boost <val>    Force Carrier TL even lower (increase volume for test/audibility).\n"
-        "  --force-retrigger-each-note  Retrigger attack for every note (forces key-on for each note event).\n"
-        "  --audible-sanity           Force fast envelope & audible TL for debug purposes.\n"
-        "  --debug-verbose            Print verbose information for detailed debug.\n"
-        "  -o <output.vgm>            Output file name (otherwise auto-generated).\n"
-        "  -ch_panning <val>          Channel panning mode.\n"
-        "  -vr0 <val>, -vr1 <val>     Port0/Port1 volume ratios.\n"
-        "  -v, -verbose               Print verbose information.\n"
-        "  --override <overrides.json>  Apply override settings from overrides.json.\n"
-        "  --min-gate-samples <val>   Minimum gate duration in samples per note event (OPLL_MIN_GATE_SAMPLES).\n"
-        "                             This ensures the key-on (gate) signal is held for at least <val> samples, guaranteeing proper note triggering in OPLL emulation.\n"
-        "  --pre-keyon-wait <val>     Number of samples to wait before key-on event (OPLL_PRE_KEYON_WAIT_SAMPLES).\n"
-        "                             Allows internal chip state stabilization before key-on.\n"
-        "  --min-off-on-wait <val>    Minimum samples to wait between key-off and key-on (OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES).\n"
-        "                             Ensures reliable note retriggering in emulation.\n"
-        "  --strip-unused-chips       Set unused chip clocks (YM2413/AY/etc.) to zero in output.\n"
-        "  --opl3-clock <val>         Override YMF262 (OPL3) clock value (e.g., 14318180).\n"
-        "  -h, --help                 Show this help message.\n"
-        "\n"
-        "Example:\n"
-        "  %s music.vgm 1.0 --convert-ym2413 --strip-non-opl --fast-attack --carrier-tl-clamp 58 --audible-sanity --debug-verbose -o out.vgm\n",
-        progname, progname
-    );
+static void print_usage(const char *progname, DebugOpts *debug) {
+    if (debug->verbose){
+        printf(
+            "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
+            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--wait <val>]\n"
+            "          [--convert-ymXXXX ...] [--override <overrides.json>]\n"
+            "          [--strip-non-opl] [--test-tone] [--fast-attack]\n"
+            "          [--no-post-keyon-tl] [--single-port]\n"
+            "          [--carrier-tl-clamp <val>] [--emergency-boost <val>] [--force-retrigger-each-note]\n"
+            "          [--audible-sanity] [--debug-verbose]\n"
+            "          [--min-gate-samples <val>] [--pre-keyon-wait <val>] [--min-off-on-wait <val>]\n"
+            "          [--strip-unused-chips] [--opl3-clock <val>]\n"
+            "\n"
+            "Options:\n"
+            "  --detune <val>             Detune percentage (can also specify as 2nd arg for backward compatibility).\n"
+            "  --detune_limit <val>       Maximum detune absolute value (default: 4.0).\n"
+            "  --wait <val>               KeyOn/Off wait samples.\n"
+            "  --ch_panning <val>         Channel panning mode (0=mono, 1=alternate L/R, ...).\n"
+            "  --vr0 <val>                Port0 volume ratio (default: 1.0).\n"
+            "  --vr1 <val>                Port1 volume ratio (default: 0.8).\n"
+            "  -o, --output <file>        Output file name (otherwise auto-generated).\n"
+            "  --convert-ymXXXX           Explicit chip selection (YM2413, YM3812, YM3526, Y8950).\n"
+            "                             (Default: OPL group auto-detection; first OPL chip is converted unless specified)\n"
+            "  --strip-non-opl            Remove AY8910/K051649 (and similar) commands from output.\n"
+            "  --test-tone                Inject a simple OPL3 test tone at start for audibility check.\n"
+            "  --fast-attack              Force fast envelope (AR=15, DR>=4, Carrier TL=0).\n"
+            "  --no-post-keyon-tl         Suppress TL changes immediately after KeyOn.\n"
+            "  --single-port              Emit only port0 writes (suppress port1 duplicates).\n"
+            "  --carrier-tl-clamp <val>   Clamp final Carrier TL value (range: 0..63 or 0x00..0x3F).\n"
+            "  --emergency-boost <val>    Force Carrier TL even lower (increase volume for test/audibility).\n"
+            "  --force-retrigger-each-note  Retrigger attack for every note (forces key-on for each note event).\n"
+            "  --audible-sanity           Force fast envelope & audible TL for debug purposes.\n"
+            "  --debug-verbose            Print verbose information for detailed debug.\n"
+            "  --override <overrides.json>  Apply override settings from overrides.json.\n"
+            "  --min-gate-samples <val>   Minimum gate duration in samples per note event (OPLL_MIN_GATE_SAMPLES).\n"
+            "                             This ensures the key-on (gate) signal is held for at least <val> samples, guaranteeing proper note triggering in OPLL emulation.\n"
+            "  --pre-keyon-wait <val>     Number of samples to wait before key-on event (OPLL_PRE_KEYON_WAIT_SAMPLES).\n"
+            "                             Allows internal chip state stabilization before key-on.\n"
+            "  --min-off-on-wait <val>    Minimum samples to wait between key-off and key-on (OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES).\n"
+            "                             Ensures reliable note retriggering in emulation.\n"
+            "  --strip-unused-chips       Set unused chip clocks (YM2413/AY/etc.) to zero in output.\n"
+            "  --opl3-clock <val>         Override YMF262 (OPL3) clock value (e.g., 14318180).\n"
+            "  -h, --help                 Show this help message.\n"
+            "\n"
+            "Examples:\n"
+            "  %s music.vgm --detune 1.0 --convert-ym2413 --strip-non-opl --fast-attack --carrier-tl-clamp 58 --audible-sanity --debug-verbose -o out.vgm\n"
+            "  %s music.vgm 1.0 --ch_panning 1 --vr0 1.0 --vr1 0.8 --detune_limit 2.5\n"
+            ,
+            progname, progname, progname
+        );
+    } else {
+        printf(
+            "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
+            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--wait <val>]\n"
+            "          [other options, see --help]\n"
+            "\n"
+            "Most commonly-used options:\n"
+            "  --detune <val>             Detune percentage.\n"
+            "  --detune_limit <val>       Maximum detune value.\n"
+            "  --ch_panning <val>         Channel panning mode.\n"
+            "  --vr0 <val>, --vr1 <val>   Port0/Port1 volume ratios.\n"
+            "  -o <output.vgm>            Output file name.\n"
+            "  -h, --help                 Show this help message.\n"
+            "\n"
+            "Example:\n"
+            "  %s music.vgm --detune 1.0 -o out.vgm --ch_panning 1\n",
+            progname
+        );
+    }
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        print_usage(argv[0]);
+        DebugOpts debug_opts = {0};
+        print_usage(argv[0],&debug_opts);
         return 1;
     }
 
     // Parse main arguments
     const char *p_input_vgm = argv[1];
     double detune = atof(argv[2]);
+    double detune_limit = DEFAULT_DETUNE_LIMIT;
     int opl3_keyon_wait = DEFAULT_WAIT;
     const char *p_creator = "eseopl3patcher";
     const char *p_output_path = NULL;
@@ -200,12 +227,23 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             p_output_path = argv[++i];
-        } else if (strcmp(argv[i], "-ch_panning") == 0 && i + 1 < argc) {
+        } else if ((strcmp(argv[i], "-detune") == 0 || strcmp(argv[i], "--detune") == 0) && i + 1 < argc) {
+            detune = atof(argv[++i]);
+        } else if ((strcmp(argv[i], "-detune_limit") == 0 || strcmp(argv[i], "--detune_limit") == 0) && i + 1 < argc) {
+            detune_limit = atof(argv[++i]);
+        } else if ((strcmp(argv[i], "-ch_panning") == 0 || strcmp(argv[i], "--ch_panning") == 0) && i + 1 < argc) {
             ch_panning = (int)strtoul(argv[++i], &endptr, 10);
-        } else if (strcmp(argv[i], "-vr0") == 0 && i + 1 < argc) {
+        } else if ((strcmp(argv[i], "-vr0") == 0 || strcmp(argv[i], "--vr0") == 0) && i + 1 < argc) {
             v_ratio0 = atof(argv[++i]);
-        } else if (strcmp(argv[i], "-vr1") == 0 && i + 1 < argc) {
+        } else if ((strcmp(argv[i], "-vr1") == 0 || strcmp(argv[i], "--vr1") == 0) && i + 1 < argc) {
             v_ratio1 = atof(argv[++i]);
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-verbose") == 0) {
+            verbose = true;
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0],&debug_opts);
+            return 0;
+        } else if (strcmp(argv[i], "-debug") == 0 || strcmp(argv[i], "--debug") == 0) {
+            debug_opts.verbose = true;
         } else if (strcmp(argv[i], "--carrier-tl-clamp") == 0 && i + 1 < argc) {
             carrier_tl_clamp_enabled = 1;
             carrier_tl_clamp = (uint8_t)strtoul(argv[++i], &endptr, 10);
@@ -215,10 +253,6 @@ int main(int argc, char *argv[]) {
             force_retrigger_each_note = true;
         } else if (strcmp(argv[i], "--audible-sanity") == 0) {
             debug_opts.audible_sanity = true;
-        } else if (strcmp(argv[i], "--debug-verbose") == 0) {
-            debug_opts.verbose = true;
-        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-verbose") == 0) {
-            debug_opts.verbose = true;
         } else if (strcmp(argv[i], "--strip-non-opl") == 0) {
             debug_opts.strip_non_opl = true;
         } else if (strcmp(argv[i], "--test-tone") == 0) {
@@ -239,9 +273,6 @@ int main(int argc, char *argv[]) {
             strip_unused_chip_clocks = true;
         } else if (strcmp(argv[i], "--opl3-clock") == 0 && i + 1 < argc) {
             override_opl3_clock = (uint32_t)strtoul(argv[++i], &endptr, 10);
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            print_usage(argv[0]);
-            return 0;
         } else if (argv[i][0] != '-') {
             int val = (int)strtoul(argv[i], &endptr, 10);
             if (*endptr == '\0' && opl3_keyon_wait == DEFAULT_WAIT) {
@@ -271,6 +302,7 @@ int main(int argc, char *argv[]) {
         .min_off_on_wait_samples = min_off_on_wait_samples,
         .strip_unused_chip_clocks = strip_unused_chip_clocks,
         .override_opl3_clock = override_opl3_clock,
+        .detune_limit = detune_limit,
         .debug = debug_opts
     };
 
@@ -375,20 +407,33 @@ int main(int argc, char *argv[]) {
     state.rhythm_mode = false;
     state.opl3_mode_initialized = false;
 
-    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YMF262);
+    uint32_t additional_bytes = 0;
+    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YMF262,&cmd_opts);
     opll_set_program_args(argc, argv);
     opll_init(&state, &cmd_opts);
 
     long read_done_byte = data_start;
     long loop_start_in_buffer = -1;
-    uint32_t additional_bytes = 0;
+    
 
     while (read_done_byte < filesize) {
+        uint32_t current_addr = read_done_byte; // read_done_byteはdata_startから始まっていればファイル先頭からの位置
+        
+        // input VGMのループオフセット（ファイル先頭からのバイトアドレス）
+        uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
+        
+        // ループ開始位置判定
+        if (orig_loop_offset != 0xFFFFFFFF && current_addr < orig_loop_offset) {
+            vgmctx.status.is_adding_port1_bytes = 1;
+        } else {
+            vgmctx.status.is_adding_port1_bytes = 0;
+        }
+    
         if (orig_loop_offset != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
             loop_start_in_buffer = vgmctx.buffer.size;
         }
         uint8_t cmd = p_vgm_data[read_done_byte];
-
+    
         /* OPL-family autodetect */
         if (chip_flags.opl_group_autodetect) {
             if (cmd == 0x51 && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
@@ -421,12 +466,12 @@ int main(int argc, char *argv[]) {
                 vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
             }
         }
-
+    
         /* YM2413 */
         if (cmd == 0x51) {
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
-
+        
             if (read_done_byte + 2 >= filesize) {
                 fprintf(stderr, "Truncated YM2413 command.\n");
                 break;
@@ -434,11 +479,11 @@ int main(int argc, char *argv[]) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
-
+        
             if (cmd_opts.debug.verbose)
                 printf("YM2413 write: reg=0x%02X val=0x%02X (pos=%ld/%ld)\n",
                        reg, val, read_done_byte, filesize);
-
+                
             uint16_t wait_samples = 0;
             if (read_done_byte < filesize) {
                 uint8_t peek = p_vgm_data[read_done_byte];
@@ -456,11 +501,11 @@ int main(int argc, char *argv[]) {
                     wait_samples = 882; read_done_byte += 1;
                 }
             }
-
+        
             if (chip_flags.convert_ym2413) {
                 if (!state.opl3_mode_initialized) {
                     if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM2413);
+                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM2413,&cmd_opts);
                     state.opl3_mode_initialized = true;
                 }
                 opll_write_register(&vgmctx.buffer, &vgmctx, &state,
@@ -473,19 +518,19 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-
+    
         /* YM3812 */
         if (cmd == 0x5A) {
             // Updates the stats
             vgmctx.status.stats.ym3812_write_count++;
-
+        
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3812\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_ym3812) {
                 if (!state.opl3_mode_initialized) {
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3812);
+                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM3812,&cmd_opts);
                     state.opl3_mode_initialized = true;
                 }
                 additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
@@ -494,19 +539,19 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-
+    
         /* YM3526 */
         if (cmd == 0x5B) {
             // Updates the stats
             vgmctx.status.stats.ym3526_write_count++;
-
+        
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3526\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_ym3526) {
                 if (!state.opl3_mode_initialized) {
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_YM3526);
+                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM3526,&cmd_opts);
                     state.opl3_mode_initialized = true;
                 }
                 additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
@@ -527,7 +572,7 @@ int main(int argc, char *argv[]) {
             read_done_byte += 3;
             if (chip_flags.convert_y8950) {
                 if (!state.opl3_mode_initialized) {
-                    opl3_init(&vgmctx.buffer, ch_panning, &state, FMCHIP_Y8950);
+                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_Y8950,&cmd_opts);
                     state.opl3_mode_initialized = true;
                     if (cmd_opts.debug.test_tone) {
                         // Simple additive test tone: mod muted, carrier AR=15 etc.
@@ -659,6 +704,7 @@ int main(int argc, char *argv[]) {
     build_new_gd3_chunk(&gd3, p_gd3_fields, orig_gd3_ver, creator_append, note_append);
     for (int i = 0; i < GD3_FIELDS; ++i) free(p_gd3_fields[i]);
 
+ // Compute header and buffer sizes
     uint32_t music_data_size = (uint32_t)vgmctx.buffer.size;
     uint32_t gd3_size = (uint32_t)gd3.size;
     uint32_t header_size = (orig_header_size > VGM_HEADER_SIZE) ? orig_header_size : VGM_HEADER_SIZE;
@@ -666,12 +712,15 @@ int main(int argc, char *argv[]) {
     uint32_t vgm_eof_offset_field = new_eof_offset - 0x04;
     uint32_t gd3_offset_field_value = header_size + music_data_size - 0x14;
     uint32_t data_offset = header_size - 0x34;
-    uint32_t new_loop_offset = (loop_start_in_buffer >= 0)
-                               ? (header_size + (uint32_t)loop_start_in_buffer)
-                               : 0xFFFFFFFF;
+
+    // Set port1_bytes according to your logic (e.g., actual port1 copy size)
+    uint32_t port1_bytes = 0; // Set this appropriately for your program
+    // Determine if port1 bytes should be included in loop offset (from status)
+    bool is_adding_port1_bytes = vgmctx.status.is_adding_port1_bytes;
 
     uint8_t *p_header_buf = (uint8_t*)calloc(1, header_size);
 
+    // Call the new build_vgm_header with the new parameters
     build_vgm_header(
         p_header_buf,
         p_vgm_data,
@@ -679,16 +728,11 @@ int main(int argc, char *argv[]) {
         vgm_eof_offset_field,
         gd3_offset_field_value,
         data_offset,
-        0x00000171,
-        additional_bytes
+        0x00000171,                // VGM version
+        additional_bytes,          // additional_data_bytes
+        is_adding_port1_bytes,     // is_adding_port1_bytes
+        port1_bytes                // port1_bytes
     );
-
-    if (new_loop_offset != 0xFFFFFFFF) {
-        p_header_buf[0x1C] = (uint8_t)(new_loop_offset & 0xFF);
-        p_header_buf[0x1D] = (uint8_t)((new_loop_offset >> 8) & 0xFF);
-        p_header_buf[0x1E] = (uint8_t)((new_loop_offset >> 16) & 0xFF);
-        p_header_buf[0x1F] = (uint8_t)((new_loop_offset >> 24) & 0xFF);
-    }
 
     /** Update the clock information in new header */
     vgm_header_postprocess(p_header_buf, &vgmctx, &cmd_opts);
@@ -712,7 +756,7 @@ int main(int argc, char *argv[]) {
     printf("[OPL3] Detune value: %g%%\n", detune);
     printf("[OPL3] Wait value: %d\n", opl3_keyon_wait);
     printf("[OPL3] Creator: %s\n", p_creator);
-    printf("[OPL3] Channel Panning Mode: %d\n", ch_panning);
+    printf("[OPL3] Channel Panning Mode (-ch_panning <val>): %d\n", ch_panning);
     printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
     printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
 

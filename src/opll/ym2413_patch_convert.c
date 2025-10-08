@@ -8,6 +8,7 @@
 #include "ym2413_patch_convert.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 static const uint8_t fnum_to_atten[16] = {0,24,32,37,40,43,45,47,48,50,51,52,53,54,55,56};
 static const float rate_to_attack_time[16] = {2826.24f,2260.99f,1888.43f,1577.74f,1318.52f,1102.96f,921.98f,770.38f,644.21f,539.54f,452.28f,379.99f,319.84f,269.51f,227.15f,191.20f};
@@ -230,18 +231,6 @@ void ym2413_patch_to_opl3_with_fb(int inst,
             p_vp->op[1].tl, p_vp->op[1].ar, p_vp->op[1].dr, p_vp->op[1].sl, p_vp->op[1].rr,
             fb);
     }
-}
-
-static uint8_t final_tl_clamp(uint8_t car40, const CommandOptions *p_opts) {
-    if (!p_opts || p_opts->carrier_tl_clamp < 0) return car40;
-    uint8_t ksl = (uint8_t)((car40 >> 6) & 0x03);
-    uint8_t tl  = (uint8_t)(car40 & 0x3F);
-    if (tl > (uint8_t)p_opts->carrier_tl_clamp) {
-        if (p_opts->debug.verbose)
-            fprintf(stderr,"[CLAMP] Carrier final TL %u -> %d\n", tl, p_opts->carrier_tl_clamp);
-        tl = (uint8_t)p_opts->carrier_tl_clamp;
-    }
-    return (uint8_t)((ksl << 6) | tl);
 }
 
 /** Suppress duplicate B0 writes when unchanged key state */
