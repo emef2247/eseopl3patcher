@@ -326,32 +326,32 @@ void vgm_header_postprocess(
         ? p_cmd_opts->override_opl3_clock : OPL3_CLOCK;
     set_ymf262_clock(p_header_buf, opl3_clock);
 
-    fprintf(stderr, "[VGM HEADER] Total Write Count YM2413:%d YM3812:%d YM3526:%d Y8950:%d \n", 
-            p_ctx->status.stats.ym2413_write_count,p_ctx->status.stats.ym3812_write_count,p_ctx->status.stats.ym3526_write_count,p_ctx->status.stats.y8950_write_count);
+    if(p_cmd_opts->debug.verbose) 
+        fprintf(stderr, "[VGM HEADER] Total Write Count YM2413:%d YM3812:%d YM3526:%d Y8950:%d \n",  p_ctx->status.stats.ym2413_write_count,p_ctx->status.stats.ym3812_write_count,p_ctx->status.stats.ym3526_write_count,p_ctx->status.stats.y8950_write_count);
 
     if (p_cmd_opts->strip_unused_chip_clocks == false) {
-        fprintf(stderr, "[VGM HEADER] strip_unused_chip_clocks == %d: Skip setting unused clocks to zero on OPL-series chips.\n", 
-        p_cmd_opts->strip_unused_chip_clocks );
+        //if(p_cmd_opts->debug.verbose) 
+            fprintf(stderr, "[VGM HEADER] strip_unused_chip_clocks == %d: Skip setting unused clocks to zero on OPL-series chips.\n", p_cmd_opts->strip_unused_chip_clocks );
     } else {
         // YM2413
         if (p_ctx->status.stats.ym2413_write_count == 0) {
-            fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header since this chip is not used.\n" );
-            set_ym2413_clock(p_header_buf, 0);
+            //if(p_cmd_opts->debug.verbose) 
+                fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header since this chip is not used.\n" ); set_ym2413_clock(p_header_buf, 0);
         }
         // YM3812
         if (p_ctx->status.stats.ym3812_write_count == 0) {
-            fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header since this chip is not used.\n" );
-            set_ym3812_clock(p_header_buf, 0);
+            //if(p_cmd_opts->debug.verbose) 
+                fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header since this chip is not used.\n" ); set_ym3812_clock(p_header_buf, 0);
         }
         // YM3526
         if (p_ctx->status.stats.ym3526_write_count == 0) {
-            fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header since this chip is not used.\n" );
-            set_ym3526_clock(p_header_buf, 0);
+            //if(p_cmd_opts->debug.verbose) 
+                fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header since this chip is not used.\n" ); set_ym3526_clock(p_header_buf, 0);
         }
         // Y8950
         if (p_ctx->status.stats.y8950_write_count == 0) {
-            fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header since this chip is not used.\n" );
-            set_y8950_clock(p_header_buf, 0);
+            //if(p_cmd_opts->debug.verbose) 
+                fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header since this chip is not used.\n" ); set_y8950_clock(p_header_buf, 0);
         }
     }
 

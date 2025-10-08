@@ -415,25 +415,24 @@ int main(int argc, char *argv[]) {
     long read_done_byte = data_start;
     long loop_start_in_buffer = -1;
     
-
     while (read_done_byte < filesize) {
         uint32_t current_addr = read_done_byte; // read_done_byteはdata_startから始まっていればファイル先頭からの位置
-        
+
         // input VGMのループオフセット（ファイル先頭からのバイトアドレス）
         uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
-        
+
         // ループ開始位置判定
         if (orig_loop_offset != 0xFFFFFFFF && current_addr < orig_loop_offset) {
             vgmctx.status.is_adding_port1_bytes = 1;
         } else {
             vgmctx.status.is_adding_port1_bytes = 0;
         }
-    
+
         if (orig_loop_offset != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
             loop_start_in_buffer = vgmctx.buffer.size;
         }
         uint8_t cmd = p_vgm_data[read_done_byte];
-    
+
         /* OPL-family autodetect */
         if (chip_flags.opl_group_autodetect) {
             if (cmd == 0x51 && !chip_flags.convert_ym2413 && !chip_flags.convert_ym3812 &&
@@ -466,12 +465,12 @@ int main(int argc, char *argv[]) {
                 vgmctx.source_fm_clock = (double)chip_flags.y8950_clock;
             }
         }
-    
+
         /* YM2413 */
         if (cmd == 0x51) {
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
-        
+
             if (read_done_byte + 2 >= filesize) {
                 fprintf(stderr, "Truncated YM2413 command.\n");
                 break;
@@ -479,11 +478,11 @@ int main(int argc, char *argv[]) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
-        
+
             if (cmd_opts.debug.verbose)
                 printf("YM2413 write: reg=0x%02X val=0x%02X (pos=%ld/%ld)\n",
                        reg, val, read_done_byte, filesize);
-                
+
             uint16_t wait_samples = 0;
             if (read_done_byte < filesize) {
                 uint8_t peek = p_vgm_data[read_done_byte];
@@ -501,7 +500,7 @@ int main(int argc, char *argv[]) {
                     wait_samples = 882; read_done_byte += 1;
                 }
             }
-        
+
             if (chip_flags.convert_ym2413) {
                 if (!state.opl3_mode_initialized) {
                     if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
@@ -518,12 +517,12 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-    
+
         /* YM3812 */
         if (cmd == 0x5A) {
             // Updates the stats
             vgmctx.status.stats.ym3812_write_count++;
-        
+
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3812\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
@@ -539,12 +538,12 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-    
+
         /* YM3526 */
         if (cmd == 0x5B) {
             // Updates the stats
             vgmctx.status.stats.ym3526_write_count++;
-        
+
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3526\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
@@ -752,13 +751,13 @@ int main(int argc, char *argv[]) {
     fwrite(gd3.data, 1, gd3.size, p_wf);
     fclose(p_wf);
 
+    printf("[GD3] Creator: %s\n", p_creator);
     printf("[OPL3] Converted VGM written to: %s\n", p_output_path);
-    printf("[OPL3] Detune value: %g%%\n", detune);
-    printf("[OPL3] Wait value: %d\n", opl3_keyon_wait);
-    printf("[OPL3] Creator: %s\n", p_creator);
+    printf("[OPL3] Detune percentage (-detune <val>): %g%%\n", detune);
+    printf("[OPL3] Detune limit (-detune_limit <val>): max +-%g\n", detune_limit);
     printf("[OPL3] Channel Panning Mode (-ch_panning <val>): %d\n", ch_panning);
-    printf("[OPL3] Port0 Volume: %.2f%%\n", v_ratio0 * 100);
-    printf("[OPL3] Port1 Volume: %.2f%%\n", v_ratio1 * 100);
+    printf("[OPL3] Port0 Volume (-vr0 <val>): %.2f%%\n", v_ratio0 * 100);
+    printf("[OPL3] Port1 Volume (-vr1 <val>): %.2f%%\n", v_ratio1 * 100);
 
     if (vgmctx.source_fmchip == FMCHIP_YM2413) {
         printf("[YM2413] Debug Verbose: %s\n", debug_opts.verbose ? "ON" : "OFF");
