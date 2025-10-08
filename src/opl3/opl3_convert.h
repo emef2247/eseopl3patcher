@@ -38,8 +38,6 @@ double calc_fmchip_frequency(
     unsigned char block,
     unsigned short fnum);
 
-// Carrier TL calculation (used during conversion)
-uint8_t make_carrier_40_from_vol(VGMStatus *p_vstat,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts);
 
 /**
  * Find optimal FNUM and BLOCK values for a given frequency with error in cents.

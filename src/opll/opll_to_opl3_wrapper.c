@@ -285,7 +285,7 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
 
 #ifndef OPLL_PRE_KEYON_WAIT_SAMPLES
 // A0/TL適用後、B0=ONの前に入れる待ち（audible-sanity時のみ）
-#define OPLL_PRE_KEYON_WAIT_SAMPLES 0
+#define OPLL_PRE_KEYON_WAIT_SAMPLES 1
 #endif
 
 #ifndef OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
@@ -727,6 +727,48 @@ static uint8_t g_acc_1n[YM2413_NUM_CH]      = {0};
 static uint8_t g_acc_2n[YM2413_NUM_CH]      = {0};
 static uint8_t g_acc_3n[YM2413_NUM_CH]      = {0};
 
+#ifndef YM2413_VOL_MAP_STEP
+#define YM2413_VOL_MAP_STEP 2
+#endif
+/*
+ * make_carrier_40_from_vol
+ * Reflect YM2413 $3n register (reg3n) lower 4 bits (VOL) into OPL3 Carrier TL,
+ * and return the value to write to 0x40 + slotCar (KSL/TL).
+ *  - vp->op[1].ksl: upper 2 bits (KSL)
+ *  - vp->op[1].tl : base TL
+ *  - VOL nibble   : added to TL (0=add 0, 15=maximum add)
+ * Clip: if over 63, set to 63.
+ */
+/* Fully replaces old make_carrier_40_from_vol */
+uint8_t make_carrier_40_from_vol(VGMStatus *p_status,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts)
+{
+    /* YM2413 volume nibble: 0=loudest .. 15=softest */
+    uint8_t vol = reg3n & 0x0F;          // 0..15
+    uint8_t base_tl = (uint8_t)(vp->op[1].tl & 0x3F);
+
+    /* STEP: 2 => slightly less than 3dB per step (0.75dB * 2 ≈1.5dB). Make this configurable if needed */
+    const uint8_t STEP = YM2413_VOL_MAP_STEP;
+
+    uint16_t tl = (uint16_t)base_tl + (uint16_t)vol * STEP;
+    if (tl > 63) tl = 63;
+
+    /* KSL bits preserved */
+    uint8_t ksl_bits = (vp->op[1].ksl & 0x03) << 6;
+
+    /* For debugging (only first few times) */
+    static int dbg_cnt = 0;
+    if (dbg_cnt < 8) {
+        if(p_opts->debug.verbose) {
+            fprintf(stderr,
+            "[VOLMAP] reg3n=%02X vol=%u baseTL=%u => newTL=%u (STEP=%u)\n",
+            reg3n, vol, base_tl, (unsigned)tl, STEP);
+        }
+        dbg_cnt++;
+    }
+
+    return (uint8_t)(ksl_bits | (uint8_t)tl);
+}
+
 static inline void acc_reset_ch(int ch) {
     g_acc_has_1n[ch] = g_acc_has_2n[ch] = g_acc_has_3n[ch] = 0;
 }
@@ -831,8 +873,6 @@ static inline void acc_maybe_flush_triple(
     g_has_pending_keyoff[ch] = 0;
     g_gate_elapsed[ch] = 0;
 }
-/* ===================== 順不同アキュムレータ経路 ここまで ===================== */
-
 
 /** Flush pending channel state (KeyOn/KeyOff/param writes) */
 static inline void flush_channel_ch(
@@ -922,12 +962,22 @@ static inline void flush_channel_ch(
         duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0x40 + car_slot, car40, p_opts);
 
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
-    // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
-    if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, p_vstatus, (uint16_t)get_pre_keyon_wait(p_opts));
-        if (p_opts->debug.verbose) {
-            fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n",
-                    ch, (unsigned)get_pre_keyon_wait(p_opts));
+    /* パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
+       注：ここで注入した wait は実際にゲート経過（g_gate_elapsed）に寄与するため、
+       その分を進めておく。そうすることで直後の KeyOff 判定（最短ゲート判定）と矛盾しない。 */
+    if (p_opts && p_opts->debug.audible_sanity) {
+        uint16_t pre = (uint16_t)get_pre_keyon_wait(p_opts);
+        if (pre > 0) {
+            vgm_wait_samples(p_music_data, p_vstatus, pre);
+            if (p_opts->debug.verbose) {
+                fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n", ch, (unsigned)pre);
+            }
+            /* inject したサンプル分を gate elapsed に反映（飽和処理） */
+            uint32_t newel = (uint32_t)g_gate_elapsed[ch] + (uint32_t)pre;
+            g_gate_elapsed[ch] = (newel > 0xFFFF) ? 0xFFFF : (uint16_t)newel;
+            if (p_opts && p_opts->debug.verbose) {
+                fprintf(stderr,"[PRE_KEYON_ADVANCE] ch=%d elapsed(after)=%u\n", ch, g_gate_elapsed[ch]);
+            }
         }
     }
 #endif
