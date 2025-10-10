@@ -42,6 +42,13 @@ typedef enum {
     FMCHIP_MAX
 } FMChipType;
 
+typedef enum {
+    VGMCommandType_RegWrite,
+    VGMCommandType_Wait,
+    VGMCommandType_End,
+    VGMCommandType_Unkown,
+} VGMCommandType;
+
 /** Global debug / diagnostic options */
 typedef struct {
     bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
@@ -144,6 +151,7 @@ typedef struct {
     // Optionally: parsed title/artist/etc. fields can be added
 } VGMGD3Tag;
 
+
 /**
  * VGMContext
  * Super-structure to manage all VGM stream state and metadata.
@@ -158,6 +166,7 @@ typedef struct {
 typedef struct {
     VGMBuffer buffer;              /**< Data buffer for the VGM stream */
     VGMTimeStamp timestamp;        /**< Sample clock/timestamp */
+    VGMCommandType cmd_type;
     VGMStatus     status;          /**< Status (total samples etc.) */
     VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
     VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */

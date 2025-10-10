@@ -362,6 +362,7 @@ int main(int argc, char *argv[]) {
     vgm_buffer_init(&vgmctx.buffer);
     vgm_timestamp_init(&vgmctx.timestamp, 44100.0);
     vgmctx.status.total_samples = 0;
+    vgmctx.cmd_type =  VGMCommandType_Unkown;
     memset(&vgmctx.header, 0, sizeof(vgmctx.header));
     vgmctx.gd3.data = NULL;
     vgmctx.gd3.size = 0;
@@ -470,6 +471,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x51) {
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) {
                 fprintf(stderr, "Truncated YM2413 command.\n");
@@ -479,6 +481,8 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
 
+            #define NEW_VGM_OPLL2OPL3
+            #ifndef NEW_VGM_OPLL2OPL3
             if (cmd_opts.debug.verbose)
                 printf("YM2413 write: reg=0x%02X val=0x%02X (pos=%ld/%ld)\n",
                        reg, val, read_done_byte, filesize);
@@ -515,6 +519,11 @@ int main(int argc, char *argv[]) {
                     vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, wait_samples);
                 }
             }
+            #else
+            int wait_samples = -1;
+            opll2opl_command_handler (&vgmctx.buffer,&vgmctx.status,&state, reg, val, wait_samples,&cmd_opts);
+            #endif
+
             continue;
         }
 
@@ -522,6 +531,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5A) {
             // Updates the stats
             vgmctx.status.stats.ym3812_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3812\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
@@ -543,6 +553,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5B) {
             // Updates the stats
             vgmctx.status.stats.ym3526_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3526\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
@@ -564,6 +575,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5C) {
             // Updates the stats
             vgmctx.status.stats.y8950_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc Y8950\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
@@ -601,6 +613,7 @@ int main(int argc, char *argv[]) {
 
         /* Other OPN-family passthrough */
         if (cmd == 0x52 || cmd == 0x54 || cmd == 0x55 || cmd == 0x56 || cmd == 0x57) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc OPN-like\n"); break; }
             forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
             read_done_byte += 3;
@@ -609,22 +622,81 @@ int main(int argc, char *argv[]) {
 
         /* Wait process */
         if (cmd >= 0x70 && cmd <= 0x7F) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
             vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
             read_done_byte += 1;
+
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                //  Write a short wait command (0x70-0x7F) and update status.
+                int wait_samples = (cmd & 0x0F) + 1;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                opll2opl_command_handler (&vgmctx.buffer,&vgmctx.status,&state, reg, val, wait_samples,&cmd_opts);
+            } else {
+                vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
+            }
+            read_done_byte += 1;
+
             continue;
         }
         if (cmd == 0x61) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc wait 0x61\n"); break; }
             uint16_t ws = p_vgm_data[read_done_byte + 1] | (p_vgm_data[read_done_byte + 2] << 8);
+        #ifndef NEW_VGM_OPLL2OPL3
             vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, ws);
+        #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                //  Write a short wait command (0x70-0x7F) and update status.
+                int wait_samples = ws;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                opll2opl_command_handler (&vgmctx.buffer,&vgmctx.status,&state, reg, val, wait_samples,&cmd_opts);
+            } else {
+                vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, ws);
+            }
+        #endif
             read_done_byte += 3;
             continue;
         }
-        if (cmd == 0x62) { vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1; continue; }
-        if (cmd == 0x63) { vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1; continue; }
+        if (cmd == 0x62) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
+            #ifndef NEW_VGM_OPLL2OPL3
+            vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1;
+            #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                // Write a wait 1/60s command (0x62) and update status.
+                int wait_samples = 735;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                opll2opl_command_handler (&vgmctx.buffer,&vgmctx.status,&state, reg, val, wait_samples,&cmd_opts);
+            } else {
+                vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1;
+            }
+            #endif
+            continue;
+        }
+        if (cmd == 0x63) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
+        #ifndef NEW_VGM_OPLL2OPL3
+            vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1;
+        #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                // Write a wait 1/50s command (0x63) and update status.
+                int wait_samples = 882;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                opll2opl_command_handler (&vgmctx.buffer,&vgmctx.status,&state, reg, val, wait_samples,&cmd_opts);
+            } else {
+                vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1;
+            }
+        #endif
+            continue;
+        }
 
         /* End */
         if (cmd == 0x66) {
+            vgmctx.cmd_type = VGMCommandType_End;
             vgm_append_byte(&vgmctx.buffer, 0x66);
             read_done_byte += 1;
             break; /* End reached */
@@ -651,6 +723,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[WARN] Unknown VGM command 0x%02X at offset 0x%lX (forward as raw)\n",
                     cmd, read_done_byte);
         }
+        vgmctx.cmd_type = VGMCommandType_Unkown;
         vgm_append_byte(&vgmctx.buffer, cmd);
         read_done_byte += 1;
     }
