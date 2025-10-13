@@ -31,12 +31,10 @@ typedef struct {
 
 /** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
-void opll_init(OPL3State *p_state, const CommandOptions* opts) ;
+void opll_init(VGMContext *p_vgmctx, const CommandOptions* opts) ;
 
 int opll_write_register(
-    VGMBuffer *p_music_data,
-    VGMContext *p_vgm_context,
-    OPL3State *p_state,
+    VGMContext *p_vgmctx,
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
     const CommandOptions *opts);
 

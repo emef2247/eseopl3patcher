@@ -9,6 +9,7 @@
 #include "opl3/opl3_convert.h"
 #include "opl3/opl3_debug_util.h"
 #include "opll/opll_to_opl3_wrapper.h"
+#include "opll/opll2opl3_conv.h"
 #include "vgm/gd3_util.h"
 
 // Default values for command options
@@ -360,8 +361,11 @@ int main(int argc, char *argv[]) {
     // VGMContext setup
     VGMContext vgmctx;
     vgm_buffer_init(&vgmctx.buffer);
-    vgm_timestamp_init(&vgmctx.timestamp, 44100.0);
+    vgmctx.timestamp.current_sample = 0;
+    vgmctx.timestamp.last_sample = 0;
+    vgmctx.timestamp.sample_rate = 44100.0;
     vgmctx.status.total_samples = 0;
+    vgmctx.cmd_type =  VGMCommandType_Unkown;
     memset(&vgmctx.header, 0, sizeof(vgmctx.header));
     vgmctx.gd3.data = NULL;
     vgmctx.gd3.size = 0;
@@ -402,21 +406,26 @@ int main(int argc, char *argv[]) {
         printf(" Y8950 :%s clock=%u\n", chip_flags.has_y8950 ?"Y":"N", chip_flags.y8950_clock);
     }
 
-    OPL3State state;
-    memset(&state, 0, sizeof(state));
-    state.rhythm_mode = false;
-    state.opl3_mode_initialized = false;
+    memset(&vgmctx.opl3_state, 0, sizeof(OPL3State));
+    vgmctx.opl3_state.rhythm_mode = false;
+    vgmctx.opl3_state.opl3_mode_initialized = false;
+    // OPL3State state;
+    // memset(&state, 0, sizeof(state));
+    // state.rhythm_mode = false;
+    // state.opl3_mode_initialized = false;
 
     uint32_t additional_bytes = 0;
-    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YMF262,&cmd_opts);
+    additional_bytes += opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
     opll_set_program_args(argc, argv);
-    opll_init(&state, &cmd_opts);
+    opll_init(&vgmctx, &cmd_opts);
+    opll2opl3_init_scheduler();
 
     long read_done_byte = data_start;
     long loop_start_in_buffer = -1;
     
     while (read_done_byte < filesize) {
         uint32_t current_addr = read_done_byte; // read_done_byteはdata_startから始まっていればファイル先頭からの位置
+        vgmctx.cmd_type = VGMCommandType_Unkown; 
 
         // input VGMのループオフセット（ファイル先頭からのバイトアドレス）
         uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
@@ -470,6 +479,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x51) {
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) {
                 fprintf(stderr, "Truncated YM2413 command.\n");
@@ -478,7 +488,9 @@ int main(int argc, char *argv[]) {
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
-
+            
+            #define NEW_VGM_OPLL2OPL3
+            #ifndef NEW_VGM_OPLL2OPL3
             if (cmd_opts.debug.verbose)
                 printf("YM2413 write: reg=0x%02X val=0x%02X (pos=%ld/%ld)\n",
                        reg, val, read_done_byte, filesize);
@@ -512,9 +524,22 @@ int main(int argc, char *argv[]) {
             } else {
                 forward_write(&vgmctx.buffer, 0, reg, val);
                 if (wait_samples) {
-                    vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, wait_samples);
+                    vgm_wait_samples(&vgmctx.buffer, &vgmctx, &vgmctx.status, wait_samples);
                 }
             }
+            #else
+             if (chip_flags.convert_ym2413) {
+                if (!vgmctx.opl3_state.opl3_mode_initialized) {
+                    if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
+                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM2413,&cmd_opts);
+                    vgmctx.opl3_state.opl3_mode_initialized = true;
+                }
+                int wait_samples = -1;
+                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+            }
+            #endif
+
             continue;
         }
 
@@ -522,19 +547,20 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5A) {
             // Updates the stats
             vgmctx.status.stats.ym3812_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3812\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_ym3812) {
-                if (!state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM3812,&cmd_opts);
-                    state.opl3_mode_initialized = true;
+                if (!vgmctx.opl3_state.opl3_mode_initialized) {
+                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM3812,&cmd_opts);
+                    vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
+                forward_write(&vgmctx, 0, reg, val);
             }
             continue;
         }
@@ -543,19 +569,20 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5B) {
             // Updates the stats
             vgmctx.status.stats.ym3526_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc YM3526\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_ym3526) {
-                if (!state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM3526,&cmd_opts);
-                    state.opl3_mode_initialized = true;
+                if (!vgmctx.opl3_state.opl3_mode_initialized) {
+                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM3526,&cmd_opts);
+                    vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
+                forward_write(&vgmctx, 0, reg, val);
             }
             continue;
         }
@@ -564,67 +591,141 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x5C) {
             // Updates the stats
             vgmctx.status.stats.y8950_write_count++;
+            vgmctx.cmd_type = VGMCommandType_RegWrite;
 
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc Y8950\n"); break; }
             uint8_t reg = p_vgm_data[read_done_byte + 1];
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             if (chip_flags.convert_y8950) {
-                if (!state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_Y8950,&cmd_opts);
-                    state.opl3_mode_initialized = true;
+                if (!vgmctx.opl3_state.opl3_mode_initialized) {
+                    additional_bytes += opl3_init(&vgmctx, FMCHIP_Y8950,&cmd_opts);
+                    vgmctx.opl3_state.opl3_mode_initialized = true;
                     if (cmd_opts.debug.test_tone) {
                         // Simple additive test tone: mod muted, carrier AR=15 etc.
                         // Port0 only
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
+                        duplicate_write_opl3(&vgmctx, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
                         // Operator settings (slot 0 carrier path simplified)
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x20, 0x01, &cmd_opts); // mul=1
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x40, 0x00, &cmd_opts); // TL=0
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xE0, 0x00, &cmd_opts);
+                        duplicate_write_opl3(&vgmctx, 0x20, 0x01, &cmd_opts); // mul=1
+                        duplicate_write_opl3(&vgmctx, 0x40, 0x00, &cmd_opts); // TL=0
+                        duplicate_write_opl3(&vgmctx, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
+                        duplicate_write_opl3(&vgmctx, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
+                        duplicate_write_opl3(&vgmctx, 0xE0, 0x00, &cmd_opts);
                         // Set algorithm=1 (additive)
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
+                        duplicate_write_opl3(&vgmctx, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
                         // FNUM for ~A440 (example fnum=0x15B oct=4) => LSB
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xA0, 0x5B, &cmd_opts);
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
-                        vgm_wait_samples(&vgmctx.buffer,&vgmctx.status,4410); // 100ms
-                        duplicate_write_opl3(&vgmctx.buffer,&vgmctx.status,&state, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
+                        duplicate_write_opl3(&vgmctx, 0xA0, 0x5B, &cmd_opts);
+                        duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
+                        vgm_wait_samples(&vgmctx,4410); // 100ms
+                        duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
                     }
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx.buffer, &vgmctx.status, &state, reg, val, &cmd_opts);
+                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
+                forward_write(&vgmctx, 0, reg, val);
             }
             continue;
         }
 
         /* Other OPN-family passthrough */
         if (cmd == 0x52 || cmd == 0x54 || cmd == 0x55 || cmd == 0x56 || cmd == 0x57) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc OPN-like\n"); break; }
-            forward_write(&vgmctx.buffer, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            forward_write(&vgmctx, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
             read_done_byte += 3;
             continue;
         }
 
         /* Wait process */
         if (cmd >= 0x70 && cmd <= 0x7F) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
+            #ifndef NEW_VGM_OPLL2OPL3
+
             vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
             read_done_byte += 1;
+            #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                //  Write a short wait command (0x70-0x7F) and update status.
+                int wait_samples = (cmd & 0x0F) + 1;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+
+            } else {
+                vgm_wait_short(&vgmctx, cmd);
+            }
+            read_done_byte += 1;
+            #endif
+
             continue;
         }
         if (cmd == 0x61) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc wait 0x61\n"); break; }
             uint16_t ws = p_vgm_data[read_done_byte + 1] | (p_vgm_data[read_done_byte + 2] << 8);
-            vgm_wait_samples(&vgmctx.buffer, &vgmctx.status, ws);
+        #ifndef NEW_VGM_OPLL2OPL3
+            vgm_wait_samples(&vgmctx.buffer, &vgmctx, &vgmctx.status, ws);
+        #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                //  Write a short wait command (0x70-0x7F) and update status.
+                int wait_samples = ws;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+
+            } else {
+                vgm_wait_samples(&vgmctx, ws);
+            }
+        #endif
             read_done_byte += 3;
             continue;
         }
-        if (cmd == 0x62) { vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1; continue; }
-        if (cmd == 0x63) { vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status); read_done_byte += 1; continue; }
+        if (cmd == 0x62) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
+            #ifndef NEW_VGM_OPLL2OPL3
+            vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status);
+            #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                // Write a wait 1/60s command (0x62) and update status.
+                int wait_samples = 735;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+
+            } else {
+                vgm_wait_60hz(&vgmctx);
+            }
+            #endif
+            read_done_byte += 1;
+            continue;
+        }
+        if (cmd == 0x63) {
+            vgmctx.cmd_type = VGMCommandType_Wait;
+        #ifndef NEW_VGM_OPLL2OPL3
+            vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
+        #else
+            if (vgmctx.source_fmchip == FMCHIP_YM2413) {
+                // Write a wait 1/50s command (0x63) and update status.
+                int wait_samples = 882;
+                uint8_t reg = 0;
+                uint8_t val = 0;
+                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+
+            } else {
+                vgm_wait_50hz(&vgmctx);
+            }
+        #endif
+            read_done_byte += 1;
+            continue;
+        }
 
         /* End */
         if (cmd == 0x66) {
+            vgmctx.cmd_type = VGMCommandType_End;
             vgm_append_byte(&vgmctx.buffer, 0x66);
             read_done_byte += 1;
             break; /* End reached */
@@ -651,6 +752,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[WARN] Unknown VGM command 0x%02X at offset 0x%lX (forward as raw)\n",
                     cmd, read_done_byte);
         }
+        vgmctx.cmd_type = VGMCommandType_Unkown;
         vgm_append_byte(&vgmctx.buffer, cmd);
         read_done_byte += 1;
     }
@@ -771,7 +873,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (cmd_opts.debug.verbose) {
-        printf("[OPL3] Total voices in DB: %d\n", state.voice_db.count);
+        printf("[OPL3] Total voices in DB: %d\n", vgmctx.opl3_state.voice_db.count);
     }
 
     vgm_buffer_free(&vgmctx.buffer);

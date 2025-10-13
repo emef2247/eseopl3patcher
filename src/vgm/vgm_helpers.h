@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h> // for size_t
+#include "../opl3/opl3_state.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,6 +42,13 @@ typedef enum {
     FMCHIP_2xYMZ280B,
     FMCHIP_MAX
 } FMChipType;
+
+typedef enum {
+    VGMCommandType_RegWrite,
+    VGMCommandType_Wait,
+    VGMCommandType_End,
+    VGMCommandType_Unkown,
+} VGMCommandType;
 
 /** Global debug / diagnostic options */
 typedef struct {
@@ -144,6 +152,7 @@ typedef struct {
     // Optionally: parsed title/artist/etc. fields can be added
 } VGMGD3Tag;
 
+
 /**
  * VGMContext
  * Super-structure to manage all VGM stream state and metadata.
@@ -158,12 +167,14 @@ typedef struct {
 typedef struct {
     VGMBuffer buffer;              /**< Data buffer for the VGM stream */
     VGMTimeStamp timestamp;        /**< Sample clock/timestamp */
+    VGMCommandType cmd_type;
     VGMStatus     status;          /**< Status (total samples etc.) */
     VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
     VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */
     FMChipType    source_fmchip;   /**< The source FM chip type for conversion */
     double        source_fm_clock; /**< The source FM clock frequency */
     double        target_fm_clock; /**< The target FM clock frequency */
+    OPL3State     opl3_state;
 } VGMContext;
 
 /**
@@ -204,119 +215,47 @@ void vgm_buffer_init(VGMBuffer *p_buf);
 
 /**
  * Append arbitrary bytes to a dynamic VGMBuffer.
- * @param p_buf Pointer to VGMBuffer.
- * @param p_data Pointer to data to append.
- * @param len Length of data to append.
  */
 void vgm_buffer_append(VGMBuffer *p_buf, const void *p_data, size_t len);
 
 /**
  * Release memory allocated for a VGMBuffer.
- * @param p_buf Pointer to VGMBuffer to free.
  */
 void vgm_buffer_free(VGMBuffer *p_buf);
 
 /**
  * Append a single byte to the buffer.
- * @param p_buf Pointer to VGMBuffer.
- * @param value Byte value to append.
  */
 void vgm_append_byte(VGMBuffer *p_buf, uint8_t value);
 
 /**
  * Write an OPL3 register command (0x5E/0x5F) to the buffer.
- * @param p_buf Pointer to VGMBuffer.
- * @param port Port index (0 for port 0, 1 for port 1).
- * @param reg Register address.
- * @param val Value to write.
  */
-void forward_write(VGMBuffer *p_buf, int port, uint8_t reg, uint8_t val);
+void forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
 
 /**
  * Write a short wait command (0x70-0x7F) and update status.
- * @param p_buf Pointer to VGMBuffer.
- * @param p_vstat Pointer to VGMStatus.
- * @param cmd Command byte (0x70-0x7F).
  */
-void vgm_wait_short(VGMBuffer *p_buf, VGMStatus *p_vstat, uint8_t cmd);
+void vgm_wait_short(VGMContext *p_vgmctx, uint8_t cmd);
 
 /**
  * Write a wait n samples command (0x61) and update status.
- * @param p_buf Pointer to VGMBuffer.
- * @param p_vstat Pointer to VGMStatus.
- * @param samples Number of samples to wait.
  */
-void vgm_wait_samples(VGMBuffer *p_buf, VGMStatus *p_vstat, uint16_t samples);
+void vgm_wait_samples(VGMContext *p_vgmctx, uint16_t samples);
 
 /**
  * Write a wait 1/60s command (0x62) and update status.
- * @param p_buf Pointer to VGMBuffer.
- * @param p_vstat Pointer to VGMStatus.
  */
-void vgm_wait_60hz(VGMBuffer *p_buf, VGMStatus *p_vstat);
+void vgm_wait_60hz(VGMContext *p_vgmctx);
 
 /**
  * Write a wait 1/50s command (0x63) and update status.
- * @param p_buf Pointer to VGMBuffer.
- * @param p_vstat Pointer to VGMStatus.
  */
-void vgm_wait_50hz(VGMBuffer *p_buf, VGMStatus *p_vstat);
-
-// Timestamp utility functions
-static inline void vgm_timestamp_init(VGMTimeStamp* ts, double sample_rate) {
-    ts->current_sample = 0;
-    ts->last_sample = 0;
-    ts->sample_rate = sample_rate;
-}
-static inline void vgm_timestamp_advance(VGMTimeStamp* ts, uint32_t samples) {
-    ts->last_sample = ts->current_sample;
-    ts->current_sample += samples;
-}
-static inline double vgm_timestamp_sec(const VGMTimeStamp* ts) {
-    return ts->current_sample / ts->sample_rate;
-}
-static inline double vgm_timestamp_last_sec(const VGMTimeStamp* ts) {
-    return ts->last_sample / ts->sample_rate;
-}
-static inline double vgm_timestamp_delta_sec(const VGMTimeStamp* ts) {
-    return (ts->current_sample - ts->last_sample) / ts->sample_rate;
-}
-static inline uint32_t vgm_timestamp_delta_samples(const VGMTimeStamp* ts) {
-    return ts->current_sample - ts->last_sample;
-}
-
-/**
- * Wait for (cmd & 0x0F) + 1 samples (short wait) using VGMContext.
- * @param ctx Pointer to VGMContext.
- * @param cmd Command byte (0x70-0x7F).
- */
-void vgm_wait_short_ctx(VGMContext *ctx, uint8_t cmd);
-
-/**
- * Wait for a specific number of samples using VGMContext.
- * @param ctx Pointer to VGMContext.
- * @param samples Number of samples to wait.
- */
-void vgm_wait_samples_ctx(VGMContext *ctx, uint16_t samples);
-
-/**
- * Wait for 1/60 second (735 samples) using VGMContext.
- * @param ctx Pointer to VGMContext.
- */
-void vgm_wait_60hz_ctx(VGMContext *ctx);
-
-/**
- * Wait for 1/50 second (882 samples) using VGMContext.
- * @param ctx Pointer to VGMContext.
- */
-void vgm_wait_50hz_ctx(VGMContext *ctx);
+void vgm_wait_50hz(VGMContext *p_vgmctx);
 
 /**
  * Parse the VGM header for FM chip clock values and flags.
  * Returns true if parsing was successful.
- * @param vgm_data  Pointer to the start of the VGM file
- * @param filesize  Size of the VGM file
- * @param out_flags Pointer to a VGMChipClockFlags struct to fill
  */
 bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockFlags *out_flags);
 

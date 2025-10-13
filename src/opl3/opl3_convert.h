@@ -4,30 +4,26 @@
 #include "../vgm/vgm_helpers.h"   /* FMChipType, CommandOptions, VGMBuffer, VGMStatus */
 #include "opl3_state.h"
 #include "../compat_bool.h"
-
+#include "../vgm/vgm_helpers.h"
+#include "../vgm/vgm_header.h"       /* OPL3_CLOCK */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* struct キーワードを外し、typedef 名をそのまま使用 */
 int opl3_init(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstat, 
-    OPL3State *p_state,
+    VGMContext *p_vpmctx,
     FMChipType source_fmchip,
     const CommandOptions *opts);
 
 int duplicate_write_opl3(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstat,
-    OPL3State *p_state,
+    VGMContext *p_vpmctx,
     uint8_t reg,
     uint8_t val,
     const CommandOptions *p_opts);
 
 void opl3_write_reg(
-    OPL3State *p_state,
-    VGMBuffer *p_music_data,
+    VGMContext *p_vpmctx,
     int port,
     uint8_t reg,
     uint8_t value);
@@ -39,7 +35,7 @@ double calc_fmchip_frequency(
     unsigned short fnum);
 
 // Carrier TL calculation (used during conversion)
-uint8_t make_carrier_40_from_vol(VGMStatus *p_vstat,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts);
+uint8_t make_carrier_40_from_vol(VGMContext *p_vpmctx,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts);
 
 /**
  * Find optimal FNUM and BLOCK values for a given frequency with error in cents.

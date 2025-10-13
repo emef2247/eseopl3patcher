@@ -116,7 +116,7 @@ static void map_opll_to_opl3_freq(uint8_t reg1n, uint8_t reg2n,
 }
 
 static inline void flush_channel_ch(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    VGMContext *p_vgmctx,
     int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
     OpllPendingCh* p, OpllStampCh* s);
 
@@ -176,8 +176,8 @@ static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const 
 /**
  * Initialize OPLL/OPL3 voice DB and state
  */
-void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
-    if (!p_state) return;
+void opll_init(VGMContext *p_vpmctx, const CommandOptions* p_opts) {
+    if (!p_vpmctx) return;
 
     // Read frequency mapping mode
     const char *fm = getenv("ESEOPL3_FREQMAP");
@@ -204,7 +204,7 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
             g_triple_force_retrigger, tr ? tr : "(unset)");
 
 
-    opl3_register_all_ym2413(&p_state->voice_db, p_opts);
+    opl3_register_all_ym2413(&p_vpmctx->opl3_state.voice_db, p_opts);
     memset(g_ym2413_regs, 0, sizeof(g_ym2413_regs));
     for (int i = 0; i < YM2413_NUM_CH; ++i) {
         opll_pending_clear(&g_pend[i]);
@@ -217,7 +217,7 @@ void opll_init(OPL3State *p_state, const CommandOptions* p_opts) {
         g_pending_keyoff_val2n[i] = 0;
     }
     for (int ch = 0; ch < 9; ++ch) {
-        p_state->last_key[ch] = 0;
+        p_vpmctx->opl3_state.last_key[ch] = 0;
     }
 }
 
@@ -515,7 +515,7 @@ static inline void maybe_shape_fix(int inst, int op_index, uint8_t* p_ar, uint8_
 #endif
 
 /** Apply OPL3VoiceParam to channel */
-int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+int opl3_voiceparam_apply(VGMContext *p_vgmctx,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *p_opts) {
     if (!vp || ch < 0 || ch >= 9) return 0;
     int bytes = 0;
@@ -526,37 +526,38 @@ int opl3_voiceparam_apply(VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State
 
     uint8_t opl3_2n_mod = (uint8_t)((vp->op[0].am << 7) | (vp->op[0].vib << 6) | (vp->op[0].egt << 5) | (vp->op[0].ksr << 4) | (vp->op[0].mult & 0x0F));
     uint8_t opl3_2n_car = (uint8_t)((vp->op[1].am << 7) | (vp->op[1].vib << 6) | (vp->op[1].egt << 5) | (vp->op[1].ksr << 4) | (vp->op[1].mult & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_mod, opl3_2n_mod, p_opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x20 + slot_car, opl3_2n_car, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x20 + slot_mod, opl3_2n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x20 + slot_car, opl3_2n_car, p_opts);
 
     uint8_t opl3_4n_mod = (uint8_t)(((vp->op[0].ksl & 0x03) << 6) | (vp->op[0].tl & 0x3F));
     uint8_t opl3_4n_car = (uint8_t)(((vp->op[1].ksl & 0x03) << 6) | (vp->op[1].tl & 0x3F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_mod, opl3_4n_mod, p_opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x40 + slot_car, opl3_4n_car, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x40 + slot_mod, opl3_4n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x40 + slot_car, opl3_4n_car, p_opts);
 
     uint8_t opl3_6n_mod = (uint8_t)((vp->op[0].ar << 4) | (vp->op[0].dr & 0x0F));
     uint8_t opl3_6n_car = (uint8_t)((vp->op[1].ar << 4) | (vp->op[1].dr & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_mod, opl3_6n_mod, p_opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x60 + slot_car, opl3_6n_car, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x60 + slot_mod, opl3_6n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x60 + slot_car, opl3_6n_car, p_opts);
 
     uint8_t opl3_8n_mod = (uint8_t)((vp->op[0].sl << 4) | (vp->op[0].rr & 0x0F));
     uint8_t opl3_8n_car = (uint8_t)((vp->op[1].sl << 4) | (vp->op[1].rr & 0x0F));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_mod, opl3_8n_mod, p_opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0x80 + slot_car, opl3_8n_car, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x80 + slot_mod, opl3_8n_mod, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0x80 + slot_car, opl3_8n_car, p_opts);
 
     uint8_t c0_val = (uint8_t)(0xC0 | ((vp->fb[0] & 0x07) << 1) | (vp->cnt[0] & 0x01));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xC0 + ch, c0_val, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0xC0 + ch, c0_val, p_opts);
 
     uint8_t opl3_en_mod = (uint8_t)((vp->op[0].ws & 0x07));
     uint8_t opl3_en_car = (uint8_t)((vp->op[1].ws & 0x07));
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_mod, opl3_en_mod, p_opts);
-    bytes += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xE0 + slot_car, opl3_en_car, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0xE0 + slot_mod, opl3_en_mod, p_opts);
+    bytes += duplicate_write_opl3(p_vgmctx, 0xE0 + slot_car, opl3_en_car, p_opts);
 
     return bytes;
 }
 
 /** Register all YM2413 patches to OPL3 voice DB */
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *p_db, CommandOptions *p_opts) {
+    printf("register_all_ym2413_patches_to_opl3_voice_db\n");
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;
         ym2413_patch_to_opl3_with_fb(inst, NULL, &vp, p_opts);
@@ -572,10 +573,11 @@ void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *p_db, CommandOpti
  * Apply instrument before KeyOn - batch application assuming "ready to play"
  */
 static inline void apply_inst_before_keyon(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    VGMContext *p_vgmctx,
     int ch, uint8_t reg3n, const CommandOptions *p_opts,
     OPL3VoiceParam *out_cached_vp /* 後段でTL算出に再利用 */
 ) {
+    printf("apply_inst_before_keyon\n");
     int8_t inst = (reg3n >> 4) & 0x0F;
     OPL3VoiceParam vp;
     ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp, p_opts);
@@ -584,7 +586,7 @@ static inline void apply_inst_before_keyon(
     opll_apply_all_debug(&vp, p_opts);
 
     /* フルレジスタ一括書き込み */
-    opl3_voiceparam_apply(p_music_data, p_vstat, p_state, ch, &vp, p_opts);
+    opl3_voiceparam_apply(p_vgmctx, ch, &vp, p_opts);
 
     if (out_cached_vp) *out_cached_vp = vp;
 }
@@ -596,19 +598,17 @@ static inline bool has_effective_3n(const OpllPendingCh* p_p, const OpllStampCh*
 
 /** Flush channel wrapper (calls flush_channel_ch) */
 static inline void flush_channel(
-    VGMBuffer *p_music_data, VGMStatus *p_vstat, OPL3State *p_state,
+    VGMContext *p_vgmctx,
     int ch, const OPL3VoiceParam *vp, const CommandOptions *p_opts, OpllPendingCh* p, OpllStampCh* s)
 {
     (void)vp;
-    flush_channel_ch(p_music_data, p_vstat, p_state, ch, vp, p_opts, p, s);
+    flush_channel_ch(p_vgmctx, ch, vp, p_opts, p, s);
 }
 
 /** 
  * Add fresh 1n timeout wait (fallback to stamp 1n as compromise)
  */
-static inline void opll_tick_pending_on_elapsed(
-    VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
-    const CommandOptions *p_opts, uint16_t wait_samples)
+static inline void opll_tick_pending_on_elapsed(VGMContext *p_vgmctx, const CommandOptions *p_opts, uint16_t wait_samples)
 {
     if (wait_samples == 0) return;
 
@@ -629,8 +629,7 @@ static inline void opll_tick_pending_on_elapsed(
                 if (!has_effective_3n(&g_pend[ch], &g_stamp[ch])) {
                     uint32_t elapsed = (uint32_t)g_pending_on_elapsed[ch] + wait_samples;
                     if (elapsed >= KEYON_WAIT_FOR_INST_TIMEOUT_SAMPLES) {
-                        flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                      ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                        flush_channel(p_vgmctx,ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                         g_pending_on_elapsed[ch] = 0;
                     } else {
                         g_pending_on_elapsed[ch] = (uint16_t)elapsed;
@@ -650,8 +649,7 @@ static inline void opll_tick_pending_on_elapsed(
                         if (p_opts && p_opts->debug.verbose)
                             fprintf(stderr,"[KEYON_FNUM_TIMEOUT_FLUSH] ch=%d use_stamp_1n=%d val=%02X\n",
                                     ch, (int)g_stamp[ch].valid_1n, g_stamp[ch].last_1n);
-                        flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                      ch, NULL, p_opts, &temp, &g_stamp[ch]);
+                        flush_channel(p_vgmctx,ch, NULL, p_opts, &temp, &g_stamp[ch]);
                         g_pending_on_elapsed[ch] = 0;
                     } else {
                         g_pending_on_elapsed[ch] = (uint16_t)elapsed;
@@ -664,12 +662,11 @@ static inline void opll_tick_pending_on_elapsed(
         if (g_has_pending_keyoff[ch] && g_gate_elapsed[ch] >= get_min_gate(p_opts)) {
             uint8_t v2n = g_pending_keyoff_val2n[ch];
             uint8_t opl3_bn = opll_to_opl3_bn(v2n); // v2n は KO=0 にクリア済みを想定
-            duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                 0xB0 + ch, opl3_bn, p_opts);
+            duplicate_write_opl3(p_vgmctx, 0xB0 + ch, opl3_bn, p_opts);
 
             // stamp と状態更新
             g_stamp[ch].last_2n = v2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
-            p_state->last_key[ch] = 0;
+            p_vgmctx->opl3_state.last_key[ch] = 0;
             g_has_pending_keyoff[ch] = 0;
 
             if (p_opts && p_opts->debug.verbose) {
@@ -737,7 +734,7 @@ static inline void acc_reset_ch(int ch) {
    - flush 後は g_pend[ch] もクリアして二重フラッシュを防止
 */
 static inline void acc_maybe_flush_triple(
-    VGMBuffer *p_music_data, VGMContext *p_vgm_context, OPL3State *p_state,
+    VGMContext *p_vgmctx,
     const CommandOptions *p_opts, int ch)
 {
     if (!g_acc_has_1n[ch] || !g_acc_has_2n[ch] || !g_acc_has_3n[ch]) return;
@@ -781,7 +778,7 @@ static inline void acc_maybe_flush_triple(
                     fprintf(stderr,"[KEYOFF_INJECT_WAIT][TRIPLE] ch=%d need=%u (elapsed=%u, min=%u)\n",
                             ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                 }
-                vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                vgm_wait_samples(p_vgmctx, need);
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
             }
@@ -791,10 +788,9 @@ static inline void acc_maybe_flush_triple(
         uint8_t ko_val2n = g_has_pending_keyoff[ch] ? g_pending_keyoff_val2n[ch]
                                                     : opll_make_keyoff(g_stamp[ch].last_2n);
         uint8_t opl3_bn = opll_to_opl3_bn(ko_val2n);
-        duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                             0xB0 + ch, opl3_bn, p_opts);
+        duplicate_write_opl3(p_vgmctx,0xB0 + ch, opl3_bn, p_opts);
         g_stamp[ch].last_2n = ko_val2n; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
-        p_state->last_key[ch] = 0;
+        p_vgmctx->opl3_state.last_key[ch] = 0;
         g_has_pending_keyoff[ch] = 0;
         if (p_opts && p_opts->debug.verbose)
             fprintf(stderr,"[TRIPLE_PRE_KEYOFF] ch=%d reg2n=%02X\n", ch, ko_val2n);
@@ -802,7 +798,7 @@ static inline void acc_maybe_flush_triple(
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // Prevent KeyOff→KeyOn edge collision by adding small wait
     if (p_opts && p_opts->debug.audible_sanity && get_min_off_on_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, &p_vgm_context->status, (uint16_t)get_min_off_on_wait(p_opts));
+        vgm_wait_samples(p_vgmctx, (uint16_t)get_min_off_on_wait(p_opts));
         if (p_opts->debug.verbose) {
             fprintf(stderr,"[OFF_TO_ON_WAIT][TRIPLE] ch=%d samples=%u\n",
                     ch, (unsigned)get_min_off_on_wait(p_opts));
@@ -820,8 +816,7 @@ static inline void acc_maybe_flush_triple(
     if (p_opts && p_opts->debug.verbose)
         fprintf(stderr,"[TRIPLE_FLUSH] ch=%d 1n=%02X 2n=%02X 3n=%02X\n", ch, reg1n, reg2n, reg3n);
 
-    flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                  ch, NULL, p_opts, &temp, &g_stamp[ch]);
+    flush_channel(p_vgmctx, ch, NULL, p_opts, &temp, &g_stamp[ch]);
 
     // 後処理: 重複フラッシュ防止
     acc_reset_ch(ch);
@@ -836,7 +831,7 @@ static inline void acc_maybe_flush_triple(
 
 /** Flush pending channel state (KeyOn/KeyOff/param writes) */
 static inline void flush_channel_ch(
-    VGMBuffer *p_music_data, VGMStatus *p_vstatus, OPL3State *p_state,
+    VGMContext *p_vgmctx,
     int ch, const OPL3VoiceParam *vp_unused, const CommandOptions *p_opts,
     OpllPendingCh* p, OpllStampCh* s)
 {
@@ -870,12 +865,12 @@ static inline void flush_channel_ch(
         uint8_t reg1n_eff = p->has_1n ? p->reg1n : s->last_1n;
 
         OPL3VoiceParam vp_cached;
-        apply_inst_before_keyon(p_music_data, p_vstatus, p_state, ch, reg3n_eff, p_opts, &vp_cached);
+        apply_inst_before_keyon(p_vgmctx, ch, reg3n_eff, p_opts, &vp_cached);
 
         // A0（バッファ対象）、TL、B0（KeyOn）を呼び出し順で投入
         // duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, opll_to_opl3_an(reg1n_eff), p_opts);
 
-        uint8_t car40 = make_carrier_40_from_vol(p_vstatus, &vp_cached, reg3n_eff, p_opts);
+        uint8_t car40 = make_carrier_40_from_vol(p_vgmctx, &vp_cached, reg3n_eff, p_opts);
         car40 = emergency_boost_carrier_tl(car40, p_opts ? p_opts->emergency_boost_steps : 0, p_opts);
         if (p_opts && p_opts->carrier_tl_clamp_enabled) {
             uint8_t tl = car40 & 0x3F;
@@ -916,15 +911,15 @@ static inline void flush_channel_ch(
         }
 
         // A0（周波数 LSB）
-        duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xA0 + ch, a0_val, p_opts);
+        duplicate_write_opl3(p_vgmctx, 0xA0 + ch, a0_val, p_opts);
 
         // TL（既存どおり）
-        duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0x40 + car_slot, car40, p_opts);
+        duplicate_write_opl3(p_vgmctx, 0x40 + car_slot, car40, p_opts);
 
 #if OPLL_ENABLE_WAIT_BEFORE_KEYON
     // パラメータをラッチさせるため、B0=ONの前に少量の待ちを入れる（audible-sanity時のみ）
     if (p_opts && p_opts->debug.audible_sanity && get_pre_keyon_wait(p_opts) > 0) {
-        vgm_wait_samples(p_music_data, p_vstatus, (uint16_t)get_pre_keyon_wait(p_opts));
+        vgm_wait_samples(p_vgmctx, (uint16_t)get_pre_keyon_wait(p_opts));
         if (p_opts->debug.verbose) {
             fprintf(stderr,"[PRE_KEYON_WAIT] ch=%d samples=%u\n",
                     ch, (unsigned)get_pre_keyon_wait(p_opts));
@@ -940,8 +935,8 @@ static inline void flush_channel_ch(
         //         (b0_val >> 1) & 0x07);
         // }
         // 修正: flush_channel_ch 内の「ノートON確定」直後にアキュムレータをクリアして二重発火を防止
-        if (!key_state_already(p_state, ch, true)) {
-            duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, b0_val, p_opts);
+        if (!key_state_already(&(p_vgmctx->opl3_state), ch, true)) {
+            duplicate_write_opl3(p_vgmctx, 0xB0 + ch, b0_val, p_opts);
 
             uint16_t fnum10 = (uint16_t)(((b0_val & 0x03) << 8) | a0_val);
             uint8_t  blk3   = (uint8_t)((b0_val >> 2) & 0x07);
@@ -966,15 +961,15 @@ static inline void flush_channel_ch(
                             ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                 }
                 // VGMに待ちを注入してからゲート経過を進める
-                vgm_wait_samples(p_music_data, p_vstatus, need);
+                vgm_wait_samples(p_vgmctx, need);
                 // saturate
                 uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                 g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
 
                 // 直後に即時 KeyOff を発行
                 uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-                duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, opl3_bn, p_opts);
-                p_state->last_key[ch] = 0;
+                duplicate_write_opl3(p_vgmctx, 0xB0 + ch, opl3_bn, p_opts);
+                p_vgmctx->opl3_state.last_key[ch] = 0;
                 if (p_opts && p_opts->debug.verbose)
                     fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (after inject wait)\n", ch, p->reg2n);
 
@@ -994,8 +989,8 @@ static inline void flush_channel_ch(
         } else {
             // 閾値以上なら即時 KeyOff
             uint8_t opl3_bn = opll_to_opl3_bn(opll_make_keyoff(p->reg2n));
-            duplicate_write_opl3(p_music_data, p_vstatus, p_state, 0xB0 + ch, opl3_bn, p_opts);
-            p_state->last_key[ch] = 0;
+            duplicate_write_opl3(p_vgmctx, 0xB0 + ch, opl3_bn, p_opts);
+            p_vgmctx->opl3_state.last_key[ch] = 0;
             if (p_opts && p_opts->debug.verbose)
                 fprintf(stderr,"[KEYOFF] ch=%d reg2n=%02X (elapsed=%u)\n", ch, p->reg2n, g_gate_elapsed[ch]);
 
@@ -1006,15 +1001,17 @@ static inline void flush_channel_ch(
     else {
         // No edge; just flush any changed params
         if (need_1n) {
-            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
+            duplicate_write_opl3(p_vgmctx,
                                  0xA0 + ch, opll_to_opl3_an(p->reg1n), p_opts);
         }
         if (need_3n) {
             int8_t inst = (p->reg3n >> 4) & 0x0F;
             OPL3VoiceParam vp_tmp;
+            printf("cccc\n");
+
             ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
             opll_apply_all_debug(&vp_tmp, p_opts);
-            uint8_t car40 = make_carrier_40_from_vol(p_vstatus, &vp_tmp, p->reg3n, p_opts);
+            uint8_t car40 = make_carrier_40_from_vol(p_vgmctx, &vp_tmp, p->reg3n, p_opts);
             if (p_opts && p_opts->carrier_tl_clamp_enabled) {
                 uint8_t tl = car40 & 0x3F;
                 if (tl > p_opts->carrier_tl_clamp) {
@@ -1024,12 +1021,10 @@ static inline void flush_channel_ch(
                     car40 = (uint8_t)((car40 & 0xC0) | (p_opts->carrier_tl_clamp & 0x3F));
                 }
             }
-            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
-                                 0x40 + car_slot, car40, p_opts);
+            duplicate_write_opl3(p_vgmctx, 0x40 + car_slot, car40, p_opts);
         }
         if (need_2n) {
-            duplicate_write_opl3(p_music_data, p_vstatus, p_state,
-                                 0xB0 + ch, opll_to_opl3_bn(p->reg2n), p_opts);
+            duplicate_write_opl3(p_vgmctx, 0xB0 + ch, opll_to_opl3_bn(p->reg2n), p_opts);
         }
     }
 
@@ -1051,13 +1046,11 @@ static inline void flush_channel_ch(
 
 /** Main register write entrypoint for OPLL emulation */
 int opll_write_register(
-    VGMBuffer *p_music_data,
-    VGMContext *p_vgm_context,
-    OPL3State *p_state,
+    VGMContext *p_vgmctx,
     uint8_t addr, uint8_t val, uint16_t next_wait_samples,
     const CommandOptions *p_opts)
 {
-    g_last_ctx = p_vgm_context;
+    g_last_ctx = p_vgmctx;
     // Handle global registers (0x00 - 0x07)
     // グローバルレジスタ(<=0x07)での保留フラッシュを厳格化（inst+fresh fnum が必須）
     if (addr <= 0x07) {
@@ -1065,8 +1058,7 @@ int opll_write_register(
         for (int c = 0; c < YM2413_NUM_CH; ++c) {
             if (g_pend[c].has_2n && !g_stamp[c].ko && (g_pend[c].reg2n & 0x10)) {
                 if (have_inst_ready_policy(&g_pend[c], &g_stamp[c]) && have_fnum_ready_policy(c, &g_pend[c], &g_stamp[c])) {
-                    flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                c, NULL, p_opts, &g_pend[c], &g_stamp[c]);
+                    flush_channel(p_vgmctx, c, NULL, p_opts, &g_pend[c], &g_stamp[c]);
                     g_pending_on_elapsed[c] = 0;
                 } else if (p_opts && p_opts->debug.verbose) {
                     fprintf(stderr,"[GLOBAL_SKIP_FLUSH] ch=%d instReady=%d fnumReady=%d\n",
@@ -1097,12 +1089,10 @@ int opll_write_register(
         if (kind == 1) { // $1n
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
-                flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                              ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                flush_channel(p_vgmctx, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                 g_pending_on_elapsed[ch] = 0;
             } else if (g_stamp[ch].ko) {
-                duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                     0xA0 + ch, opll_to_opl3_an(val), p_opts);
+                duplicate_write_opl3(p_vgmctx, 0xA0 + ch, opll_to_opl3_an(val), p_opts);
                 g_stamp[ch].last_1n = val; g_stamp[ch].valid_1n = 1;
             } else {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
@@ -1112,8 +1102,7 @@ int opll_write_register(
             if (pend_note_on) {
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 if (have_fnum_ready_policy(ch, &g_pend[ch], &g_stamp[ch])) {
-                    flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                  ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                    flush_channel(p_vgmctx, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                     g_pending_on_elapsed[ch] = 0;
                     if (p_opts && p_opts->debug.verbose)
                         fprintf(stderr,"[KEYON_FLUSH_ON_3N] ch=%d 3n=%02X (fnum ready)\n", ch, val);
@@ -1125,10 +1114,12 @@ int opll_write_register(
                 /* Post-30: 鳴ってる最中の VOL 反映だけ */
                 int8_t inst = (val >> 4) & 0x0F;
                 OPL3VoiceParam vp_tmp;
+                printf("ddd\n");
+
                 ym2413_patch_to_opl3_with_fb(inst, g_ym2413_regs, &vp_tmp, p_opts);
                 opll_apply_all_debug(&vp_tmp, p_opts);
 
-                uint8_t car40 = make_carrier_40_from_vol(&p_vgm_context->status, &vp_tmp, val, p_opts);
+                uint8_t car40 = make_carrier_40_from_vol(p_vgmctx, &vp_tmp, val, p_opts);
 
                 /* boost → clamp の順 (KeyOn 時と同一) */
                 car40 = emergency_boost_carrier_tl(car40,
@@ -1148,8 +1139,7 @@ int opll_write_register(
                     fprintf(stderr,"[FORCE_TL0][POST30] ch=%d\n", ch);
 #endif
                 uint8_t car_slot2 = opl3_local_car_slot((uint8_t)ch);
-                duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                    0x40 + car_slot2, car40, p_opts);
+                duplicate_write_opl3(p_vgmctx, 0x40 + car_slot2, car40, p_opts);
 
                 if (p_opts->debug.verbose) {
                     fprintf(stderr,
@@ -1175,8 +1165,7 @@ int opll_write_register(
                 g_pending_on_elapsed[ch] = 0;
 
                 if (have_inst_ready_policy(&g_pend[ch], &g_stamp[ch]) && have_fnum_ready_policy(ch, &g_pend[ch], &g_stamp[ch])) {
-                    flush_channel(p_music_data, &p_vgm_context->status, p_state,
-                                  ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                    flush_channel(p_vgmctx, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                     g_pending_on_elapsed[ch] = 0;
                     if (p_opts && p_opts->debug.verbose)
                         fprintf(stderr,"[KEYON_FLUSH_NOW] ch=%d reg2n=%02X (inst+fnum ready)\n", ch, val);
@@ -1199,16 +1188,15 @@ int opll_write_register(
                             fprintf(stderr,"[KEYOFF_INJECT_WAIT][B0] ch=%d need=%u (elapsed=%u, min=%u)\n",
                                     ch, need, g_gate_elapsed[ch], get_min_gate(p_opts));
                         }
-                        vgm_wait_samples(p_music_data, &p_vgm_context->status, need);
+                        vgm_wait_samples(p_vgmctx, need);
                         uint32_t el2 = (uint32_t)g_gate_elapsed[ch] + need;
                         g_gate_elapsed[ch] = (el2 > 0xFFFF) ? 0xFFFF : (uint16_t)el2;
 
                         // 即時 KeyOff（valはKO=0）
                         uint8_t opl3_bn = opll_to_opl3_bn(val);
-                        duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                            0xB0 + ch, opl3_bn, p_opts);
+                        duplicate_write_opl3(p_vgmctx,0xB0 + ch, opl3_bn, p_opts);
                         g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
-                        p_state->last_key[ch] = 0;
+                        p_vgmctx->opl3_state.last_key[ch] = 0;
                         if (p_opts->debug.verbose) {
                             fprintf(stderr,"[KEYOFF][B0] ch=%d reg2n=%02X (after inject wait)\n",
                                     ch, val);
@@ -1231,10 +1219,9 @@ int opll_write_register(
                 } else {
                     // 閾値を満たしていれば即時 KeyOff
                     uint8_t opl3_bn = opll_to_opl3_bn(val); // val は KO=0
-                    duplicate_write_opl3(p_music_data, &p_vgm_context->status, p_state,
-                                         0xB0 + ch, opl3_bn, p_opts);
+                    duplicate_write_opl3(p_vgmctx,0xB0 + ch, opl3_bn, p_opts);
                     g_stamp[ch].last_2n = val; g_stamp[ch].valid_2n = 1; g_stamp[ch].ko = 0;
-                    p_state->last_key[ch] = 0;
+                    p_vgmctx->opl3_state.last_key[ch] = 0;
                     if (p_opts && p_opts->debug.verbose) {
                         fprintf(stderr,"[KEYOFF][B0] ch=%d reg2n=%02X (elapsed=%u)\n",
                                 ch, val, g_gate_elapsed[ch]);
@@ -1246,7 +1233,7 @@ int opll_write_register(
                 /* 周波数 MSB 更新など */
                 set_pending_from_opll_write(g_pend, g_stamp, addr, val);
                 if (g_stamp[ch].ko) {
-                    flush_channel(p_music_data, &p_vgm_context->status, p_state, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
+                    flush_channel(p_vgmctx, ch, NULL, p_opts, &g_pend[ch], &g_stamp[ch]);
                 } else {
                     if (p_opts && p_opts->debug.verbose) fprintf(stderr,"[B0_PEND_FREQ] ch=%d reg2n=%02X (awaiting keyon conditions)\n", ch, val);
                 }
@@ -1255,14 +1242,14 @@ int opll_write_register(
      }
     // Handle waits
     if (is_wait_samples_done == 0 && next_wait_samples > 0) {
-        opll_tick_pending_on_elapsed(p_music_data, p_vgm_context, p_state, p_opts, next_wait_samples);
-        vgm_wait_samples(p_music_data, &p_vgm_context->status, next_wait_samples);
+        opll_tick_pending_on_elapsed(p_vgmctx, p_opts, next_wait_samples);
+        vgm_wait_samples(p_vgmctx, next_wait_samples);
         is_wait_samples_done = 1;
     }
 
     // 追加: 最後に「3つ揃っていたら即フラッシュ」を試みる（順不同対応）
     if (ch >= 0) {
-        acc_maybe_flush_triple(p_music_data, p_vgm_context, p_state, p_opts, ch);
+        acc_maybe_flush_triple(p_vgmctx, p_opts, ch);
     }
 
     return additional_bytes;
