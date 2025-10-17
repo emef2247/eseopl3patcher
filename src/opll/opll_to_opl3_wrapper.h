@@ -39,5 +39,6 @@ int opll_write_register(
     const CommandOptions *opts);
 
 void register_all_ym2413_patches_to_opl3_voice_db(OPL3VoiceDB *db, CommandOptions* opts);
+double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum);
 
 #endif /* ESEOPL3PATCHER_OPLL_TO_OPL3_WRAPPER_H */

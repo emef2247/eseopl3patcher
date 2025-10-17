@@ -5,6 +5,9 @@
         "math.h": "c",
         "stddef.h": "c",
         "vgm_helpers.h": "c",
-        "opl3_convert.h": "c"
+        "opl3_convert.h": "c",
+        "vgm_header.h": "c",
+        "ym2413_voice_rom.h": "c",
+        "opll_to_opl3_wrapper.h": "c"
     }
 }

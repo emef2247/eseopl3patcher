@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h> // for size_t
 #include "../opl3/opl3_state.h"
+#include "../opll/opll_state.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,6 +52,11 @@ typedef enum {
     VGMCommandType_Unkown,
 } VGMCommandType;
 
+typedef enum {
+    FM_MappingStyle_classic,
+    FM_MappingStyle_modern,
+} FM_MappingStyle;
+
 /** Global debug / diagnostic options */
 typedef struct {
     bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
@@ -79,6 +86,7 @@ typedef struct {
     bool strip_unused_chip_clocks;      // 未使用チップのクロックを0化
     uint32_t override_opl3_clock;       // 0 以外なら OPL3 clock を上書き
     double detune_limit; // detuneの絶対値
+    FM_MappingStyle fm_mapping_style;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -175,6 +183,8 @@ typedef struct {
     double        source_fm_clock; /**< The source FM clock frequency */
     double        target_fm_clock; /**< The target FM clock frequency */
     OPL3State     opl3_state;
+    OPLLState     opll_state;
+    uint8_t       ym2413_user_patch[8]; // YM2413ユーザーパッチ用（0x00〜0x07）
 } VGMContext;
 
 /**

@@ -26,7 +26,7 @@ static void opl3_debug_log(const CommandOptions *opts, const char *fmt, ...) {
     va_end(args);
 }
 
-static inline bool opl3_should_account_port1(const VGMStatus *p_vstatus) {
+bool opl3_should_account_port1(const VGMStatus *p_vstatus) {
         return (p_vstatus && p_vstatus->is_adding_port1_bytes);
 }
 

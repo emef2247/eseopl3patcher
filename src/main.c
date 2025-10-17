@@ -409,10 +409,14 @@ int main(int argc, char *argv[]) {
     memset(&vgmctx.opl3_state, 0, sizeof(OPL3State));
     vgmctx.opl3_state.rhythm_mode = false;
     vgmctx.opl3_state.opl3_mode_initialized = false;
-    // OPL3State state;
-    // memset(&state, 0, sizeof(state));
-    // state.rhythm_mode = false;
-    // state.opl3_mode_initialized = false;
+
+    memset(&vgmctx.opll_state, 0, sizeof(OPLLState));
+    memset(&vgmctx.opll_state.reg, 0, 0x200);
+    memset(&vgmctx.opll_state.reg_stamp, 0x0, 0x200);
+    vgmctx.opll_state.is_rhythm_mode = false;
+    vgmctx.opll_state.is_initialized = false;
+
+    memset(&vgmctx.ym2413_user_patch, 0, 8);
 
     uint32_t additional_bytes = 0;
     additional_bytes += opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
@@ -477,6 +481,7 @@ int main(int argc, char *argv[]) {
 
         /* YM2413 */
         if (cmd == 0x51) {
+            
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
             vgmctx.cmd_type = VGMCommandType_RegWrite;
@@ -489,6 +494,12 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             
+            // Inject Original Command
+            vgm_append_byte(&vgmctx.buffer, cmd);
+            vgm_append_byte(&vgmctx.buffer, reg);
+            vgm_append_byte(&vgmctx.buffer, val);
+            if (opl3_should_account_port1(&(vgmctx.status))) additional_bytes += 3;
+
             #define NEW_VGM_OPLL2OPL3
             #ifndef NEW_VGM_OPLL2OPL3
             if (cmd_opts.debug.verbose)
@@ -534,7 +545,7 @@ int main(int argc, char *argv[]) {
                     additional_bytes += opl3_init(&vgmctx, FMCHIP_YM2413,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
-                int wait_samples = -1;
+                int wait_samples = 0;
                 //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
             }
@@ -649,7 +660,7 @@ int main(int argc, char *argv[]) {
                 int wait_samples = (cmd & 0x0F) + 1;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                fprintf(stderr, "\n[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
@@ -672,7 +683,7 @@ int main(int argc, char *argv[]) {
                 int wait_samples = ws;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                fprintf(stderr, "\n[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
@@ -692,7 +703,7 @@ int main(int argc, char *argv[]) {
                 int wait_samples = 735;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                fprintf(stderr, "\n[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
@@ -712,7 +723,7 @@ int main(int argc, char *argv[]) {
                 int wait_samples = 882;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                //fprintf(stderr, "[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                fprintf(stderr, "\n[MAIN] call opll2opl_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 opll2opl_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {

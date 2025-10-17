@@ -42,7 +42,7 @@ typedef struct {
     bool is_pending_keyoff; // KeyOff waiting to be applied (handled in flush)
     bool is_active;         // currently logically KeyOn (after flush active=true)
     bool is_keyoff_forced;  // internal marker for forced (retrigger) off
-
+    bool ignore_first_tl;
     // Register cache (for edge detect + diagnostics)
     uint8_t last_reg_10;
     uint8_t last_reg_20;
@@ -52,18 +52,26 @@ typedef struct {
     uint8_t  fnum_low;
     uint8_t  fnum_high;   // lower 2 bits used
     uint16_t fnum_comb;  // assembled 10-bit fnum (maintain)
+    uint16_t last_fnum_comb;
     uint8_t  block;
+    uint8_t  key_state;
+    uint8_t  prev_keybit;
+    uint8_t  last_block;
     uint8_t  tl;
     uint8_t  voice_id;
 
     // Timing
     sample_t keyon_time;  // when key-on was detected (used for gate length)
+    sample_t last_emit_time; 
+    bool    accessed[0x200];
     uint8_t last_emitted_reg_val[0x200];
 } OPLL2OPL3_PendingChannel;
 
 typedef struct {
-    sample_t virtual_time; // 入力（解析）側の進行時間（samples）
-    sample_t emit_time;    // 出力済みVGMの進行時間（samples）
+    sample_t  virtual_time; // 入力（解析）側の進行時間（samples）
+    sample_t  emit_time;    // 出力済みVGMの進行時間（samples）
+    OPLLState opll_state;
+    uint8_t lfo_reg;
     OPLL2OPL3_PendingChannel ch[OPLL_NUM_CHANNELS];
 } OPLL2OPL3_Scheduler;
 
