@@ -31,7 +31,7 @@ typedef struct {
 
 /** Public wrapper API */
 void opll_set_program_args(int argc, char **argv);
-void opll_init(VGMContext *p_vgmctx, const CommandOptions* opts) ;
+int opll_init(VGMContext *p_vgmctx, const CommandOptions* opts) ;
 
 int opll_write_register(
     VGMContext *p_vgmctx,

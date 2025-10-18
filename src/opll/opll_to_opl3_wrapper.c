@@ -17,15 +17,6 @@
 static VGMContext *g_last_ctx = NULL;
 static int g_triple_force_retrigger = 0;
 
-/** Calculate OPLL frequency for debugging */
-double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
-    // YM2413 (OPLL) frequency calculation based on observed behavior:
-    // f ≈ (clock / 72) / 2^18 * fnum * 2^block
-    // Example: clock=3579545, block=2, fnum=500 -> approximately 379.3 Hz
-    const double base = (clock / 72.0) / 262144.0; // 2^18
-    fprintf(stderr, "[DEBUG] calc_opll_frequency base=%.10f, block=%d, fnum=%d, ldexp=%.10f\n", base, block, fnum, ldexp(1.0, block));
-    return base * (double)fnum * ldexp(1.0, block);
-}
 // Global variable for fast-path mode
 static int g_freqmap_fast = 0;
 
@@ -177,8 +168,9 @@ static inline bool have_fnum_ready_policy(int ch, const OpllPendingCh* p, const 
 /**
  * Initialize OPLL/OPL3 voice DB and state
  */
-void opll_init(VGMContext *p_vpmctx, const CommandOptions* p_opts) {
-    if (!p_vpmctx) return;
+int opll_init(VGMContext *p_vpmctx, const CommandOptions* p_opts) {
+    int add_bytes = 0;
+    if (!p_vpmctx) return add_bytes;
 
     // Read frequency mapping mode
     const char *fm = getenv("ESEOPL3_FREQMAP");
@@ -220,6 +212,8 @@ void opll_init(VGMContext *p_vpmctx, const CommandOptions* p_opts) {
     for (int ch = 0; ch < 9; ++ch) {
         p_vpmctx->opl3_state.last_key[ch] = 0;
     }
+
+    return add_bytes;
 }
 
 // ---------- Macro definitions ----------

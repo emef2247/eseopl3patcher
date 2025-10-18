@@ -57,6 +57,13 @@ typedef enum {
     FM_MappingStyle_modern,
 } FM_MappingStyle;
 
+typedef enum {
+    OPLL_PresetType_YM2413,
+    OPLL_PresetType_VRC7,
+    OPLL_PresetType_YMF281B,
+} OPLL_PresetType;
+
+
 /** Global debug / diagnostic options */
 typedef struct {
     bool strip_non_opl;       /* Remove AY8910/K051649 etc. from output */
@@ -90,6 +97,8 @@ typedef struct {
     bool is_port1_enabled;
     bool is_voice_zero_clear;
     bool is_a0_b0_aligned;
+    bool is_keep_source_vgm;
+    OPLL_PresetType preset;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -239,32 +248,32 @@ void vgm_buffer_free(VGMBuffer *p_buf);
 /**
  * Append a single byte to the buffer.
  */
-void vgm_append_byte(VGMBuffer *p_buf, uint8_t value);
+int vgm_append_byte(VGMBuffer *p_buf, uint8_t value);
 
 /**
  * Write an OPL3 register command (0x5E/0x5F) to the buffer.
  */
-void forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
+int forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
 
 /**
  * Write a short wait command (0x70-0x7F) and update status.
  */
-void vgm_wait_short(VGMContext *p_vgmctx, uint8_t cmd);
+int vgm_wait_short(VGMContext *p_vgmctx, uint8_t cmd);
 
 /**
  * Write a wait n samples command (0x61) and update status.
  */
-void vgm_wait_samples(VGMContext *p_vgmctx, uint16_t samples);
+int vgm_wait_samples(VGMContext *p_vgmctx, uint16_t samples);
 
 /**
  * Write a wait 1/60s command (0x62) and update status.
  */
-void vgm_wait_60hz(VGMContext *p_vgmctx);
+int vgm_wait_60hz(VGMContext *p_vgmctx);
 
 /**
  * Write a wait 1/50s command (0x63) and update status.
  */
-void vgm_wait_50hz(VGMContext *p_vgmctx);
+int vgm_wait_50hz(VGMContext *p_vgmctx);
 
 /**
  * Parse the VGM header for FM chip clock values and flags.

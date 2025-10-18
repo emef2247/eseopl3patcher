@@ -30,9 +30,7 @@ void build_vgm_header(
     uint32_t gd3_offset,
     uint32_t data_offset,
     uint32_t version,
-    uint32_t additional_data_bytes,
-    bool is_adding_port1_bytes,
-    uint32_t port1_bytes
+    uint32_t additional_data_bytes
 );
 
 bool should_account_addtional_bytes_pre_loop(const VGMStatus *p_vstatus);

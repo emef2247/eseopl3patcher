@@ -23,7 +23,7 @@ int duplicate_write_opl3(
     uint8_t val,
     const CommandOptions *p_opts);
 
-void opl3_write_reg(
+int opl3_write_reg(
     VGMContext *p_vpmctx,
     int port,
     uint8_t reg,

@@ -6,7 +6,6 @@
 #include "../vgm/vgm_helpers.h"
 #include "../opll/ym2413_voice_roms.h"
 #include "../opll/nukedopll_voice_rom.h"
-#include "../opll/opll_to_opl3_wrapper.h"
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>  // getenv
@@ -15,7 +14,7 @@
 
 #define YM2413_REGS_SIZE 0x40
 
-// リズムパートの仮想チャンネルID定義（通常chと区別しても良い）
+// Virtual channel IDs for rhythm part
 #define CH_BD  6   // Bass Drum
 #define CH_SD  7   // Snare Drum / Tom
 #define CH_CYM 8   // Cymbal / HiHat
@@ -98,13 +97,21 @@ void opll2opl3_init_scheduler(VGMContext *p_vgmctx, const CommandOptions *p_opts
     }
 }
 
+/** Calculate OPLL frequency for debugging */
+double calc_opll_frequency(double clock, unsigned char block, unsigned short fnum) {
+    // YM2413 (OPLL) frequency calculation based on observed behavior:
+    // f ≈ (clock / 72) / 2^18 * fnum * 2^block
+    // Example: clock=3579545, block=2, fnum=500 -> approximately 379.3 Hz
+    const double base = (clock / 72.0) / 262144.0; // 2^18
+    return base * (double)fnum * ldexp(1.0, block);
+}
+
 /* Convert OPLL fnum/block to OPL3 fnum/block (10-bit fnum, 3bit block)
    returns true if conversion within range */
 bool convert_fnum_block_from_opll_to_opl3(double opll_clock, double opl3_clock, uint8_t opll_block, uint16_t opll_fnum, uint16_t *best_f, uint8_t *best_b)
 {
-    fprintf(stderr, "[DEBUG] convert_fnum_block_from_opll_to_opl3: opll_block=%d, opll_fnum=%d\n", opll_block, opll_fnum);
+
     double freq = calc_opll_frequency(opll_clock, opll_block, opll_fnum);
-    fprintf(stderr, "[DEBUG] OPLL freq: %.6f Hz\n", freq);
     double best_err_cents = 0.0;
     opl3_find_fnum_block_with_pref_block(freq, opl3_clock, best_b, best_f, &best_err_cents, (int)opll_block);
     return true;
@@ -162,46 +169,48 @@ int  opll2opl3_emit_reg_write(VGMContext *p_vgmctx, uint8_t addr, uint8_t val, c
     OPLL2OPL3_Scheduler *s = &(p_vgmctx->opll_state.sch);
     uint8_t last_val =  s->last_emitted_reg_val[addr];
     bool first_access = !s->accessed[addr];
-    int additional_bytes = 0;
+    int wrote_bytes = 0;
 
     if (p_opts->debug.verbose) {
         fprintf(stderr, "[EMIT][Reg Write] time=%u addr=%02X val=%02X emit_time=%u\n", (unsigned)s->virtual_time, addr, val, (unsigned)s->emit_time);
     }
    if (first_access || val != last_val) {
         int bytes = duplicate_write_opl3(p_vgmctx, addr, val, p_opts);
-        if (should_account_addtional_bytes_pre_loop(&(p_vgmctx->status))) additional_bytes += bytes;
+        if (should_account_addtional_bytes_pre_loop(&(p_vgmctx->status))) wrote_bytes += bytes;
 
         s->accessed[addr] = true;
     }
     s->last_emitted_reg_val[addr] = val;
 
-    return additional_bytes;
+    return wrote_bytes;
 }
 
-void emit_wait(VGMContext *p_vgmctx, uint16_t samples, OPLL2OPL3_Scheduler *s,const CommandOptions *p_opts) {
+int emit_wait(VGMContext *p_vgmctx, uint16_t samples, OPLL2OPL3_Scheduler *s,const CommandOptions *p_opts) {
+    int wrote_bytes = 0;
     if (samples == 0) {
         if (p_opts->debug.verbose) {
             fprintf(stderr,"[EMIT][WAIT] emit_time was ignored by samples = %u\n", samples);
         }
-        return;
+        return wrote_bytes;
     }
 
-    vgm_wait_samples(p_vgmctx, samples);
+    wrote_bytes += vgm_wait_samples(p_vgmctx, samples);
     // Advance emitted timeline
     s->emit_time += samples;
 
     if (p_opts->debug.verbose) {
         fprintf(stderr,"[EMIT][WAIT] emit_time advanced by %u -> %u\n", samples, (unsigned)s->emit_time);
     }
+    return wrote_bytes;
 }
 
-// FNUMレジスタ判定 (ピッチ下位8bit)
+/** Returns true if register is OPLL FNUM (pitch lower 8bit) */
 static inline bool is_opll_fnum_reg(uint8_t reg)
 {
     return (reg >= 0x10 && reg <= 0x18);
 }
 
-// KeyOn判定
+/** Returns true if register is KeyOn */
 static inline bool is_opll_keyon_reg(uint8_t reg, uint8_t val)
 {
     if (reg >= 0x20 && reg <= 0x28)
@@ -209,7 +218,7 @@ static inline bool is_opll_keyon_reg(uint8_t reg, uint8_t val)
     return false;
 }
 
-// KeyOff判定
+/** Returns true if register is KeyOff */
 static inline bool is_opll_keyoff_reg(uint8_t reg, uint8_t val)
 {
     if (reg >= 0x20 && reg <= 0x28)
@@ -217,23 +226,19 @@ static inline bool is_opll_keyoff_reg(uint8_t reg, uint8_t val)
     return false;
 }
 
-// 音量 (Total Level) 判定
-// OPLLでは 0x30〜0x38 に TL(5bit) + Inst(4bit) が格納
-// TL更新時は KeyOn中にもボリューム変化がある
+/** Returns true if register is TL (Total Level/Volume) */
 static inline bool is_opll_tl_reg(uint8_t reg)
 {
     return (reg >= 0x30 && reg <= 0x38);
 }
 
-// 音色(Voice/Instrument)レジスタ判定
-// 0x00〜0x07 : ユーザー音色パラメータ
-// 0x30〜0x38 の上位ビットでもプリセット音色指定が入る
+/** Returns true if register is voice/instrument */
 static inline bool is_opll_voice_reg(uint8_t reg)
 {
-    // 音色定義そのもの
+    // User patch definition
     if (reg <= 0x07)
         return true;
-    // チャンネル別の音色番号設定 (bit5〜bit7部分)
+    // Channel-specific instrument setting
     if (reg >= 0x30 && reg <= 0x38)
         return true;
     return false;
@@ -261,9 +266,10 @@ static inline uint8_t opl3_opreg_addr(uint8_t base, uint8_t ch_local, int is_car
     return (uint8_t)(base + slot);
 }
 
-// Sustain Level (SL) passthrough (0-15)
+/** Sustain Level (SL) passthrough (0-15) */
 static inline uint8_t opll2opl_sl(uint8_t sl) { return sl & 0x0F; }
 
+/** Compute unique hash for OPLL voice parameters */
 uint32_t compute_opll_voice_hash(uint8_t voice_id, uint8_t tl, uint8_t algo_fb, uint8_t wave_bits)
 {
     return ((uint32_t)voice_id << 24)
@@ -288,7 +294,6 @@ static inline uint8_t _KLFix(uint8_t kl) {
     }
 }
 
-/* YM2413チャンネル→OPL3スロットオフセット */
 static inline int get_mod_offset(int ch) {
     static const int tbl[9] = {0, 1, 2, 8, 9, 10, 16, 17, 18};
     return tbl[ch];
@@ -317,11 +322,9 @@ static inline uint8_t opll2opl_tl(uint8_t tl) {
     return (tl & 0x0F) << 1;
 }
 
-/* --- OPL3レジスタ書き込み（VGM出力） --- */
+/** Write to OPL3 register mirror and VGM output */
 static inline void write_opl3_reg(VGMContext *p_vgmctx, uint8_t addr, uint8_t data) {
-    /* Portは0固定（9ch分） */
     forward_write(p_vgmctx, 0, addr, data);
-    /* ステート反映 */
     p_vgmctx->opll_state.reg[addr] = data;
 }
 
@@ -338,24 +341,38 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     // --- パッチデータの参照元決定 ---
     uint8_t user_patch[8];
     const uint8_t *src = NULL;
-    if (inst == 0) {
-        for (int i = 0; i < 8; ++i)
-            user_patch[i] = p_vgmctx->opll_state.reg[i];
-        src = user_patch;
-    } else if (inst >= 1 && inst <= 20) {
-        src = YM2413_VOICES[inst - 1];
-    } else {
-        src = YM2413_VOICES[0];
+    const uint8_t *source_preset = NULL;
+    if (p_opts->preset == OPLL_PresetType_YM2413) {
+        if (inst == 0) {
+            for (int i = 0; i < 8; ++i)
+                user_patch[i] = p_vgmctx->opll_state.reg[i];
+            src = user_patch;
+        } else if (inst >= 1 && inst <= 20) {
+            src = YM2413_VOICES[inst - 1];
+        } else {
+            src = YM2413_VOICES[0];
+        }
+    } else if (p_opts->preset == OPLL_PresetType_VRC7) {
+        if (inst == 0) {
+            for (int i = 0; i < 8; ++i)
+                user_patch[i] = p_vgmctx->opll_state.reg[i];
+            src = user_patch;
+        } else if (inst >= 1 && inst <= 20) {
+            src = VRC7_VOICES[inst - 1];
+        } else {
+            src = VRC7_VOICES[0];
+        }
+    } else if (p_opts->preset == OPLL_PresetType_YMF281B) {
+        if (inst == 0) {
+            for (int i = 0; i < 8; ++i)
+                user_patch[i] = p_vgmctx->opll_state.reg[i];
+            src = user_patch;
+        } else if (inst >= 1 && inst <= 20) {
+            src = YMF281B_VOICES[inst - 1];
+        } else {
+            src = YMF281B_VOICES[0];
+        }
     }
-
-    // YM2413のKeyOn/EG型状態取得
-    uint8_t reg30 = p_vgmctx->opll_state.reg[0x30 + ch];
-    uint8_t cur_key = (p_vgmctx->opll_state.reg[0x20 + ch] & 0x10) ? 1 : 0;
-    uint8_t prev_key = (p_vgmctx->opll_state.reg_stamp[0x20 + ch] & 0x10) ? 1 : 0;
-    uint8_t eg_type = (src[1] >> 5) & 1; // キャリアEGT: sustain型(1) or normal型(0)
-
-    // YM2413ボリューム（TL）取得
-    uint8_t ym_tl = reg30 & 0x0F; // 0x30-0x38の下位4bit
 
     // --- Modulator ---
     uint8_t m_am   = (src[0] >> 7) & 1;
@@ -385,33 +402,15 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     uint8_t c_rr   = src[7] & 0x0F;
     uint8_t c_ws   = (src[3] >> 4) & 0x01;
 
-    // // キャリア側Release Rate補正（vgm-conv互換: キャリアのみ2倍）
-    // c_rr = c_rr * 2;
-    // if (c_rr > 15) c_rr = 15;
-// 
-    // // KeyOffかつEG型(normal)の場合はRelease Rate=6に強制（vgm-conv特殊ロジック）
-    // if (!cur_key && !eg_type) {
-    //     c_rr = 6;
-    // }
-
-    // フィードバック
     uint8_t fb = src[3] & 0x07;
 
-    // YM2413の音量をOPL3のTLに変換（vgm-conv互換）
-    // YM2413: 0=最大音量、15=最小音量 → OPL3 TL: 0=最大、63=最小
-    // vgm-convは (ym_tl << 2) で反映
-    uint8_t opl3_tl = ym_tl << 2;
-    if (opl3_tl > 63) opl3_tl = 63;
-
-    // --- Conversion tables (vgm-conv compatible) ---
     // Modulator
     p_vp->op[0].am   = m_am;
     p_vp->op[0].vib  = m_vib;
     p_vp->op[0].egt  = m_egt;
     p_vp->op[0].ksr  = m_ksr;
     p_vp->op[0].mult = m_mult;
-    p_vp->op[0].ksl  = m_kl; //opll2opl_ksl[m_kl];
-    // Modulator TLはパッチ値そのまま
+    p_vp->op[0].ksl  = m_kl;
     p_vp->op[0].tl   = m_tl;
     p_vp->op[0].ar   = m_ar;
     p_vp->op[0].dr   = m_dr;
@@ -425,8 +424,7 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     p_vp->op[1].egt  = c_egt;
     p_vp->op[1].ksr  = c_ksr;
     p_vp->op[1].mult = c_mult;
-    p_vp->op[1].ksl  = c_kl;//opll2opl_ksl[c_kl];
-    // Carrier TLにYM2413の音量(TL)を反映（vgm-conv方式）
+    p_vp->op[1].ksl  = c_kl;
     p_vp->op[1].tl   = c_tl;
     p_vp->op[1].ar   = c_ar;
     p_vp->op[1].dr   = c_dr;
@@ -461,46 +459,44 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
 int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, int mod_volume, int car_volume, bool key, OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
 {
     if (!p_vp || ch < 0 || ch >= 9) return 0;
-    int additional_bytes = 0;
+    int wrote_bytes = 0;
     int slot_mod = opl3_opreg_addr(0, ch, 0);
     int slot_car = opl3_opreg_addr(0, ch, 1);
     uint8_t tl = p_vgmctx->opll_state.reg[0x30 + ch] & 0xF;
-    //OPLL2OPL3_PendingChannel *p = &s->ch[ch];
 
-    printf("[DEBUG] Apply OPL3 VoiceParam to ch=%d\n", ch);
     // AM/VIB/EGT/KSR/MULT
     uint8_t opl3_2n_mod = (uint8_t)((p_vp->op[0].am << 7) | (p_vp->op[0].vib << 6) | (p_vp->op[0].egt << 5) | (p_vp->op[0].ksr << 4) | (p_vp->op[0].mult & 0x0F));
     uint8_t opl3_2n_car = (uint8_t)((p_vp->op[1].am << 7) | (p_vp->op[1].vib << 6) | (p_vp->op[1].egt << 5) | (p_vp->op[1].ksr << 4) | (p_vp->op[1].mult & 0x0F));
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_mod, opl3_2n_mod, p_opts);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_car, opl3_2n_car, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_mod, opl3_2n_mod, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_car, opl3_2n_car, p_opts);
 
     // KSL/TL 
     uint8_t opl3_4n_mod = (uint8_t)((opll2opl_ksl[(p_vp->op[0].ksl & 0x03)] << 6) | ((mod_volume >= 0) ? mod_volume : (p_vp->op[0].tl & 0x3F)));
     uint8_t opl3_4n_car = (uint8_t)((opll2opl_ksl[(p_vp->op[1].ksl & 0x03)] << 6) | ((car_volume >= 0) ? car_volume : (p_vp->op[1].tl & 0x3F)));
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_mod, opl3_4n_mod, p_opts);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_car, opl3_4n_car, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_mod, opl3_4n_mod, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_car, opl3_4n_car, p_opts);
 
     // AR/DR
     uint8_t opl3_6n_mod = (uint8_t)((p_vp->op[0].ar << 4) | (p_vp->op[0].dr & 0x0F));
     uint8_t opl3_6n_car = (uint8_t)((p_vp->op[1].ar << 4) | (p_vp->op[1].dr & 0x0F));
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + slot_mod, opl3_6n_mod, p_opts);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + slot_car, opl3_6n_car, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + slot_mod, opl3_6n_mod, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + slot_car, opl3_6n_car, p_opts);
 
     // SL/RR
     uint8_t opl3_8n_mod = (uint8_t)((p_vp->op[0].sl << 4) | ((!p_vp->op[0].egt) ? (p_vp->op[0].rr & 0x0F) : 0));
     uint8_t opl3_8n_car = (uint8_t)((p_vp->op[1].sl << 4) | ((p_vp->op[1].egt || key) ? (p_vp->op[1].rr & 0x0F) : 6));
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_mod, opl3_8n_mod, p_opts);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_car, opl3_8n_car, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_mod, opl3_8n_mod, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_car, opl3_8n_car, p_opts);
 
     // FB/CNT
     uint8_t c0_val = (uint8_t)(0xC0 | ((p_vp->fb[0] & 0x07) << 1) | (p_vp->cnt[0] & 0x01));
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, c0_val, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, c0_val, p_opts);
 
     // WS
     uint8_t opl3_en_mod = (uint8_t)((p_vp->op[0].ws)? 1 : 0);
     uint8_t opl3_en_car = (uint8_t)((p_vp->op[1].ws)? 1 : 0);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_mod, opl3_en_mod, p_opts);
-    additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_car, opl3_en_car, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_mod, opl3_en_mod, p_opts);
+    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_car, opl3_en_car, p_opts);
 
     if (p_opts->debug.verbose ) {
         fprintf(stderr,"[DEBUG][Apply Voice] Ch %d Reg0x%02X : Op 0 AM: %s, Vibrato: %s, KSR: %s, EG Type: %d, Freq Multipler: %d\n",ch,opl3_2n_mod,(p_vp->op[0].am) ? "On":"Off",(p_vp->op[0].vib << 6) ? "On":"Off",(p_vp->op[0].ksr << 4) ? "On":"Off",(p_vp->op[0].egt << 5),(p_vp->op[0].mult & 0x0F));
@@ -514,11 +510,11 @@ int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, int mod_volume, int car_
         fprintf(stderr,"[DEBUG][Apply Voice] Ch %d Reg0x%02X : Waveform Select: %X\n",ch,opl3_en_mod,(p_vp->op[0].ws & 0x07));
         fprintf(stderr,"[DEBUG][Apply Voice] Ch %d Reg0x%02X : Waveform Select: %X\n",ch,opl3_en_car,(p_vp->op[0].ws & 0x07));
     }
-    return additional_bytes;
+    return wrote_bytes;
 }
 
 /* --- _updateVoice 等価 --- */
-void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p_opts)
+int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p_opts)
 {
     OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
     uint8_t *regs = p_vgmctx->opll_state.reg;
@@ -527,6 +523,7 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
     int inst = (d & 0xF0) >> 4;
     int volume = d & 0x0F;
     bool key = (regs[0x20 + ch] & 0x10) ? true : false;
+    int wrote_bytes = 0;
     
     OPLL2OPL3_PendingChannel *p = &p_s->ch[ch];
     OPL3VoiceParam vp;
@@ -536,15 +533,15 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
         switch (ch) {
             case 6:
                 opll_load_voice(p_vgmctx, 16, ch, &vp, p_opts); // BD
-                opll2opl3_apply_voice(p_vgmctx, ch, -1 ,toTL(volume, 0), key,&vp, p_opts);
+                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, -1 ,toTL(volume, 0), key,&vp, p_opts);
                 break;
             case 7:
                 opll_load_voice(p_vgmctx, 17, ch, &vp, p_opts); // SD/TOM
-                opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
+                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
             case 8:
                 opll_load_voice(p_vgmctx, 18, ch, &vp, p_opts); // CYM/HH
-                opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
+                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
         }
     } else if (!rflag && ch >= 6) {
@@ -553,10 +550,10 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
         if (inst_normal == 0) {
             // User patch
             opll_load_voice(p_vgmctx, 0, ch, &vp, p_opts);
-            opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
+            wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
         } else {
             opll_load_voice(p_vgmctx, inst_normal, ch, &vp, p_opts);
-            opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
+            wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
         }
     } else {
         // 通常のメロディックチャンネル
@@ -566,7 +563,7 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
         } else {
             opll_load_voice(p_vgmctx, inst_normal, ch, &vp, p_opts);
         }
-        opll2opl3_apply_voice(p_vgmctx, ch, -1, toTL(volume, 0), key,&vp, p_opts);
+        wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, -1, toTL(volume, 0), key,&vp, p_opts);
     }
 
     if (p_opts && p_opts->debug.verbose) {
@@ -574,11 +571,12 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
             "[YM2413->OPL3] ch=%d inst=%d vol=%d key=%d rhythm=%d\n",
             ch, inst, volume, key, rflag);
     }
+    return wrote_bytes;
 }
 
-void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, const CommandOptions *p_opts) 
+int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, const CommandOptions *p_opts) 
 {
-    
+    int wrote_bytes = 0;
     if (reg == 0x0e) {
         OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
         int lfoDepth = OPLL_LFO_DEPTH; // 通常3固定
@@ -594,53 +592,53 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
             // Rhythm mode enabled （posedge）
             if (p_opts->is_voice_zero_clear) {
                 for (int i = 0; i < 3; ++i) {
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
                 }
             }
             p_vgmctx->opll_state.is_rhythm_mode = true;
-            opll2opl3_update_voice(p_vgmctx, 6, p_opts); // BD
-            opll2opl3_update_voice(p_vgmctx, 7, p_opts); // SD/TOM
-            opll2opl3_update_voice(p_vgmctx, 8, p_opts); // CYM/HH
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts); // BD
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts); // SD/TOM
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts); // CYM/HH
         } else if (!now_rhythm_mode && prev_rhythm_mode) {
             // Rhythm mode disabled（negedge）
             if (p_opts->is_voice_zero_clear) {
                 for (int i = 0; i < 3; ++i) {
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
-                    opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
+                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
                 }
             }
             p_vgmctx->opll_state.is_rhythm_mode = false;
-            opll2opl3_update_voice(p_vgmctx, 6, p_opts);
-            opll2opl3_update_voice(p_vgmctx, 7, p_opts);
-            opll2opl3_update_voice(p_vgmctx, 8, p_opts);
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts);
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts);
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts);
             // 1. LFO深度=0で1回書く（0xc0 | (val & 0x3f)）
-            opll2opl3_emit_reg_write(p_vgmctx, 0xbd, 0xc0 | (val & 0x3f), p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, 0xc0 | (val & 0x3f), p_opts);
         } else {
                 // Only update the flag (no edge)
                 p_vgmctx->opll_state.is_rhythm_mode = (val & 0x20) ? true : false;
         }
          // 2. LFOデプス値で必ず1回書く（全ケース共通）
-        opll2opl3_emit_reg_write(p_vgmctx, 0xbd, (lfoDepth << 6) | (val & 0x3f), p_opts);
-        return;
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, (lfoDepth << 6) | (val & 0x3f), p_opts);
+        return wrote_bytes;
     }
         /* --- FNUM Low (0x10..0x18) --- */
     if (reg >= 0x10 && reg <= 0x18) {
@@ -684,9 +682,9 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
             fprintf(stderr,
                 "[DEBUG] reg_bn:0x%02x reg_an:0x%02x\n",reg_bn,reg_an);
         }
-        opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
-        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
-        return;
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
+        return wrote_bytes;
     }
 
     /* --- FNUM High + Block + Key (0x20..0x28) --- */
@@ -710,29 +708,29 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
             int mod_slot = opl3_opreg_addr(0, ch, 0);
             int car_slot = opl3_opreg_addr(0, ch, 1);
 
-            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts);
         }
 
-        opll2opl3_update_voice(p_vgmctx, ch, p_opts);
+        wrote_bytes += opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
         // KeyOn/KeyOff含むA0/B0レジスタ書き込み（OPLL的なNoteOn/Off反映）
         uint8_t reg_bn = ((val  & 0x1F) << 1) | ((p_vgmctx->opll_state.reg[0x10 + ch] & 0x80) >> 7);
         uint8_t reg_an = (p->last_reg_10 & 0x7f) << 1;
-        opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
-        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
         p->key_state = keybit;
         p->has_fnum_high = true;
-        return;
+        return wrote_bytes;
     }
 
     /* --- Instrument/Volume (0x30..0x38) --- */
@@ -753,29 +751,32 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
             int mod_slot = opl3_opreg_addr(0, ch, 0);
             int car_slot = opl3_opreg_addr(0, ch, 1);
 
-            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts); // AM/VIB/EGT/KSR/MULT
-            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts); // KSL/TL
-            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts); // AR/DR
-            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts); // SL/RR
-            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts); // WS
-            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
-            opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts); // Feedback/Algo（FM）
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts); // AM/VIB/EGT/KSR/MULT
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts); // KSL/TL
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts); // AR/DR
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts); // SL/RR
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts); // WS
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts); // Feedback/Algo（FM）
         }
 
         opll2opl3_debug_log(p_vgmctx, "HANDLE", "Instrument/Volume", ch, p_opts);
-        opll2opl3_update_voice(p_vgmctx, ch, p_opts);
+        wrote_bytes += opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
-        return;
+        return wrote_bytes;
     }
+    return wrote_bytes;
 }
 
-void opll2opl3_schedule_wait(VGMContext *p_vgmctx, uint32_t wait_samples, const CommandOptions *p_opts, OPLL2OPL3_Scheduler *s)
+int opll2opl3_schedule_wait(VGMContext *p_vgmctx, uint32_t wait_samples, const CommandOptions *p_opts, OPLL2OPL3_Scheduler *s)
 {
-    emit_wait(p_vgmctx, wait_samples, s, p_opts);
+    int wrote_bytes = 0;
+    wrote_bytes += emit_wait(p_vgmctx, wait_samples, s, p_opts);
+    return wrote_bytes;
 }
 
 /**
@@ -783,6 +784,7 @@ void opll2opl3_schedule_wait(VGMContext *p_vgmctx, uint32_t wait_samples, const 
  */
 int opll2opl3_command_handler (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, uint16_t wait_samples, const CommandOptions *p_opts)
  {
+    int wrote_bytes = 0;
     // Update timestamp
     p_vgmctx->opll_state.sch.virtual_time = p_vgmctx->timestamp.current_sample;
     
@@ -799,12 +801,14 @@ int opll2opl3_command_handler (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, u
         p_vgmctx->opll_state.reg_stamp[reg] = p_vgmctx->opll_state.reg[reg];
         p_vgmctx->opll_state.reg[reg] = val;
         //handle_opll_write(p_vgmctx, reg, val, p_opts, &g_scheduler );
-        opll2opl3_handle_opll_command(p_vgmctx, reg, val, p_opts);
+        wrote_bytes += opll2opl3_handle_opll_command(p_vgmctx, reg, val, p_opts);
     } else if (p_vgmctx->cmd_type == VGMCommandType_Wait) {
         //fprintf(stderr,"[OPLL2OPL3] opll2opl3_command_handler: wait_samples=%d\n",wait_samples);
         p_vgmctx->opll_state.sch.virtual_time += wait_samples;
-        opll2opl3_schedule_wait(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
+        wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
     } else {
         // Should not be occured here
     }
+
+    return wrote_bytes;
 }

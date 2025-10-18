@@ -51,18 +51,22 @@ void vgm_buffer_free(VGMBuffer *p_buf) {
 /**
  * Append a single byte to the buffer.
  */
-void vgm_append_byte(VGMBuffer *p_buf, uint8_t value) {
+int vgm_append_byte(VGMBuffer *p_buf, uint8_t value) {
+    int add_bytes = 1;
     vgm_buffer_append(p_buf, &value, 1);
+    return add_bytes;
 }
 
 /**
  * Write an OPL3 register command (0x5E/0x5F) to the buffer.
  * port: 0 for port 0 (0x5E), 1 for port 1 (0x5F)
  */
-void forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
+int forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
     uint8_t cmd = (port == 0) ? 0x5E : 0x5F;
     uint8_t bytes[3] = {cmd, reg, val};
+    int add_bytes = 3;
     vgm_buffer_append(&(p_vgmctx->buffer), bytes, 3);
+    return add_bytes;
 }
 
 /**
@@ -71,55 +75,64 @@ void forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
 /**
  * Write a short wait command (0x70-0x7F) and update status.
  */
-void vgm_wait_short(VGMContext *p_vgmctx, uint8_t cmd) {
-    vgm_append_byte(&(p_vgmctx->buffer), cmd);
+int vgm_wait_short(VGMContext *p_vgmctx, uint8_t cmd) {
+    int add_bytes = 0;
+    add_bytes = vgm_append_byte(&(p_vgmctx->buffer), cmd);
     if (p_vgmctx) {
         p_vgmctx->timestamp.last_sample = p_vgmctx->timestamp.current_sample;
         p_vgmctx->timestamp.current_sample += (cmd & 0x0F) + 1;
         p_vgmctx->status.total_samples += (cmd & 0x0F) + 1;
     }
+    return add_bytes;
 }
 
 /**
  * Write a wait n samples command (0x61) and update status.
  * Zero-length waits are skipped (not written to stream) as they are unnecessary.
  */
-void vgm_wait_samples(VGMContext *p_vgmctx, uint16_t samples) {
+int vgm_wait_samples(VGMContext *p_vgmctx, uint16_t samples) {
+    int add_bytes = 0;
     // Skip zero-length waits entirely (verified on real hardware)
     if (samples == 0) {
-        return;
+        return add_bytes;
     }
     uint8_t bytes[3] = {0x61, samples & 0xFF, samples >> 8};
     vgm_buffer_append(&(p_vgmctx->buffer), bytes, 3);
+    add_bytes = 3;
     if (p_vgmctx) {
         p_vgmctx->timestamp.last_sample = p_vgmctx->timestamp.current_sample;
         p_vgmctx->timestamp.current_sample += samples;
         p_vgmctx->status.total_samples += samples;
     } 
+    return add_bytes;
 }
 
 /**
  * Write a wait 1/60s command (0x62) and update status.
  */
-void vgm_wait_60hz(VGMContext *p_vgmctx) {
-    vgm_append_byte(&(p_vgmctx->buffer), 0x62);
+int vgm_wait_60hz(VGMContext *p_vgmctx) {
+    int add_bytes = 0;
+    add_bytes = vgm_append_byte(&(p_vgmctx->buffer), 0x62);
     if (p_vgmctx) {
         p_vgmctx->timestamp.last_sample = p_vgmctx->timestamp.current_sample;
         p_vgmctx->timestamp.current_sample += 735;
         p_vgmctx->status.total_samples += 735;
     }
+    return add_bytes;
 }
 
 /**
  * Write a wait 1/50s command (0x63) and update status.
  */
-void vgm_wait_50hz(VGMContext *p_vgmctx) {
-    vgm_append_byte(&(p_vgmctx->buffer), 0x63);
+int vgm_wait_50hz(VGMContext *p_vgmctx) {
+    int add_bytes = 0;
+    add_bytes = vgm_append_byte(&(p_vgmctx->buffer), 0x63);
     if (p_vgmctx) {
         p_vgmctx->timestamp.last_sample = p_vgmctx->timestamp.current_sample;
         p_vgmctx->timestamp.current_sample += 882;
         p_vgmctx->status.total_samples += 882;
     }
+    return add_bytes;
 }
 
 /**

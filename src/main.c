@@ -124,7 +124,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
         printf(
             "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
             "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--wait <val>]\n"
-            "          [--convert-ymXXXX ...] [--override <overrides.json>]\n"
+            "          [--convert-ymXXXX ...] [--keep_source_vgm] [--override <overrides.json>]\n"
             "          [--strip-non-opl] [--test-tone] [--fast-attack]\n"
             "          [--no-post-keyon-tl] [--single-port]\n"
             "          [--carrier-tl-clamp <val>] [--emergency-boost <val>] [--force-retrigger-each-note]\n"
@@ -139,6 +139,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
             "  --ch_panning <val>         Channel panning mode (0=mono, 1=alternate L/R, ...).\n"
             "  --vr0 <val>                Port0 volume ratio (default: 1.0).\n"
             "  --vr1 <val>                Port1 volume ratio (default: 0.8).\n"
+            "  --keep_source_vgm          Output original vgm command \n"
             "  -o, --output <file>        Output file name (otherwise auto-generated).\n"
             "  --convert-ymXXXX           Explicit chip selection (YM2413, YM3812, YM3526, Y8950).\n"
             "                             (Default: OPL group auto-detection; first OPL chip is converted unless specified)\n"
@@ -190,6 +191,36 @@ static void print_usage(const char *progname, DebugOpts *debug) {
     }
 }
 
+/**
+ * Decode preset string to OPLL_PresetType enum.
+ * Supported values: "YM2413", "VRC7", "YMF281B"
+ * Returns OPLL_PresetType_YM2413 for unknown input.
+ */
+static OPLL_PresetType decode_preset_type(const char *str) {
+    if (!str) return OPLL_PresetType_YM2413;
+    if (strcasecmp(str, "YM2413") == 0) return OPLL_PresetType_YM2413;
+    if (strcasecmp(str, "VRC7") == 0)   return OPLL_PresetType_VRC7;
+    if (strcasecmp(str, "YMF281B") == 0) return OPLL_PresetType_YMF281B;
+    return OPLL_PresetType_YM2413; // default fallback
+}
+
+static int update_is_adding_bytes(VGMContext *vgmctx, uint32_t orig_loop_offset, uint32_t current_addr) {
+    if (orig_loop_offset != 0xFFFFFFFF && current_addr < orig_loop_offset) {
+        vgmctx->status.is_adding_port1_bytes = 1;
+        return 1;
+    } else {
+        vgmctx->status.is_adding_port1_bytes = 0;
+        return 0;
+    }
+}
+
+static void update_loop_start_in_buffer(long read_done_byte, uint32_t orig_loop_address, VGMContext *vgmctx, long *loop_start_in_buffer) {
+    if (orig_loop_address != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
+        *loop_start_in_buffer = vgmctx->buffer.size;
+    }
+}
+
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         DebugOpts debug_opts = {0};
@@ -211,13 +242,17 @@ int main(int argc, char *argv[]) {
     uint8_t carrier_tl_clamp = DEFAULT_CARRIER_TL_CLAMP;
     int emergency_boost_steps= 0; /* Default is disabled */
     bool force_retrigger_each_note = false;
+    bool is_keep_source_vgm = false;
+    OPLL_PresetType preset = OPLL_PresetType_YM2413;
+    const char *preset_str = "YM2413";
+
     // Added: audible-sanity runtime value (if 0, use build-time default)
     uint16_t min_gate_samples        = 8196; // Equivalent to OPLL_MIN_GATE_SAMPLES
     uint16_t pre_keyon_wait_samples  = 16;   // Equivalent to OPLL_PRE_KEYON_WAIT_SAMPLES
     uint16_t min_off_on_wait_samples = 16;   // Equivalent to OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
 
     // Added: Header formatting
-    bool strip_unused_chip_clocks = true;   // Zero unused chip clocks
+    bool strip_unused_chip_clocks = false;   // Zero unused chip clocks
     uint32_t override_opl3_clock  = 0;       // If not 0, override OPL3 clock
     DebugOpts debug_opts = {0};
 
@@ -238,6 +273,8 @@ int main(int argc, char *argv[]) {
             v_ratio0 = atof(argv[++i]);
         } else if ((strcmp(argv[i], "-vr1") == 0 || strcmp(argv[i], "--vr1") == 0) && i + 1 < argc) {
             v_ratio1 = atof(argv[++i]);
+        } else if (strcmp(argv[i], "-k") == 0 || strcmp(argv[i], "--keep_source_vgm") == 0) {
+            is_keep_source_vgm = true;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-verbose") == 0) {
             verbose = true;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -281,6 +318,10 @@ int main(int argc, char *argv[]) {
             } else if (p_creator == NULL || strcmp(p_creator, "eseopl3patcher") == 0) {
                 p_creator = argv[i];
             }
+        } else if ((strcmp(argv[i], "-preset") == 0 || strcmp(argv[i], "--preset") == 0) && i + 1 < argc) {
+            preset_str = argv[++i];
+            preset = decode_preset_type(preset_str);
+            continue;
         }
     }
 
@@ -308,6 +349,8 @@ int main(int argc, char *argv[]) {
         .is_port1_enabled = true,
         .is_voice_zero_clear = false,
         .is_a0_b0_aligned = false,
+        .is_keep_source_vgm = is_keep_source_vgm,
+        .preset = preset,
         .debug = debug_opts
     };
 
@@ -350,17 +393,41 @@ int main(int argc, char *argv[]) {
     }
 
     // Header/data offsets
-    uint32_t vgm_data_offset = (filesize >= 0x34) ? read_le_uint32(p_vgm_data + 0x34) : 0;
-    uint32_t orig_header_size = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
+    // Read DataOffset (0x34) from VGM header
+    uint32_t vgm_data_offset = read_le_uint32(p_vgm_data + 0x34);
+
+    // If DataOffset is 0, adjust to 0x0C (VGM 1.01/1.10 compatibility)
+    // This ensures that actual data starts at 0x40 (0x34 + 0x0C)
+    if (vgm_data_offset == 0) {
+        vgm_data_offset = 0x0C;
+    }
+
+    // Calculate original header size using DataOffset
+    uint32_t orig_header_size = 0x34 + vgm_data_offset;
+
+    // Ensure header size is at least 0x40 bytes (VGM minimum header size)
     if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
-    long data_start = 0x34 + (vgm_data_offset ? vgm_data_offset : 0x0C);
+
+    // Print debug information about header size
+    fprintf(stderr, "orig_header_size: 0x%0x(%d).\n", orig_header_size, orig_header_size);
+
+    // Calculate data start position (where music data begins)
+    long data_start = 0x34 + vgm_data_offset;
+
+    // Print debug information about data start offset
+    fprintf(stderr, "data_start: 0x%0x(%d).\n", data_start, data_start);
+
+    // Validate that data start offset is within file size
     if (data_start >= filesize) {
         fprintf(stderr, "Invalid VGM data offset.\n");
         free(p_vgm_data);
         return 1;
     }
+    // Loop Offset ($1C): Offset from the start of the file to the loop point (relative to $00). The loop point in the data is at ($1C + $04).
     uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
     uint32_t orig_loop_address = (orig_loop_offset != 0xFFFFFFFF) ? (orig_loop_offset + 0x04) : 0;
+    long pre_loop_output_bytes = 0;
+    long loop_start_in_buffer = -1;
 
     // VGMContext setup
     VGMContext vgmctx;
@@ -422,32 +489,21 @@ int main(int argc, char *argv[]) {
 
     memset(&vgmctx.ym2413_user_patch, 0, 8);
 
-    uint32_t additional_bytes = 0;
-    additional_bytes += opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
-    opll_set_program_args(argc, argv);
-    opll_init(&vgmctx, &cmd_opts);
-    opll2opl3_init_scheduler(&vgmctx, &cmd_opts);
+    {
+        int written_bytes = opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
+        pre_loop_output_bytes += written_bytes;
+        opll_set_program_args(argc, argv);
+        opll_init(&vgmctx, &cmd_opts);
+        opll2opl3_init_scheduler(&vgmctx, &cmd_opts);
+    }
 
-    long read_done_byte = data_start;
-    long loop_start_in_buffer = -1;
-    
+    long read_done_byte = data_start; 
     while (read_done_byte < filesize) {
         uint32_t current_addr = read_done_byte; // read_done_byteはdata_startから始まっていればファイル先頭からの位置
+        update_is_adding_bytes(&vgmctx, orig_loop_offset, current_addr);
+        update_loop_start_in_buffer(read_done_byte, orig_loop_address, &vgmctx, &loop_start_in_buffer);
+
         vgmctx.cmd_type = VGMCommandType_Unkown; 
-
-        // input VGMのループオフセット（ファイル先頭からのバイトアドレス）
-        uint32_t orig_loop_offset = read_le_uint32(p_vgm_data + 0x1C);
-
-        // ループ開始位置判定
-        if (orig_loop_offset != 0xFFFFFFFF && current_addr < orig_loop_offset) {
-            vgmctx.status.is_adding_port1_bytes = 1;
-        } else {
-            vgmctx.status.is_adding_port1_bytes = 0;
-        }
-
-        if (orig_loop_offset != 0xFFFFFFFF && read_done_byte == orig_loop_address) {
-            loop_start_in_buffer = vgmctx.buffer.size;
-        }
         uint8_t cmd = p_vgm_data[read_done_byte];
 
         /* OPL-family autodetect */
@@ -485,7 +541,7 @@ int main(int argc, char *argv[]) {
 
         /* YM2413 */
         if (cmd == 0x51) {
-            
+            int written_bytes = 0;
             // Updates the stats
             vgmctx.status.stats.ym2413_write_count++;
             vgmctx.cmd_type = VGMCommandType_RegWrite;
@@ -498,12 +554,13 @@ int main(int argc, char *argv[]) {
             uint8_t val = p_vgm_data[read_done_byte + 2];
             read_done_byte += 3;
             
-            // Inject Original Command
-            vgm_append_byte(&vgmctx.buffer, cmd);
-            vgm_append_byte(&vgmctx.buffer, reg);
-            vgm_append_byte(&vgmctx.buffer, val);
-            if (should_account_addtional_bytes_pre_loop(&(vgmctx.status))) additional_bytes += 3;
-
+            if (cmd_opts.is_keep_source_vgm) {
+                // Inject Original Command
+                written_bytes += vgm_append_byte(&vgmctx.buffer, cmd);
+                written_bytes += vgm_append_byte(&vgmctx.buffer, reg);
+                written_bytes += vgm_append_byte(&vgmctx.buffer, val);
+            }
+            
             #define NEW_VGM_OPLL2OPL3
             #ifndef NEW_VGM_OPLL2OPL3
             if (cmd_opts.debug.verbose)
@@ -534,32 +591,35 @@ int main(int argc, char *argv[]) {
                     additional_bytes += opl3_init(&vgmctx.buffer, &vgmctx.status, &state, FMCHIP_YM2413,&cmd_opts);
                     state.opl3_mode_initialized = true;
                 }
-                opll_write_register(&vgmctx.buffer, &vgmctx, &state,
+                written_bytes += opll_write_register(&vgmctx.buffer, &vgmctx, &state,
                                     reg, val, wait_samples, &cmd_opts);
             } else {
-                forward_write(&vgmctx.buffer, 0, reg, val);
+                written_bytes += forward_write(&vgmctx.buffer, 0, reg, val);
                 if (wait_samples) {
-                    vgm_wait_samples(&vgmctx.buffer, &vgmctx, &vgmctx.status, wait_samples);
+                    written_bytes += vgm_wait_samples(&vgmctx.buffer, &vgmctx, &vgmctx.status, wait_samples);
                 }
             }
             #else
              if (chip_flags.convert_ym2413) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
                     if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
-                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM2413,&cmd_opts);
+                    written_bytes += opl3_init(&vgmctx, FMCHIP_YM2413,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
                 int wait_samples = 0;
                 //fprintf(stderr, "[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
-                opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+                written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
             }
             #endif
-
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             continue;
         }
 
         /* YM3812 */
         if (cmd == 0x5A) {
+            int written_bytes = 0;
             // Updates the stats
             vgmctx.status.stats.ym3812_write_count++;
             vgmctx.cmd_type = VGMCommandType_RegWrite;
@@ -570,18 +630,23 @@ int main(int argc, char *argv[]) {
             read_done_byte += 3;
             if (chip_flags.convert_ym3812) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM3812,&cmd_opts);
+                    written_bytes += opl3_init(&vgmctx, FMCHIP_YM3812,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
+                written_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx, 0, reg, val);
+                written_bytes += forward_write(&vgmctx, 0, reg, val);
+            }
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
             }
             continue;
         }
 
         /* YM3526 */
         if (cmd == 0x5B) {
+            int written_bytes = 0;
             // Updates the stats
             vgmctx.status.stats.ym3526_write_count++;
             vgmctx.cmd_type = VGMCommandType_RegWrite;
@@ -592,18 +657,23 @@ int main(int argc, char *argv[]) {
             read_done_byte += 3;
             if (chip_flags.convert_ym3526) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx, FMCHIP_YM3526,&cmd_opts);
+                    written_bytes += opl3_init(&vgmctx, FMCHIP_YM3526,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
+                written_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx, 0, reg, val);
+                written_bytes += forward_write(&vgmctx, 0, reg, val);
+            }
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
             }
             continue;
         }
 
         /* Y8950 */
         if (cmd == 0x5C) {
+            int written_bytes = 0;
             // Updates the stats
             vgmctx.status.stats.y8950_write_count++;
             vgmctx.cmd_type = VGMCommandType_RegWrite;
@@ -614,45 +684,51 @@ int main(int argc, char *argv[]) {
             read_done_byte += 3;
             if (chip_flags.convert_y8950) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
-                    additional_bytes += opl3_init(&vgmctx, FMCHIP_Y8950,&cmd_opts);
+                    written_bytes += opl3_init(&vgmctx, FMCHIP_Y8950,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                     if (cmd_opts.debug.test_tone) {
                         // Simple additive test tone: mod muted, carrier AR=15 etc.
                         // Port0 only
-                        duplicate_write_opl3(&vgmctx, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
                         // Operator settings (slot 0 carrier path simplified)
-                        duplicate_write_opl3(&vgmctx, 0x20, 0x01, &cmd_opts); // mul=1
-                        duplicate_write_opl3(&vgmctx, 0x40, 0x00, &cmd_opts); // TL=0
-                        duplicate_write_opl3(&vgmctx, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
-                        duplicate_write_opl3(&vgmctx, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
-                        duplicate_write_opl3(&vgmctx, 0xE0, 0x00, &cmd_opts);
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0x20, 0x01, &cmd_opts); // mul=1
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0x40, 0x00, &cmd_opts); // TL=0
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0xE0, 0x00, &cmd_opts);
                         // Set algorithm=1 (additive)
-                        duplicate_write_opl3(&vgmctx, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
                         // FNUM for ~A440 (example fnum=0x15B oct=4) => LSB
-                        duplicate_write_opl3(&vgmctx, 0xA0, 0x5B, &cmd_opts);
-                        duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
-                        vgm_wait_samples(&vgmctx,4410); // 100ms
-                        duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0xA0, 0x5B, &cmd_opts);
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
+                        written_bytes += vgm_wait_samples(&vgmctx,4410); // 100ms
+                        written_bytes += duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
                     }
                 }
-                additional_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
+                written_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {
-                forward_write(&vgmctx, 0, reg, val);
+                written_bytes += forward_write(&vgmctx, 0, reg, val);
+            }
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
             }
             continue;
         }
 
         /* Other OPN-family passthrough */
         if (cmd == 0x52 || cmd == 0x54 || cmd == 0x55 || cmd == 0x56 || cmd == 0x57) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc OPN-like\n"); break; }
-            forward_write(&vgmctx, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
+            written_bytes += forward_write(&vgmctx, 0, p_vgm_data[read_done_byte + 1], p_vgm_data[read_done_byte + 2]);
             read_done_byte += 3;
             continue;
         }
 
         /* Wait process */
         if (cmd >= 0x70 && cmd <= 0x7F) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
             #ifndef NEW_VGM_OPLL2OPL3
 
@@ -664,8 +740,10 @@ int main(int argc, char *argv[]) {
                 int wait_samples = (cmd & 0x0F) + 1;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
-                opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+                if (cmd_opts.debug.verbose) {
+                    fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                }
+                written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
                 vgm_wait_short(&vgmctx, cmd);
@@ -673,9 +751,13 @@ int main(int argc, char *argv[]) {
             read_done_byte += 1;
             #endif
 
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             continue;
         }
         if (cmd == 0x61) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc wait 0x61\n"); break; }
             uint16_t ws = p_vgm_data[read_done_byte + 1] | (p_vgm_data[read_done_byte + 2] << 8);
@@ -687,17 +769,24 @@ int main(int argc, char *argv[]) {
                 int wait_samples = ws;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
-                opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+                if (cmd_opts.debug.verbose) {
+                    fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                }
+                written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
                 vgm_wait_samples(&vgmctx, ws);
             }
         #endif
             read_done_byte += 3;
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             continue;
         }
         if (cmd == 0x62) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
             #ifndef NEW_VGM_OPLL2OPL3
             vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status);
@@ -707,42 +796,60 @@ int main(int argc, char *argv[]) {
                 int wait_samples = 735;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
-                opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+                if (cmd_opts.debug.verbose) {
+                    fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                }
+                written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
-                vgm_wait_60hz(&vgmctx);
+                written_bytes += vgm_wait_60hz(&vgmctx);
             }
             #endif
             read_done_byte += 1;
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             continue;
         }
         if (cmd == 0x63) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
         #ifndef NEW_VGM_OPLL2OPL3
-            vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
+            written_bytes += vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
         #else
             if (vgmctx.source_fmchip == FMCHIP_YM2413) {
                 // Write a wait 1/50s command (0x63) and update status.
                 int wait_samples = 882;
                 uint8_t reg = 0;
                 uint8_t val = 0;
-                fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
-                opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
+                if (cmd_opts.debug.verbose) {
+                    fprintf(stderr, "\n[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                }
+                written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
 
             } else {
-                vgm_wait_50hz(&vgmctx);
+                written_bytes += vgm_wait_50hz(&vgmctx);
             }
         #endif
             read_done_byte += 1;
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             continue;
         }
 
         /* End */
         if (cmd == 0x66) {
+            int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_End;
-            vgm_append_byte(&vgmctx.buffer, 0x66);
+            written_bytes += vgm_append_byte(&vgmctx.buffer, 0x66);
             read_done_byte += 1;
+
+            if (vgmctx.status.is_adding_port1_bytes) {
+                pre_loop_output_bytes += written_bytes;
+            }
             break; /* End reached */
         }
 
@@ -844,12 +951,14 @@ int main(int argc, char *argv[]) {
         vgm_eof_offset_field,
         gd3_offset_field_value,
         data_offset,
-        0x00000171,                // VGM version
-        additional_bytes,          // additional_data_bytes
-        is_adding_port1_bytes,     // is_adding_port1_bytes
-        port1_bytes                // port1_bytes
+        0x00000171,             // VGM version
+        pre_loop_output_bytes  // additional_data_bytes
     );
 
+    if (cmd_opts.is_keep_source_vgm) {
+        cmd_opts.strip_unused_chip_clocks = false;
+    }
+    
     /** Update the clock information in new header */
     vgm_header_postprocess(p_header_buf, &vgmctx, &cmd_opts);
 
@@ -877,14 +986,16 @@ int main(int argc, char *argv[]) {
     printf("[OPL3] Port1 Volume (-vr1 <val>): %.2f%%\n", v_ratio1 * 100);
 
     if (vgmctx.source_fmchip == FMCHIP_YM2413) {
-        printf("[YM2413] Debug Verbose: %s\n", debug_opts.verbose ? "ON" : "OFF");
-        printf("[YM2413] Audible Sanity: %s\n", debug_opts.audible_sanity ? "ON" : "OFF");
-        printf("[YM2413] Emergency Boost: %d \n",  emergency_boost_steps);
-        printf("[YM2413] Force retrigger each note: %s \n",  force_retrigger_each_note? "ON" : "OFF" );
-        printf("[YM2413] Carrier TL Clamp: %s (%u)\n", carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp);
-        printf("[YM2413] Minimum gate duration [samples]:%u \n",min_gate_samples);
-        printf("[YM2413] Minimum gate :%u \n", pre_keyon_wait_samples);
-        printf("[YM2413] Min weight samples:%u \n", min_off_on_wait_samples);
+        //printf("[YM2413] Debug Verbose: %s\n", debug_opts.verbose ? "ON" : "OFF");
+        //printf("[YM2413] Audible Sanity: %s\n", debug_opts.audible_sanity ? "ON" : "OFF");
+        //printf("[YM2413] Emergency Boost: %d \n",  emergency_boost_steps);
+        //printf("[YM2413] Force retrigger each note: %s \n",  force_retrigger_each_note? "ON" : "OFF" );
+        //printf("[YM2413] Carrier TL Clamp: %s (%u)\n", carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp);
+        //printf("[YM2413] Minimum gate duration [samples]:%u \n",min_gate_samples);
+        //printf("[YM2413] Minimum gate :%u \n", pre_keyon_wait_samples);
+        //printf("[YM2413] Min weight samples:%u \n", min_off_on_wait_samples);
+        printf("[YM2413] Preset(-preset): %s\n",preset_str);
+
     }
 
     if (cmd_opts.debug.verbose) {
