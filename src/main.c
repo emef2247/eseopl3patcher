@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
     uint16_t min_off_on_wait_samples = 16;   // Equivalent to OPLL_MIN_OFF_TO_ON_WAIT_SAMPLES
 
     // Added: Header formatting
-    bool strip_unused_chip_clocks = false;   // Zero unused chip clocks
+    bool strip_unused_chip_clocks = true;   // Zero unused chip clocks
     uint32_t override_opl3_clock  = 0;       // If not 0, override OPL3 clock
     DebugOpts debug_opts = {0};
 
@@ -305,6 +305,9 @@ int main(int argc, char *argv[]) {
         .override_opl3_clock = override_opl3_clock,
         .detune_limit = detune_limit,
         .fm_mapping_style = FM_MappingStyle_modern,
+        .is_port1_enabled = true,
+        .is_voice_zero_clear = false,
+        .is_a0_b0_aligned = false,
         .debug = debug_opts
     };
 
@@ -499,7 +502,7 @@ int main(int argc, char *argv[]) {
             vgm_append_byte(&vgmctx.buffer, cmd);
             vgm_append_byte(&vgmctx.buffer, reg);
             vgm_append_byte(&vgmctx.buffer, val);
-            if (opl3_should_account_port1(&(vgmctx.status))) additional_bytes += 3;
+            if (should_account_addtional_bytes_pre_loop(&(vgmctx.status))) additional_bytes += 3;
 
             #define NEW_VGM_OPLL2OPL3
             #ifndef NEW_VGM_OPLL2OPL3

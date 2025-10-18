@@ -87,6 +87,9 @@ typedef struct {
     uint32_t override_opl3_clock;       // 0 以外なら OPL3 clock を上書き
     double detune_limit; // detuneの絶対値
     FM_MappingStyle fm_mapping_style;
+    bool is_port1_enabled;
+    bool is_voice_zero_clear;
+    bool is_a0_b0_aligned;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */

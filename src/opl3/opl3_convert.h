@@ -12,8 +12,6 @@ extern "C" {
 
 /* struct キーワードを外し、typedef 名をそのまま使用 */
 
-bool opl3_should_account_port1(const VGMStatus *p_vstatus);
-
 int opl3_init(
     VGMContext *p_vpmctx,
     FMChipType source_fmchip,

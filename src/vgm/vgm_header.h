@@ -35,6 +35,8 @@ void build_vgm_header(
     uint32_t port1_bytes
 );
 
+bool should_account_addtional_bytes_pre_loop(const VGMStatus *p_vstatus);
+
 /**
  * Sets the YM2413 clock value in the VGM header
  * @param p_header Pointer to the VGM header

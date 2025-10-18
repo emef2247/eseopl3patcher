@@ -162,18 +162,20 @@ int  opll2opl3_emit_reg_write(VGMContext *p_vgmctx, uint8_t addr, uint8_t val, c
     OPLL2OPL3_Scheduler *s = &(p_vgmctx->opll_state.sch);
     uint8_t last_val =  s->last_emitted_reg_val[addr];
     bool first_access = !s->accessed[addr];
-    int addtional_bytes = 0;
+    int additional_bytes = 0;
 
     if (p_opts->debug.verbose) {
         fprintf(stderr, "[EMIT][Reg Write] time=%u addr=%02X val=%02X emit_time=%u\n", (unsigned)s->virtual_time, addr, val, (unsigned)s->emit_time);
     }
    if (first_access || val != last_val) {
-        addtional_bytes += duplicate_write_opl3(p_vgmctx, addr, val, p_opts);
+        int bytes = duplicate_write_opl3(p_vgmctx, addr, val, p_opts);
+        if (should_account_addtional_bytes_pre_loop(&(p_vgmctx->status))) additional_bytes += bytes;
+
         s->accessed[addr] = true;
     }
     s->last_emitted_reg_val[addr] = val;
 
-    return addtional_bytes;
+    return additional_bytes;
 }
 
 void emit_wait(VGMContext *p_vgmctx, uint16_t samples, OPLL2OPL3_Scheduler *s,const CommandOptions *p_opts) {
@@ -323,24 +325,20 @@ static inline void write_opl3_reg(VGMContext *p_vgmctx, uint8_t addr, uint8_t da
     p_vgmctx->opll_state.reg[addr] = data;
 }
 
-static int toTL(int vol, int off) {
+static inline int toTL(int vol, int off) {
     int t = (vol << 2) - off;
     return (t > 0) ? t : 0;
 }
 
-void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
+void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
 {
     if (!p_vp) return;
     memset(p_vp, 0, sizeof(*p_vp));
 
     // --- パッチデータの参照元決定 ---
-    // INST=0: レジスタ0x00〜0x07がユーザーパッチ
-    // INST=1..20: ROMパッチ
-    // それ以外: フォールバックでROMパッチ0
     uint8_t user_patch[8];
     const uint8_t *src = NULL;
     if (inst == 0) {
-        // YM2413 Application Manualに準拠: 0x00〜0x07がユーザーパッチ定義
         for (int i = 0; i < 8; ++i)
             user_patch[i] = p_vgmctx->opll_state.reg[i];
         src = user_patch;
@@ -350,10 +348,14 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
         src = YM2413_VOICES[0];
     }
 
-    if (p_opts && p_opts->debug.verbose) {
-        fprintf(stderr, "[YM2413->OPL3] inst=%d RAW: %02X %02X %02X %02X  %02X %02X %02X %02X\n",
-            inst, src[0],src[1],src[2],src[3],src[4],src[5],src[6],src[7]);
-    }
+    // YM2413のKeyOn/EG型状態取得
+    uint8_t reg30 = p_vgmctx->opll_state.reg[0x30 + ch];
+    uint8_t cur_key = (p_vgmctx->opll_state.reg[0x20 + ch] & 0x10) ? 1 : 0;
+    uint8_t prev_key = (p_vgmctx->opll_state.reg_stamp[0x20 + ch] & 0x10) ? 1 : 0;
+    uint8_t eg_type = (src[1] >> 5) & 1; // キャリアEGT: sustain型(1) or normal型(0)
+
+    // YM2413ボリューム（TL）取得
+    uint8_t ym_tl = reg30 & 0x0F; // 0x30-0x38の下位4bit
 
     // --- Modulator ---
     uint8_t m_am   = (src[0] >> 7) & 1;
@@ -367,7 +369,7 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
     uint8_t m_dr   = src[4] & 0x0F;
     uint8_t m_sl   = (src[6] >> 4) & 0x0F;
     uint8_t m_rr   = src[6] & 0x0F;
-    uint8_t m_ws   = (src[3] >> 3) & 0x01; // Modulator waveform select
+    uint8_t m_ws   = (src[3] >> 3) & 0x01;
 
     // --- Carrier ---
     uint8_t c_am   = (src[1] >> 7) & 1;
@@ -376,14 +378,30 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
     uint8_t c_ksr  = (src[1] >> 4) & 1;
     uint8_t c_mult = src[1] & 0x0F;
     uint8_t c_kl   = (src[3] >> 6) & 0x03;
+    uint8_t c_tl   = src[3] & 0x3F;
     uint8_t c_ar   = (src[5] >> 4) & 0x0F;
     uint8_t c_dr   = src[5] & 0x0F;
     uint8_t c_sl   = (src[7] >> 4) & 0x0F;
     uint8_t c_rr   = src[7] & 0x0F;
-    uint8_t c_ws   = (src[3] >> 4) & 0x01; // Carrier waveform select
+    uint8_t c_ws   = (src[3] >> 4) & 0x01;
 
-    // Feedback
-    uint8_t fb     = src[3] & 0x07;
+    // // キャリア側Release Rate補正（vgm-conv互換: キャリアのみ2倍）
+    // c_rr = c_rr * 2;
+    // if (c_rr > 15) c_rr = 15;
+// 
+    // // KeyOffかつEG型(normal)の場合はRelease Rate=6に強制（vgm-conv特殊ロジック）
+    // if (!cur_key && !eg_type) {
+    //     c_rr = 6;
+    // }
+
+    // フィードバック
+    uint8_t fb = src[3] & 0x07;
+
+    // YM2413の音量をOPL3のTLに変換（vgm-conv互換）
+    // YM2413: 0=最大音量、15=最小音量 → OPL3 TL: 0=最大、63=最小
+    // vgm-convは (ym_tl << 2) で反映
+    uint8_t opl3_tl = ym_tl << 2;
+    if (opl3_tl > 63) opl3_tl = 63;
 
     // --- Conversion tables (vgm-conv compatible) ---
     // Modulator
@@ -392,7 +410,8 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
     p_vp->op[0].egt  = m_egt;
     p_vp->op[0].ksr  = m_ksr;
     p_vp->op[0].mult = m_mult;
-    p_vp->op[0].ksl  = opll2opl_ksl[m_kl];
+    p_vp->op[0].ksl  = m_kl; //opll2opl_ksl[m_kl];
+    // Modulator TLはパッチ値そのまま
     p_vp->op[0].tl   = m_tl;
     p_vp->op[0].ar   = m_ar;
     p_vp->op[0].dr   = m_dr;
@@ -406,8 +425,9 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
     p_vp->op[1].egt  = c_egt;
     p_vp->op[1].ksr  = c_ksr;
     p_vp->op[1].mult = c_mult;
-    p_vp->op[1].ksl  = opll2opl_ksl[c_kl];
-    p_vp->op[1].tl   = 0; // always zero for carrier
+    p_vp->op[1].ksl  = c_kl;//opll2opl_ksl[c_kl];
+    // Carrier TLにYM2413の音量(TL)を反映（vgm-conv方式）
+    p_vp->op[1].tl   = c_tl;
     p_vp->op[1].ar   = c_ar;
     p_vp->op[1].dr   = c_dr;
     p_vp->op[1].sl   = c_sl;
@@ -438,7 +458,7 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, OPL3VoiceParam *p_vp, const
 /**
  * Apply OPL3VoiceParam to a channel.
  */
-int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, const OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
+int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, int mod_volume, int car_volume, bool key, OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
 {
     if (!p_vp || ch < 0 || ch >= 9) return 0;
     int additional_bytes = 0;
@@ -454,13 +474,9 @@ int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, const OPL3VoiceParam *p_
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_mod, opl3_2n_mod, p_opts);
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + slot_car, opl3_2n_car, p_opts);
 
-    // KSL/TL
-    uint8_t inst_tl = p_vp->op[0].tl & 0x0F; // 4bit
-    uint8_t volume  = (p_vgmctx->opll_state.reg[0x30 + ch]) & 0x0F; // 4bit
-    uint8_t opl3_tl = ym2413_to_opl3_tl(inst_tl, volume);
-    //uint8_t opl3_4n_mod = (uint8_t)(((p_vp->op[0].ksl & 0x03) << 6) | (opl3_tl & 0x3F));
-    uint8_t opl3_4n_mod = (uint8_t)(((p_vp->op[0].ksl & 0x03) << 6) | (p_vp->op[0].tl & 0x3F));
-    uint8_t opl3_4n_car = (uint8_t)(((p_vp->op[1].ksl & 0x03) << 6) | (0 & 0x3F)); // キャリアはTL=0
+    // KSL/TL 
+    uint8_t opl3_4n_mod = (uint8_t)((opll2opl_ksl[(p_vp->op[0].ksl & 0x03)] << 6) | ((mod_volume >= 0) ? mod_volume : (p_vp->op[0].tl & 0x3F)));
+    uint8_t opl3_4n_car = (uint8_t)((opll2opl_ksl[(p_vp->op[1].ksl & 0x03)] << 6) | ((car_volume >= 0) ? car_volume : (p_vp->op[1].tl & 0x3F)));
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_mod, opl3_4n_mod, p_opts);
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + slot_car, opl3_4n_car, p_opts);
 
@@ -471,8 +487,8 @@ int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, const OPL3VoiceParam *p_
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + slot_car, opl3_6n_car, p_opts);
 
     // SL/RR
-    uint8_t opl3_8n_mod = (uint8_t)((p_vp->op[0].sl << 4) | (p_vp->op[0].rr & 0x0F));
-    uint8_t opl3_8n_car = (uint8_t)((p_vp->op[1].sl << 4) | (p_vp->op[1].rr & 0x0F));
+    uint8_t opl3_8n_mod = (uint8_t)((p_vp->op[0].sl << 4) | ((!p_vp->op[0].egt) ? (p_vp->op[0].rr & 0x0F) : 0));
+    uint8_t opl3_8n_car = (uint8_t)((p_vp->op[1].sl << 4) | ((p_vp->op[1].egt || key) ? (p_vp->op[1].rr & 0x0F) : 6));
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_mod, opl3_8n_mod, p_opts);
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + slot_car, opl3_8n_car, p_opts);
 
@@ -481,8 +497,8 @@ int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, const OPL3VoiceParam *p_
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, c0_val, p_opts);
 
     // WS
-    uint8_t opl3_en_mod = (uint8_t)((p_vp->op[0].ws & 0x07));
-    uint8_t opl3_en_car = (uint8_t)((p_vp->op[1].ws & 0x07));
+    uint8_t opl3_en_mod = (uint8_t)((p_vp->op[0].ws)? 1 : 0);
+    uint8_t opl3_en_car = (uint8_t)((p_vp->op[1].ws)? 1 : 0);
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_mod, opl3_en_mod, p_opts);
     additional_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + slot_car, opl3_en_car, p_opts);
 
@@ -519,35 +535,38 @@ void opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *
         // リズムモード時はリズム音色適用
         switch (ch) {
             case 6:
-                opll_load_voice(p_vgmctx, 16, &vp, p_opts); // BD
+                opll_load_voice(p_vgmctx, 16, ch, &vp, p_opts); // BD
+                opll2opl3_apply_voice(p_vgmctx, ch, -1 ,toTL(volume, 0), key,&vp, p_opts);
                 break;
             case 7:
-                opll_load_voice(p_vgmctx, 17, &vp, p_opts); // SD/TOM
+                opll_load_voice(p_vgmctx, 17, ch, &vp, p_opts); // SD/TOM
+                opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
             case 8:
-                opll_load_voice(p_vgmctx, 18, &vp, p_opts); // CYM/HH
+                opll_load_voice(p_vgmctx, 18, ch, &vp, p_opts); // CYM/HH
+                opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
         }
-        opll2opl3_apply_voice(p_vgmctx, ch, &vp, p_opts);
     } else if (!rflag && ch >= 6) {
         // リズム解除時はch6/7/8も通常音色に戻す
         int inst_normal = (regs[0x30 + ch] >> 4) & 0x0F;
         if (inst_normal == 0) {
             // User patch
-            opll_load_voice(p_vgmctx, 0, &vp, p_opts);
+            opll_load_voice(p_vgmctx, 0, ch, &vp, p_opts);
+            opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
         } else {
-            opll_load_voice(p_vgmctx, inst_normal, &vp, p_opts);
+            opll_load_voice(p_vgmctx, inst_normal, ch, &vp, p_opts);
+            opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
         }
-        opll2opl3_apply_voice(p_vgmctx, ch, &vp, p_opts);
     } else {
         // 通常のメロディックチャンネル
         int inst_normal = (regs[0x30 + ch] >> 4) & 0x0F;
         if (inst_normal == 0) {
-            opll_load_voice(p_vgmctx, 0, &vp, p_opts);
+            opll_load_voice(p_vgmctx, 0, ch, &vp, p_opts);
         } else {
-            opll_load_voice(p_vgmctx, inst_normal, &vp, p_opts);
+            opll_load_voice(p_vgmctx, inst_normal, ch, &vp, p_opts);
         }
-        opll2opl3_apply_voice(p_vgmctx, ch, &vp, p_opts);
+        opll2opl3_apply_voice(p_vgmctx, ch, -1, toTL(volume, 0), key,&vp, p_opts);
     }
 
     if (p_opts && p_opts->debug.verbose) {
@@ -567,14 +586,48 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
         bool prev_rhythm_mode = p_vgmctx->opll_state.is_rhythm_mode;
         bool now_rhythm_mode  = (val & 0x20) != 0;
 
+         // --- ch6,7,8 operator slot計算関数（例） ---
+        int mod_slots[3] = { opl3_opreg_addr(0, 6, 0), opl3_opreg_addr(0, 7, 0), opl3_opreg_addr(0, 8, 0) };
+        int car_slots[3] = { opl3_opreg_addr(0, 6, 1), opl3_opreg_addr(0, 7, 1), opl3_opreg_addr(0, 8, 1) };
+
         if (now_rhythm_mode && !prev_rhythm_mode) {
             // Rhythm mode enabled （posedge）
+            if (p_opts->is_voice_zero_clear) {
+                for (int i = 0; i < 3; ++i) {
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
+                }
+            }
             p_vgmctx->opll_state.is_rhythm_mode = true;
             opll2opl3_update_voice(p_vgmctx, 6, p_opts); // BD
             opll2opl3_update_voice(p_vgmctx, 7, p_opts); // SD/TOM
             opll2opl3_update_voice(p_vgmctx, 8, p_opts); // CYM/HH
         } else if (!now_rhythm_mode && prev_rhythm_mode) {
             // Rhythm mode disabled（negedge）
+            if (p_opts->is_voice_zero_clear) {
+                for (int i = 0; i < 3; ++i) {
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
+                    opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
+                }
+            }
             p_vgmctx->opll_state.is_rhythm_mode = false;
             opll2opl3_update_voice(p_vgmctx, 6, p_opts);
             opll2opl3_update_voice(p_vgmctx, 7, p_opts);
@@ -582,14 +635,14 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
             // 1. LFO深度=0で1回書く（0xc0 | (val & 0x3f)）
             opll2opl3_emit_reg_write(p_vgmctx, 0xbd, 0xc0 | (val & 0x3f), p_opts);
         } else {
-            // Only update the flag (no edge)
-            p_vgmctx->opll_state.is_rhythm_mode = (val & 0x20) ? true : false;
+                // Only update the flag (no edge)
+                p_vgmctx->opll_state.is_rhythm_mode = (val & 0x20) ? true : false;
         }
-        // 2. LFOデプス値で必ず1回書く（全ケース共通）
+         // 2. LFOデプス値で必ず1回書く（全ケース共通）
         opll2opl3_emit_reg_write(p_vgmctx, 0xbd, (lfoDepth << 6) | (val & 0x3f), p_opts);
         return;
     }
-    /* --- FNUM Low (0x10..0x18) --- */
+        /* --- FNUM Low (0x10..0x18) --- */
     if (reg >= 0x10 && reg <= 0x18) {
         int ch = reg & 0x0F;
         OPLL2OPL3_PendingChannel *p = &(p_vgmctx->opll_state.sch.ch[ch]);
@@ -613,8 +666,8 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
                 p_vgmctx->target_fm_clock,
                 p->block,
                 p->fnum_comb,
-                &dst_fnum,
-                &dst_block);
+            &dst_fnum,
+            &dst_block);
         if (p_opts && p_opts->debug.verbose) {
             fprintf(stderr,
                 "[DEBUG] OPLL→OPL3変換後: dst_block=%u, dst_fnum=0x%03X (dec %u)\n",
@@ -627,12 +680,12 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
         uint8_t reg_bn = ((p_vgmctx->opll_state.reg[0x20 + ch]  & 0x1F) << 1) | ((val & 0x80) >> 7) ;
         uint8_t reg_an = (val & 0x7f) << 1;
 
-         if (p_opts && p_opts->debug.verbose) {
+        if (p_opts && p_opts->debug.verbose) {
             fprintf(stderr,
                 "[DEBUG] reg_bn:0x%02x reg_an:0x%02x\n",reg_bn,reg_an);
         }
-        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
         opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
+        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
         return;
     }
 
@@ -646,58 +699,75 @@ void opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t v
         bool keybit   = (val & 0x10) != 0;
         bool prev_key = p->key_state;
 
-        bool rising_edge  = (!prev_key && keybit);
-        bool falling_edge = (prev_key && !keybit);
-
+        // FNUM/Block/Key update
         p->fnum_high = fhi;
         p->fnum_comb = (uint16_t)((fhi << 8) | (p->last_reg_10 & 0xFF));
         p->block = block;
         p->last_reg_20 = val;
 
-        // KeyOnエッジ（0→1）の場合、まず音色をapply
-        if (rising_edge) {
-            OPL3VoiceParam vp;
-            if (p->voice_id == 0) {
-                opll_load_voice(p_vgmctx, 0, &vp, p_opts);
-            } else {
-                opll_load_voice(p_vgmctx, p->voice_id, &vp, p_opts);
-            }
-            opll2opl3_apply_voice(p_vgmctx, ch, &vp, p_opts);
+        if (p_opts->is_voice_zero_clear) {
+            // 0x20～0x28書き込み時は毎回ゼロクリア＋voice apply（vgm-conv互換）
+            int mod_slot = opl3_opreg_addr(0, ch, 0);
+            int car_slot = opl3_opreg_addr(0, ch, 1);
+
+            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts);
         }
 
-        // ここでA0/B0レジスタ書き込み（KeyOn/KeyOff含む）
-        uint8_t reg_bn = ((val  & 0x1F) << 1) | ((p_vgmctx->opll_state.reg[0x10 + ch] & 0x80) >> 7) ;
-        uint8_t reg_an = (p->last_reg_10 & 0x7f) << 1;
-        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
-        opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
+        opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
+        // KeyOn/KeyOff含むA0/B0レジスタ書き込み（OPLL的なNoteOn/Off反映）
+        uint8_t reg_bn = ((val  & 0x1F) << 1) | ((p_vgmctx->opll_state.reg[0x10 + ch] & 0x80) >> 7);
+        uint8_t reg_an = (p->last_reg_10 & 0x7f) << 1;
+        opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + ch, reg_bn, p_opts);
+        opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + ch, reg_an, p_opts);
         p->key_state = keybit;
         p->has_fnum_high = true;
         return;
     }
 
     /* --- Instrument/Volume (0x30..0x38) --- */
+    // Instrument/Volume (0x30..0x38)
     if (reg >= 0x30 && reg <= 0x38) {
         int ch = reg & 0x0F;
         OPLL2OPL3_PendingChannel *p = &(p_vgmctx->opll_state.sch.ch[ch]);
         uint16_t dst_fnum = (uint16_t)(p->fnum_comb & 0x3FF);
         uint8_t dst_block = p->block & 0x07;
-        
+
         p->last_reg_30 = val;
         p->voice_id = (val >> 4) & 0x0F;
         p->tl = val & 0x0F;
 
-        // 音色変化もflush対象（vgm-convでは_updateVoice）
-        opll2opl3_debug_log(p_vgmctx, "HANDLE", "Instrument/Volume", ch, p_opts);
-        // p->is_pending = true;
-        // flush_channel_ym2413_to_opl(p_vgmctx, p_opts, s, ch);
-        OPL3VoiceParam vp;
-        if (p->voice_id == 0) {
-            opll_load_voice(p_vgmctx, 0, &vp, p_opts);
-        } else {
-            opll_load_voice(p_vgmctx, p->voice_id, &vp, p_opts);
+        if (p_opts->is_voice_zero_clear) {
+            // --- ここからゼロクリア追加 ---
+            // operator slot計算(2op)
+            int mod_slot = opl3_opreg_addr(0, ch, 0);
+            int car_slot = opl3_opreg_addr(0, ch, 1);
+
+            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts); // AM/VIB/EGT/KSR/MULT
+            opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts); // KSL/TL
+            opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts); // AR/DR
+            opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts); // SL/RR
+            opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts); // WS
+            opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
+            opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts); // Feedback/Algo（FM）
         }
-        opll2opl3_apply_voice(p_vgmctx, ch, &vp, p_opts);
+
+        opll2opl3_debug_log(p_vgmctx, "HANDLE", "Instrument/Volume", ch, p_opts);
+        opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
         return;
     }

@@ -142,6 +142,10 @@ void build_vgm_header(
     write_le32(p_header + 0x24, rate_orig);          // Rate
 }
 
+bool should_account_addtional_bytes_pre_loop(const VGMStatus *p_vstatus) {
+        return (p_vstatus && p_vstatus->is_adding_port1_bytes);
+}
+
 /**
  * Set the YM2413 clock value in the VGM header.
  */
