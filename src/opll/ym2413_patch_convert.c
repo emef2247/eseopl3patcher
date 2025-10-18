@@ -1,6 +1,6 @@
 #include <string.h>
 #include <stdio.h>
-#include "../opll/ym2413_voice_rom.h"
+#include "../opll/ym2413_voice_roms.h"
 #include "../opll/nukedopll_voice_rom.h"
 #include "../override_apply.h"
 #include "../override_loader.h"
