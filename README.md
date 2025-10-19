@@ -1,104 +1,106 @@
 # eseopl3patcher
 
-A tool to convert VGM files for YM2413, YM3812, YM3526, Y8950, VRC7, and YMF281B chips into YMF262 (OPL3) VGM files.
+YM2413, YM3812, YM3526, Y8950, VRC7, YMF281Bの VGMファイルを YMF262 (OPL3) VGMファイルに変換するツール
 
 ---
 
-## Overview
+## 概要
 
-`eseopl3patcher` is a command-line tool for converting VGM files supporting OPL chips (YM2413, YM3812, YM3526, Y8950) into OPL3 (YMF262) format.  
-It features chorus/detune effects using OPL3's extended channels, flexible stereo and volume settings, and lets you choose instrument ROMs for YM2413/OPLL conversion (VRC7 and YMF281B supported).
+`eseopl3patcher` は、OPL系音源（YM2413, YM3812, YM3526, Y8950）対応のVGMファイルを、OPL3 (YMF262) フォーマットに変換するコマンドラインツールです。  
+OPL3の拡張チャンネルによるコーラス（デチューン）効果や、柔軟なステレオ/ボリューム設定を特徴とします。  
+YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 
 ---
 
-## Supported Chips
+## サポートチップ
 
-- **YM2413 (OPLL)**
-- **VRC7 (OPLL VRC7 preset)**
-- **YMF281B (OPLLP YMF281B preset)**
+- **YM2413  (OPLL)**
+- **VRC7    (OPLL VRC7プリセット)**
+- **YMF281B (OPLLP YMF281Bプリセット)**
 - **YM3812 (OPL2)**
 - **YM3526 (OPL)**
-- **Y8950 (OPL, ADPCM is not converted)**
-- Supports VGM version 1.50 and newer
+- **Y8950 (OPL, ADPCM部は未変換)**
+- VGM 1.50以降のデータにも対応
 
 ---
 
-## Main Features
+## 主な特徴
 
-- Converts OPL2/OPLL commands to OPL3 (YMF262) commands
-- Detune/chorus effect using OPL3 extended channels (ch9–17)
-- Panning and volume control (`-ch_panning`, `-vr0`, `-vr1`)
-- Selectable instrument ROMs for YM2413 conversion (`--preset`)
-- Automatic GD3 tag generation (conversion info and parameters)
-- Detailed debug mode (`-verbose`)
-- Automatic or manual chip selection when multiple OPL chips are present
-- Flexible conversion control via command-line options
-- **`--keep_source_vgm` option for simultaneous YM2413 and OPL3 playback**
-
----
-
-## Detune and Correction
-
-- `-detune <value>` : Overall detune amount (percent, e.g. `20` → +20%)
-    - Detune curve is automatically adjusted by pitch range: detune is weaker for very high/low notes
-    - Extreme values are clamped by `detune_limit`
-- `-detune_limit <value>` : Maximum detune amount (absolute value, e.g. `4` → limited to ±4)
-    - Prevents unnatural pitch shifts by limiting total detune
+- OPL2/OPLL系コマンドをOPL3(YMF262)コマンドへ変換
+- OPL3の拡張チャンネル（ch9～17）でデチューン・コーラス効果
+- パンニング・ボリューム調整 (`-ch_panning`, `-vr0`, `-vr1`)
+- YM2413変換時に音色ROM（YM2413, VRC7, YMF281B）選択可能（`--preset`）
+- GD3タグ自動生成（変換情報・パラメータ記録）
+- 詳細デバッグモード（`-verbose`）
+- 複数OPL系チップ混在時の自動判定または明示選択
+- コマンドラインオプションによる柔軟な変換制御
+- **YM2413とOPL3の同時演奏を可能にする `--keep_source_vgm` オプション**
 
 ---
 
-## YM2413/OPLL Preset Selection
+## デチューン・補正について
+
+- `-detune <値>` : 全体にかかるデチューン量（パーセント指定、例: `20` → +20%）
+    - 変換時は音域ごとに補正カーブが入り、高音・低音では自動的にデチューンが弱まります
+    - 極端な値（例: `100`）を指定しても、実際の変化量は`detune_limit`で制限されます
+- `-detune_limit <値>` : デチューン変化量の最大値（絶対値、例: `4` → ±4以内に抑制）
+    - デチューンによるピッチずれが不自然にならないよう、上限で安全に制御します
+
+---
+
+## YM2413/OPLL プリセット選択
 
 - `--preset <YM2413|VRC7|YMF281B>`  
-    Choose the instrument ROM for YM2413 (OPLL) conversion. VRC7 and YMF281B presets are supported.
-    - `YM2413`: Original OPLL instrument set (default)
-    - `VRC7`: VRC7 instrument ROM
-    - `YMF281B`: YMF281B compatible ROM
-    - Example: `--preset VRC7`
-    - Has no effect when converting other chips
+    YM2413(OPLL)変換時の楽器ROMを選択できます。コナミVRC7互換やYMF281Bも指定可能。
+    - `YM2413`: オリジナルOPLL音色（デフォルト）
+    - `VRC7`: VRC7音色ROM
+    - `YMF281B`: YMF281B互換ROM
+    - 例: `--preset VRC7`
+    - 他チップ変換には効果なし
 
 ---
 
-## Simultaneous YM2413 and OPL3 Playback (`--keep_source_vgm`)
+## YM2413とOPL3の同時演奏 (`--keep_source_vgm`)
 
 - `--keep_source_vgm`  
-    Available only when converting YM2413 input.  
-    **Retains original YM2413 register commands at the beginning of the output VGM file.**
-    - Enables simultaneous playback on both YM2413 (MSX-MUSIC, etc.) and OPL3 (YMF262) devices
-    - Useful for dual-FM environments such as MSX Music + pseudo-OPL3 RAM, SoundCoreSLOT EX|EXG + pseudo-OPL3 RAM, NanoDrive7, etc.
-    - Normally, YM2413 commands are removed; with this option, both chips can play together
+    YM2413入力時のみ有効なオプションです。  
+    **変換後VGMの先頭に、元のYM2413コマンド（レジスタ書き込み）をそのまま残します。**
+    - これにより「YM2413（MSX-MUSIC等）とOPL3（YMF262）」が同時に鳴らせるVGMデータを生成可能です
+    - MSXのMSX Music + 似非OPL3-RAM、SoundCoreSLOT EX|EXG + 似非OPL3-RAM、NanoDrive7など、  
+      YM2413とOPL3を同時に鳴らせるシステム環境で再生する用途を想定しています
+    - 通常変換ではYM2413コマンドは削除されますが、このオプションで「両方の演奏」を実現できます
 
-    **Use cases:**
-    - Simultaneous VGM output to MSX-MUSIC (YM2413) and OPL3 RAM expansion on MSX
-    - Dual FM playback on NanoDrive7, SoundCoreSLOT EX/EXG, etc.
-    - Mixing both FM chips using VGMPlayer
-
----
-
-## Main Command-line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `<input.vgm>` | Input VGM file | Required |
-| `<detune>` | Detune amount (%; e.g. 20, -8) | Required |
-| `[keyon_wait]` | KeyOn/Off wait time (samples) | 0 |
-| `[creator]` | Creator name (GD3 tag) | eseopl3patcher |
-| `-o <output.vgm>` | Output file name | `<input>OPL3.vgm` |
-| `-ch_panning <0|1>` | Panning mode | 0 |
-| `-vr0 <float>` | Port0 volume ratio | 1.0 |
-| `-vr1 <float>` | Port1 volume ratio | 0.8 |
-| `-detune_limit <float>` | Detune amount limit | 4.0 |
-| `--preset <YM2413|VRC7|YMF281B>` | Instrument ROM for YM2413 conversion | YM2413 |
-| `--keep_source_vgm` | Retain YM2413 commands for simultaneous OPL3 playback | Off |
-| `--convert-ym2413` | Convert only YM2413 | (Auto) |
-| `--convert-ym3812` | Convert only YM3812 | (Auto) |
-| `--convert-ym3526` | Convert only YM3526 | (Auto) |
-| `--convert-y8950` | Convert only Y8950 | (Auto) |
-| `-verbose` | Detailed debug output | Off |
+    **用途例:**
+    - MSXでMSX-MUSIC（YM2413）とOPL3拡張RAMの両方に同じVGMデータを同時出力する
+    - NanoDrive7やSoundCoreSLOT EX/EXG拡張カードでデュアルFM再生
+    - VGMPlayer等で両方のFM音源をミックス再生したい場合
 
 ---
 
-## Usage
+## 主なコマンドラインオプション
+
+| オプション | 説明 | デフォルト |
+|------------|------|------------|
+| `<input.vgm>` | 入力VGMファイル | 必須 |
+| `<detune>` | デチューン値（%指定、例: 20, -8） | 必須 |
+| `[keyon_wait]` | KeyOn/Off待ち時間（サンプル数） | 0 |
+| `[creator]` | クリエイター名（GD3タグ用） | eseopl3patcher |
+| `-o <output.vgm>` | 出力ファイル名 | `<input>OPL3.vgm` |
+| `-ch_panning <0|1>` | パンニングモード | 0 |
+| `-vr0 <float>` | Port0ボリューム比 | 1.0 |
+| `-vr1 <float>` | Port1ボリューム比 | 0.8 |
+| `-detune_limit <float>` | デチューン量の上限 | 4.0 |
+| `--preset <YM2413|VRC7|YMF281B>` | YM2413変換時の音色ROM | YM2413 |
+| `--keep_source_vgm` | YM2413コマンドを残し、OPL3と同時演奏 | 無効 |
+| `--convert-ym2413` | YM2413のみ変換 | (自動判定) |
+| `--convert-ym3812` | YM3812のみ変換 | (自動判定) |
+| `--convert-ym3526` | YM3526のみ変換 | (自動判定) |
+| `--convert-y8950` | Y8950のみ変換 | (自動判定) |
+| `-verbose` | 詳細デバッグ出力 | オフ |
+
+---
+
+## 使い方
 
 ```sh
 eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] \
@@ -108,11 +110,11 @@ eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] \
     [-verbose]
 ```
 
-**Options can appear in any order; only `<input.vgm>` and `<detune>` are required.**
+**オプションは順不同・省略可。必須は`<input.vgm>`と`<detune>`のみ。**
 
 ---
 
-### Examples
+### 使用例
 
 ```sh
 eseopl3patcher song.vgm 20
@@ -126,43 +128,43 @@ eseopl3patcher song.vgm 30 --keep_source_vgm
 
 ---
 
-## Download
+## ダウンロード
 
 [![Download latest release](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
 
-Linux/Windows binaries are available from the [latest release page](https://github.com/emef2247/eseopl3patcher/releases/latest).
+Linux/Windows用バイナリは [最新リリースページ](https://github.com/emef2247/eseopl3patcher/releases/latest) からダウンロードしてください。
 
 ---
 
-## Build
+## ビルド方法
 
 ```sh
 make win
-# or
+# または
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
 
 ---
 
-## VGM Tools Integration
+## VGMツールの取得と連携
 
-For testing and analysis, official VGM tools (`vgm2txt`, `VGMPlay`, etc.) can be automatically downloaded and built into the `tools/` directory:
+テスト・解析用に、`vgm2txt`・`VGMPlay` など公式VGMツールを `tools/` 以下へ自動取得・ビルド可能です。
 
 ```bash
 bash tools/fetch_vgm_tools.sh
 ```
 
-See the `tools/` directory README for details.
+詳細は `tools/` ディレクトリのREADMEを参照。
 
 ---
 
-## License
+## ライセンス
 
 MIT License  
-External tools and code follow their respective licenses.
+各外部ツールはそれぞれのライセンスに従ってください。
 
 ---
 
-## Author
+## 作者
 
 [@emef2247](https://github.com/emef2247)
