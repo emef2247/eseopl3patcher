@@ -1,10 +1,6 @@
 #include <string.h>
 #include <stdio.h>
-#include "../opll/ym2413_voice_rom.h"
-#include "../opll/nukedopll_voice_rom.h"
-#include "../override_apply.h"
-#include "../override_loader.h"
-#include "../compat_bool.h"
+#include "../opll/ym2413_voice_roms.h"
 #include "ym2413_patch_convert.h"
 #include <math.h>
 #include <stdint.h>
@@ -165,8 +161,7 @@ void ym2413_patch_to_opl3_with_fb(int inst,
     /* ソース選択 */
     const uint8_t *src;
     if (inst == 0 && p_ym2413_regs)         src = p_ym2413_regs;
-    else if (inst >= 1 && inst <= 15)       src = YM2413_VOICES[inst - 1];
-    else if (inst >= 16 && inst <= 20)      src = YM2413_RHYTHM_VOICES[inst - 16];
+    else if (inst >= 1 && inst <= 20)       src = YM2413_VOICES[inst - 1];
     else                                    src = YM2413_VOICES[0];
 
     if (p_opts && p_opts->debug.verbose) {

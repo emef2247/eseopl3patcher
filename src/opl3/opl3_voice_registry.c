@@ -1,4 +1,5 @@
 #include <stddef.h>                 /* NULL */
+#include <stdio.h> 
 #include "opl3_voice_registry.h"
 #include "opl3_voice.h"             /* opl3_voice_db_find_or_add */
 #include "../opll/ym2413_patch_convert.h"
@@ -13,6 +14,7 @@
  */
 void opl3_register_all_ym2413(OPL3VoiceDB *db, const CommandOptions *opts) {
     if (!db) return;
+    printf("opl3_register_all_ym2413\n");
 
     for (int inst = 1; inst <= 15; ++inst) {
         OPL3VoiceParam vp;

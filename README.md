@@ -1,121 +1,138 @@
 # eseopl3patcher
 
-A tool to convert OPL2/OPL chips (YM3812, YM3526, Y8950) VGM files to YMF262 (OPL3) VGM files
+A tool to convert VGM files for YM2413, YM3812, YM3526, Y8950, VRC7, and YMF281B chips into YMF262 (OPL3) VGM files.
+
+---
 
 ## Overview
 
-eseopl3patcher is a command-line tool that converts VGM files made for the OPL2/OPL family sound chips (YM3812, YM3526, Y8950) to OPL3 (YMF262) format. It utilizes the OPL3’s extra channels, adding detuned voices for a chorus effect, and provides flexible stereo and volume options.
+`eseopl3patcher` is a command-line tool for converting VGM files supporting OPL chips (YM2413, YM3812, YM3526, Y8950) into OPL3 (YMF262) format.  
+It features chorus/detune effects using OPL3's extended channels, flexible stereo and volume settings, and lets you choose instrument ROMs for YM2413/OPLL conversion (VRC7 and YMF281B supported).
 
-## Supported Input Chips
+---
 
+## Supported Chips
+
+- **YM2413 (OPLL)**
+- **VRC7 (OPLL VRC7 preset)**
+- **YMF281B (OPLLP YMF281B preset)**
 - **YM3812 (OPL2)**
 - **YM3526 (OPL)**
-- **Y8950 (OPL, ADPCM support not converted)**
+- **Y8950 (OPL, ADPCM is not converted)**
+- Supports VGM version 1.50 and newer
 
-You can now use VGM files targeting any of these chips as input for conversion.
+---
 
-## Features
+## Main Features
 
-- Converts YM3812 (OPL2), YM3526 (OPL), and Y8950 commands to OPL3 (YMF262) commands
-- Applies detuning to the OPL3 extra channels (channels 9–17)
-- Channel panning options for flexible channel panning (see `-ch_panning`)
-- Independent volume ratio control for Port 0 and Port 1 (see `-vr0` and `-vr1`)
-- Verbose mode for detailed debug output (see `-verbose`)
-- Verbose mode for detailed debug output (see `-verbose`)
-- Automatically appends conversion info and operator information to the GD3 tag
-- Simple and flexible command-line usage (argument order is flexible)
-- **Auto-detects which OPL chip to convert if multiple are present, or allows explicit selection via command line**
+- Converts OPL2/OPLL commands to OPL3 (YMF262) commands
+- Detune/chorus effect using OPL3 extended channels (ch9–17)
+- Panning and volume control (`-ch_panning`, `-vr0`, `-vr1`)
+- Selectable instrument ROMs for YM2413 conversion (`--preset`)
+- Automatic GD3 tag generation (conversion info and parameters)
+- Detailed debug mode (`-verbose`)
+- Automatic or manual chip selection when multiple OPL chips are present
+- Flexible conversion control via command-line options
+- **`--keep_source_vgm` option for simultaneous YM2413 and OPL3 playback**
 
-## Input Parameters
+---
 
-- VGM file (YM3812/OPL2/YM3526/Y8950 format)
-- Detune value (percentage, e.g. `2.5` means +2.5% detune, `-1` means -1% detune)
-    - Specify the detune value as a percentage. For example: `2.5` = 2.5%, `-1` = -1%.
-- KeyOn wait (integer, e.g. `1`). Optional. (Default: `0`)
-- Creator string (the string specified here will be appended to the GD3 Creator field). Optional. (Default: `eseopl3patcher`)
-- Output file name (`-o output.vgm`). Optional. (Default: `<input>OPL3.vgm`)
-- Channel panning mode (`-ch_panning 0|1`). Optional. (Default: `0`)
-    - `0`: Port 0 (ch0–ch8) outputs to Left, Port 1 (ch9–ch17) outputs to Right
-    - `1`: Even channels and odd channels are alternately panned to L/R for stereo effect
-- Port 0 volume ratio (`-vr0 <float>`). Optional. (Default: `1.0`)
-    - Sets the volume ratio for Port 0 (1.0 = 100%, 0.6 = 60%, etc.)
-- Port 1 volume ratio (`-vr1 <float>`). Optional. (Default: `0.6`)
-    - Sets the volume ratio for Port 1 (1.0 = 100%, 0.6 = 60%, etc.)
-- Verbose mode (`-verbose`). Optional. (Default: off)
-    - Enables detailed debug and operator parameter messages during conversion.
+## Detune and Correction
 
-### Explicit OPL Chip Selection
+- `-detune <value>` : Overall detune amount (percent, e.g. `20` → +20%)
+    - Detune curve is automatically adjusted by pitch range: detune is weaker for very high/low notes
+    - Extreme values are clamped by `detune_limit`
+- `-detune_limit <value>` : Maximum detune amount (absolute value, e.g. `4` → limited to ±4)
+    - Prevents unnatural pitch shifts by limiting total detune
 
-By default, if multiple OPL-family chips are present, the tool automatically detects and converts the first chip encountered in the VGM data (YM3812, YM3526, or Y8950).  
-If you want to explicitly select which chip(s) to convert, add one or more of the following options:
+---
 
-- `--convert-ym3812` : Convert YM3812 commands
-- `--convert-ym3526` : Convert YM3526 commands
-- `--convert-y8950`  : Convert Y8950 commands
+## YM2413/OPLL Preset Selection
 
-### About Detune Value (+/- specification)
+- `--preset <YM2413|VRC7|YMF281B>`  
+    Choose the instrument ROM for YM2413 (OPLL) conversion. VRC7 and YMF281B presets are supported.
+    - `YM2413`: Original OPLL instrument set (default)
+    - `VRC7`: VRC7 instrument ROM
+    - `YMF281B`: YMF281B compatible ROM
+    - Example: `--preset VRC7`
+    - Has no effect when converting other chips
 
-- You can specify positive or negative values for the detune value.
-    - A positive value (e.g., `2.5`) will raise the pitch of the detuned voices.
-    - A negative value (e.g., `-2.5`) will lower the pitch of the detuned voices.
-- Example values:
-    - `2.5` … Adds +2.5% to the FNumber (higher pitch)
-    - `-2.5` … Subtracts -2.5% from the FNumber (lower pitch)
+---
 
-> **The sign of the detune value determines whether the pitch after conversion is raised or lowered. Specify according to your needs.**
+## Simultaneous YM2413 and OPL3 Playback (`--keep_source_vgm`)
 
-### About Channel panning, Volume Ratio, and Verbose Mode
-### About Channel panning, Volume Ratio, and Verbose Mode
+- `--keep_source_vgm`  
+    Available only when converting YM2413 input.  
+    **Retains original YM2413 register commands at the beginning of the output VGM file.**
+    - Enables simultaneous playback on both YM2413 (MSX-MUSIC, etc.) and OPL3 (YMF262) devices
+    - Useful for dual-FM environments such as MSX Music + pseudo-OPL3 RAM, SoundCoreSLOT EX|EXG + pseudo-OPL3 RAM, NanoDrive7, etc.
+    - Normally, YM2413 commands are removed; with this option, both chips can play together
 
-- `-ch_panning 0` (default): Port 0 outputs to Left, Port 1 outputs to Right. Useful for clearly checking the detuned sound (Port 1) isolated in the Right channel.
-- `-ch_panning 1`: Channels are alternately panned L/R for a full stereo effect.
-- You can adjust the volume balance between Port 0 and Port 1 using `-vr0` and `-vr1`.
-    - For example, to make the detuned (Port 1) sound less prominent, set `-vr1 0.6`.
-    - To clearly hear the chorus effect, use `-ch_panning 0` and adjust `-vr1` as needed.
+    **Use cases:**
+    - Simultaneous VGM output to MSX-MUSIC (YM2413) and OPL3 RAM expansion on MSX
+    - Dual FM playback on NanoDrive7, SoundCoreSLOT EX/EXG, etc.
+    - Mixing both FM chips using VGMPlayer
+
+---
+
+## Main Command-line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `<input.vgm>` | Input VGM file | Required |
+| `<detune>` | Detune amount (%; e.g. 20, -8) | Required |
+| `[keyon_wait]` | KeyOn/Off wait time (samples) | 0 |
+| `[creator]` | Creator name (GD3 tag) | eseopl3patcher |
+| `-o <output.vgm>` | Output file name | `<input>OPL3.vgm` |
+| `-ch_panning <0|1>` | Panning mode | 0 |
+| `-vr0 <float>` | Port0 volume ratio | 1.0 |
+| `-vr1 <float>` | Port1 volume ratio | 0.8 |
+| `-detune_limit <float>` | Detune amount limit | 4.0 |
+| `--preset <YM2413|VRC7|YMF281B>` | Instrument ROM for YM2413 conversion | YM2413 |
+| `--keep_source_vgm` | Retain YM2413 commands for simultaneous OPL3 playback | Off |
+| `--convert-ym2413` | Convert only YM2413 | (Auto) |
+| `--convert-ym3812` | Convert only YM3812 | (Auto) |
+| `--convert-ym3526` | Convert only YM3526 | (Auto) |
+| `--convert-y8950` | Convert only Y8950 | (Auto) |
+| `-verbose` | Detailed debug output | Off |
+
+---
 
 ## Usage
 
 ```sh
-eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] [-verbose] [--convert-ym3812] [--convert-ym3526] [--convert-y8950]
+eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] \
+    [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] \
+    [-detune_limit <float>] [--preset <YM2413|VRC7|YMF281B>] \
+    [--keep_source_vgm] [--convert-ym2413] [--convert-ym3812] [--convert-ym3526] [--convert-y8950] \
+    [-verbose]
 ```
 
-- `<input.vgm>` : VGM file to convert (YM3812/OPL2/YM3526/Y8950 format)
-- `<detune>` : Detune value (percentage, e.g. `2.5` for +2.5%, `-1` for -1%)
-- `[keyon_wait]` : KeyOn wait (integer, optional, default: 0)
-- `[creator]` : Creator string (optional, default: "eseopl3patcher")
-- `[-o output.vgm]` : Output file name (optional, autogenerated if omitted)
-- `[-ch_panning 0|1]` : Channel panning mode 0:OFF 1:ON (optional, default: 0)
-- `[-vr0 <float>]` : Port 0 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 1.0)
-- `[-vr1 <float>]` : Port 1 volume ratio (float ≤ 1.0; 1.0 means 100%) (optional, default: 0.6)
-- `[-verbose]` : Enable verbose debug output (optional)
-- `[--convert-ym3812]`, `[--convert-ym3526]`, `[--convert-y8950]` : Explicitly select which OPL chip(s) to convert (optional)
+**Options can appear in any order; only `<input.vgm>` and `<detune>` are required.**
 
-You can specify `[keyon_wait]`, `[creator]`, `-o output.vgm`, `-ch_panning`, `-vr0`, `-vr1`, `-verbose`, and `--convert-ymXXXX` in any order after `<input.vgm>` and `<detune>`.
+---
 
-**Examples:**
+### Examples
+
 ```sh
-eseopl3patcher song.vgm -1
-eseopl3patcher song.vgm 2.5 1
-eseopl3patcher song.vgm -1 2 YourName
-eseopl3patcher song.vgm -1 YourName
-eseopl3patcher song.vgm -1 -o output.vgm
-eseopl3patcher song.vgm 1.5 0 YourName -o output.vgm
-eseopl3patcher song.vgm -1 -o output.vgm YourName
-eseopl3patcher song.vgm 1.5 -ch_panning 1 -vr0 1.0 -vr1 0.5
+eseopl3patcher song.vgm 20
+eseopl3patcher song.vgm 100 -o song_OPL3.vgm -ch_panning 1 -detune_limit 4
+eseopl3patcher song.vgm 25 --preset VRC7
+eseopl3patcher song.vgm 15 --convert-ym3526 --preset YMF281B
 eseopl3patcher song.vgm 2.5 -vr1 0.8
-eseopl3patcher song.vgm 2.5 -verbose
-eseopl3patcher song.vgm 2.5 -ch_panning 1 -verbose -vr1 0.7
-eseopl3patcher song.vgm 2.5 --convert-ym3526
-eseopl3patcher song.vgm 2.5 --convert-y8950 --convert-ym3526
+eseopl3patcher song.vgm -8 -ch_panning 1 -verbose
+eseopl3patcher song.vgm 30 --keep_source_vgm
 ```
 
-For Japanese README, see [here](https://github.com/emef2247/eseopl3patcher/blob/main/README.ja.md#使い方)
+---
 
 ## Download
 
-[![Download for Linux and Windows](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
+[![Download latest release](https://img.shields.io/github/v/release/emef2247/eseopl3patcher?label=Download%20latest%20release)](https://github.com/emef2247/eseopl3patcher/releases/latest)
 
-You can download pre-built binaries for **Linux** and **Windows** from the [latest release page](https://github.com/emef2247/eseopl3patcher/releases/latest).
+Linux/Windows binaries are available from the [latest release page](https://github.com/emef2247/eseopl3patcher/releases/latest).
+
+---
 
 ## Build
 
@@ -124,24 +141,28 @@ make win
 # or
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
-### Equivalence Tests (YM2413 → OPL3)
 
-We include a regression suite under `tests/equiv/`:
-- Run: `make test-equivalence`
-- Initialize (first time): `make baseline-init`
-- Update after intentional converter changes: `make baseline-update`
-- Default detune: `0` (can override via `TEST_DETUNE=...`)
-- Extra converter args: `TEST_EXTRA_ARGS="--convert-ym2413"`
+---
 
-Transient dirs: `out_new/`, `logs/`, `txt/` (gitignored).
-Baseline outputs are committed to allow immediate verification after clone.
+## VGM Tools Integration
 
-To enable textual diffs, install `vgm2txt` and ensure it is in `$PATH`.
+For testing and analysis, official VGM tools (`vgm2txt`, `VGMPlay`, etc.) can be automatically downloaded and built into the `tools/` directory:
 
-## Author
+```bash
+bash tools/fetch_vgm_tools.sh
+```
 
-Created by [@emef2247](https://github.com/emef2247)
+See the `tools/` directory README for details.
+
+---
 
 ## License
 
-MIT License
+MIT License  
+External tools and code follow their respective licenses.
+
+---
+
+## Author
+
+[@emef2247](https://github.com/emef2247)

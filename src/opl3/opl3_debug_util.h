@@ -3,7 +3,6 @@
 
 #include "../vgm/vgm_helpers.h"   /* FMChipType / CommandOptions */
 #include "opl3_state.h"
-#include "../compat_bool.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -32,9 +32,7 @@ static uint32_t calculate_new_loop_offset(
     uint32_t orig_loop_offset,
     uint32_t orig_header_size,
     uint32_t new_header_size,
-    uint32_t additional_data_bytes,
-    bool is_adding_port1_bytes,
-    uint32_t port1_bytes
+    uint32_t pre_loop_output_bytes
 ) {
     // No loop
     if (orig_loop_offset == 0xFFFFFFFF) {
@@ -48,12 +46,8 @@ static uint32_t calculate_new_loop_offset(
         new_loop_offset -= (orig_header_size - new_header_size);
     }
     // Add additional data bytes before loop
-    if (additional_data_bytes > 0) {
-        new_loop_offset += additional_data_bytes;
-    }
-    // Add Port1 bytes if flagged
-    if (is_adding_port1_bytes && port1_bytes > 0) {
-        new_loop_offset += port1_bytes;
+    if (pre_loop_output_bytes > 0) {
+        new_loop_offset = pre_loop_output_bytes;
     }
     return new_loop_offset;
 }
@@ -69,7 +63,7 @@ static uint32_t calculate_new_loop_offset(
  * @param gd3_offset              GD3 offset for VGM header (0x14).
  * @param data_offset             Data offset for VGM header (0x34).
  * @param version                 VGM version (0x08).
- * @param additional_data_bytes   Extra bytes inserted before data (e.g., instrument blocks).
+ * @param pre_loop_output_bytes   Data bytes inserted before data (e.g., instrument blocks).
  * @param is_adding_port1_bytes   Whether Port1 copy bytes should be included in loop offset.
  * @param port1_bytes             Number of bytes to add for Port1 copy, if applicable.
  */
@@ -81,14 +75,16 @@ void build_vgm_header(
     uint32_t gd3_offset,
     uint32_t data_offset,
     uint32_t version,
-    uint32_t additional_data_bytes,
-    bool is_adding_port1_bytes,
-    uint32_t port1_bytes
+    uint32_t pre_loop_output_bytes
 ) {
     uint32_t orig_data_offset = 0;
     uint32_t orig_header_size = VGM_HEADER_SIZE;
     if (p_orig_vgm_header) {
         orig_data_offset = read_le32(p_orig_vgm_header + 0x34);
+        printf("orig_data_offset:%d(0x%x)\n",orig_data_offset,orig_data_offset);
+        if (orig_data_offset== 0 ) {
+            orig_data_offset = 0xC;
+        }
         orig_header_size = 0x34 + orig_data_offset;
         if (orig_header_size < 0x40) orig_header_size = VGM_HEADER_SIZE;
     }
@@ -132,14 +128,15 @@ void build_vgm_header(
         loop_offset_orig,
         orig_header_size,
         new_header_size,
-        additional_data_bytes,
-        is_adding_port1_bytes,
-        port1_bytes
-    );
+        pre_loop_output_bytes);
 
     write_le32(p_header + 0x1C, new_loop_offset);    // Loop offset
     write_le32(p_header + 0x20, loop_samples_orig);  // Loop samples
     write_le32(p_header + 0x24, rate_orig);          // Rate
+}
+
+bool should_account_addtional_bytes_pre_loop(const VGMStatus *p_vstatus) {
+        return (p_vstatus && p_vstatus->is_adding_port1_bytes);
 }
 
 /**

@@ -1,6 +1,6 @@
 #include "opl3_convert.h"
 #include "opl3_voice.h"
-#include "../opll/opll_to_opl3_wrapper.h"
+#include "../opll/opll_state.h"
 #include "../vgm/vgm_helpers.h"
 #include "../vgm/vgm_header.h"       /* OPL3_CLOCK */
 #include <math.h>
@@ -26,12 +26,8 @@ static void opl3_debug_log(const CommandOptions *opts, const char *fmt, ...) {
     va_end(args);
 }
 
-static inline bool opl3_should_account_port1(const VGMStatus *p_vstatus) {
-        return (p_vstatus && p_vstatus->is_adding_port1_bytes);
-}
-
 struct OPL3State;
-void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune,
+void detune_if_fm(VGMContext *p_vpmctx, int ch, uint8_t regA, uint8_t regB, double detune,
                   uint8_t *p_outA, uint8_t *p_outB, const CommandOptions *p_opts);
 
 static inline int reg_is_An(uint8_t r){ return (r & 0xF0) == 0xA0 && (r & 0x0F) <= 0x08; }
@@ -266,12 +262,14 @@ static uint8_t apply_tl_with_ratio(uint8_t orig_val, double v_ratio) {
  * Write a value to the OPL3 register mirror and update internal state flags.
  * Always writes to the register mirror (reg[]). Also writes to VGMBuffer.
  */
-void opl3_write_reg(OPL3State *p_state, VGMBuffer *p_music_data, int port, uint8_t reg, uint8_t value) {
+int opl3_write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value) {
     int reg_addr = reg + (port ? 0x100 : 0x000);
-    p_state->reg_stamp[reg_addr] = p_state->reg[reg_addr];
-    p_state->reg[reg_addr] = value;
+    int add_bytes = 0;
+    p_vpmctx->opl3_state.reg_stamp[reg_addr] = p_vpmctx->opl3_state.reg[reg_addr];
+    p_vpmctx->opl3_state.reg[reg_addr] = value;
     // Write to VGM stream
-    forward_write(p_music_data, port, reg, value);
+    add_bytes = forward_write(p_vpmctx, port, reg, value);
+    return add_bytes;
 }
 
 // fnum_min より下はscale=1.0。fnum_maxより上はscale=min_scale。
@@ -328,9 +326,9 @@ double get_detune_scale(int block, uint16_t fnum) {
     return scale;
 }
 
-void detune_if_fm(OPL3State *p_state, int ch, uint8_t regA, uint8_t regB, double detune_percent, uint8_t *p_outA, uint8_t *p_outB,const CommandOptions *p_opts) {
+void detune_if_fm(VGMContext *p_vpmctx, int ch, uint8_t regA, uint8_t regB, double detune_percent, uint8_t *p_outA, uint8_t *p_outB,const CommandOptions *p_opts) {
     // Rhythm channels (6,7,8 and 15,16,17) are not detuned in rhythm mode
-    if ((ch >= 6 && ch <= 8 && p_state->rhythm_mode) || (ch >= 15 && ch <= 17 && p_state->rhythm_mode)) {
+    if ((ch >= 6 && ch <= 8 && p_vpmctx->opl3_state.rhythm_mode) || (ch >= 15 && ch <= 17 && p_vpmctx->opl3_state.rhythm_mode)) {
         *p_outA = regA;
         *p_outB = regB;
         return;
@@ -380,9 +378,8 @@ uint8_t opl3_make_keyoff(uint8_t val) {
 
 
 
-int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
-    VGMStatus *p_vstat,
-    OPL3State *p_state,
+int opl3_write_block_fnum_key (
+    VGMContext *p_vpmctx,
     uint8_t    ch,
     uint8_t    block,
     uint16_t   fnum,
@@ -394,9 +391,9 @@ int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
     uint8_t value_b = ((fnum >> 8) & 0x03) | (block << 2) | (keyon ? 0x20 : 0x00);
 
     // Write FNUM LSB (A0..A8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xA0 + ch, value_a, opts);
+    bytes_written += duplicate_write_opl3(p_vpmctx, 0xA0 + ch, value_a, opts);
     // Write FNUM MSB (B0..B8)
-    bytes_written += duplicate_write_opl3(p_music_data, p_vstat, p_state, 0xB0 + ch, value_b, opts);
+    bytes_written += duplicate_write_opl3(p_vpmctx, 0xB0 + ch, value_b, opts);
     return bytes_written;
 }
 
@@ -405,216 +402,242 @@ int opl3_write_block_fnum_key (VGMBuffer *p_music_data,
  * Returns the number of additional bytes written (beyond the initial 3-byte write).
  */
 int duplicate_write_opl3(
-    VGMBuffer *p_music_data,
-    VGMStatus *p_vstatus,
-    OPL3State *p_state,
+    VGMContext *p_vpmctx,
     uint8_t reg, uint8_t val, const CommandOptions *p_opts
     // double detune, int opl3_keyon_wait, int ch_panning, double v_ratio0, double v_ratio1
 ) {
     int addtional_bytes = 0;
     if (reg == 0x01 || reg == 0x02 || reg == 0x03 || reg == 0x04) {
         // Write only to port 0
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
     } else if (reg == 0x05) {
         // Handle mode register (only port 1)
         // Always OPL3 mode
-        p_state->opl3_mode_initialized = (val & 0x01) != 0;
-        opl3_write_reg(p_state, p_music_data, 1, 0x05, val & 0x1);
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        p_vpmctx->opl3_state.opl3_mode_initialized = (val & 0x01) != 0;
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0x05, val & 0x1);
+        }
 
         // Update port 1 reg
         int port_1_reg_addr = reg + 0x100;
-        p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-        p_state->reg[port_1_reg_addr] = val;
+        p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+        p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
     } else if (reg >= 0x40 && reg <= 0x55) {
         int ch = reg - 0x40;
 
         uint8_t val0 = apply_tl_with_ratio(val, p_opts->v_ratio0);
-        opl3_write_reg(p_state, p_music_data, 0, reg, val0);
-        if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val0);
+        if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
             uint8_t val1 = apply_tl_with_ratio(val, p_opts->v_ratio1);
-            opl3_write_reg(p_state, p_music_data, 1, reg, val1);
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val1);
+            }
+            
             // Update port 1 reg
             int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
             opl3_debug_log(p_opts, "[OPL3] Write reg=%02X val=%02X ch=%d (port0/port1)\n", reg, val, ch);
         }
     } else if (reg >= 0x60 && reg <= 0x75) {
         int ch = reg - 0x60;
 
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, val); 
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
+        if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val); 
+            }
 
             // Update port 1 reg
             int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
         }
         opl3_debug_log(p_opts, "[OPL3] Write reg=%02X val=%02X ch=%d (60h block)\n", reg, val, ch);
     } else if (reg >= 0x80 && reg <= 0x95) {
         int ch = reg - 0x80;
 
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, val); 
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
+        if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val); 
+            }
 
             // Update port 1 reg
             int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
         }
         opl3_debug_log(p_opts, "[OPL3] Write reg=%02X val=%02X ch=%d (80h block)\n", reg, val, ch);
     } else if (reg >= 0xA0 && reg <= 0xA8) {
         // Only write port0 for A0..A8
         int ch = reg - 0xA0;
 
-        // KeyOn判定
-        uint8_t keyon = (p_state->reg[0xB0 + ch]) & 0x20;
+        if(p_opts->is_a0_b0_aligned) {
+            // KeyOn判定
+            uint8_t keyon = (p_vpmctx->opl3_state.reg[0xB0 + ch]) & 0x20;
+            if (keyon) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, val);
+                if (p_opts->is_port1_enabled) {
+                    addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, val); 
+                }
 
-        if (keyon) {
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, val);
-            opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, val); 
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-
-            // Update port 1 reg
-            int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
-            opl3_debug_log(p_opts, "[SEQ0] ch=%d %s A=%02X (rhythm=%d) port0: A(%02X)\n",
-                ch, (keyon) ? "KeyOn" : "KeyOff", val, p_state->rhythm_mode, val);
+                // Update port 1 reg
+                int port_1_reg_addr = reg + 0x100;
+                p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
+                opl3_debug_log(p_opts, "[SEQ0] ch=%d %s A=%02X (rhythm=%d) port0: A(%02X)\n",
+                    ch, (keyon) ? "KeyOn" : "KeyOff", val, p_vpmctx->opl3_state.rhythm_mode, val);
+            } else {
+                // Only update the register buffer (No dump to vgm)
+                p_vpmctx->opl3_state.reg_stamp[reg] = p_vpmctx->opl3_state.reg[reg];
+                p_vpmctx->opl3_state.reg[reg] = val;
+            }
         } else {
-            // Only update the register buffer (No dump to vgm)
-            p_state->reg_stamp[reg] = p_state->reg[reg];
-            p_state->reg[reg] = val;
+            addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, val);
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, val); 
+            }
         }
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         // Write B0 (KeyOn/Block/FnumMSB) and handle detune
         // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
         int ch = reg - 0xB0;
-        uint8_t A_lsb = p_state->reg[0xA0 + ch];
+        uint8_t A_lsb = p_vpmctx->opl3_state.reg[0xA0 + ch];
 
         // KeyOn判定
-        uint8_t prev_val = p_state->reg_stamp[reg];
+        uint8_t prev_val = p_vpmctx->opl3_state.reg_stamp[reg];
         uint8_t keyon_prev = prev_val & 0x20;
         uint8_t keyon_new  = val & 0x20;
 
         if (!keyon_prev && keyon_new) {
-            // KeyOff -> KeyOn（posedge）：A>B
-            opl3_debug_log(p_opts, "[SEQ0] ch=%d KeyOff -> KeyOn A=%02X B=%02X (rhythm=%d) port0: A(%02X)->B(%02X)\n",
-                ch, A_lsb, val, p_state->rhythm_mode, A_lsb, val);
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
-            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+            if(p_opts->is_a0_b0_aligned) {
+                // KeyOff -> KeyOn（posedge）：A>B
+                opl3_debug_log(p_opts, "[SEQ0] ch=%d KeyOff -> KeyOn A=%02X B=%02X (rhythm=%d) port0: A(%02X)->B(%02X)\n",
+                    ch, A_lsb, val, p_vpmctx->opl3_state.rhythm_mode, A_lsb, val);
+                addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, A_lsb);
+            }
+            addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xB0 + ch, val);
         } else if (keyon_prev && !keyon_new) {
-            // KeyOn -> KeyOff（negedge）：B>A
-            opl3_debug_log(p_opts, "[SEQ0] ch=%d KeyOn -> KeyOff A=%02X B=%02X (rhythm=%d) port0: B(%02X)->A(%02X)\n",
-                ch, A_lsb, val, p_state->rhythm_mode, val, A_lsb);
-            opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-            opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
+            if(p_opts->is_a0_b0_aligned) {
+                // KeyOn -> KeyOff（negedge）：B>A
+                opl3_debug_log(p_opts, "[SEQ0] ch=%d KeyOn -> KeyOff A=%02X B=%02X (rhythm=%d) port0: B(%02X)->A(%02X)\n",
+                ch, A_lsb, val, p_vpmctx->opl3_state.rhythm_mode, val, A_lsb);
+            }
+            addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xB0 + ch, val);
+            if(p_opts->is_a0_b0_aligned) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, A_lsb);
+            }
         } else {
             opl3_debug_log(p_opts, "[SEQ0] ch=%d %s mode=%s A=%02X B=%02X (rhythm=%d) ",
                 ch, (keyon_prev) ? "KeyOn" : "KeyOff", 
-                g_freqseq_mode == FREQSEQ_BAB ? "BAB" : "AB", A_lsb, val, p_state->rhythm_mode);
+                g_freqseq_mode == FREQSEQ_BAB ? "BAB" : "AB", A_lsb, val, p_vpmctx->opl3_state.rhythm_mode);
             if (g_freqseq_mode == FREQSEQ_BAB) {
                 opl3_debug_log(p_opts, "port0: B(%02X)->A(%02X)->B(%02X)\n", val, A_lsb, val);
-                opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
-                opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
-                opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+                addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xB0 + ch, val);
+                if(p_opts->is_a0_b0_aligned) {
+                    addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, A_lsb);
+                    addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xB0 + ch, val);
+                }
             } else {
-                opl3_debug_log(p_opts, "port0: A(%02X)->B(%02X)\n", A_lsb, val);
-                opl3_write_reg(p_state, p_music_data, 0, 0xA0 + ch, A_lsb);
-                opl3_write_reg(p_state, p_music_data, 0, 0xB0 + ch, val);
+                if(p_opts->is_a0_b0_aligned) {
+                    opl3_debug_log(p_opts, "port0: A(%02X)->B(%02X)\n", A_lsb, val);
+                    addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xA0 + ch, A_lsb);
+                }
+                addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xB0 + ch, val);
             }
         }
        
         if ( p_opts->opl3_keyon_wait > 0)
-            vgm_wait_samples(p_music_data, p_vstatus, p_opts->opl3_keyon_wait);
+            addtional_bytes += vgm_wait_samples(p_vpmctx, p_opts->opl3_keyon_wait);
 
         // Detune 計算
         uint8_t detunedA, detunedB;
-        detune_if_fm(p_state, ch, A_lsb, val, p_opts->detune, &detunedA, &detunedB,p_opts);
+        detune_if_fm(p_vpmctx, ch, A_lsb, val, p_opts->detune, &detunedA, &detunedB,p_opts);
         if (!keyon_prev && keyon_new) {
             // KeyOff -> KeyOn（posedge）：A>B
             opl3_debug_log(p_opts, "[SEQ1] ch=%d KeyOff -> KeyOn A=%02X B=%02X (rhythm=%d) port1: A(%02X)->B(%02X)\n",
-                ch, detunedA, detunedB, p_state->rhythm_mode, detunedA, detunedB);
-            opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-            opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB);
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+                ch, detunedA, detunedB, p_vpmctx->opl3_state.rhythm_mode, detunedA, detunedB);
+            if (p_opts->is_port1_enabled) {
+                if(p_opts->is_a0_b0_aligned) {
+                    addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, detunedA);
+                }
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xB0 + ch, detunedB);
+            }
             // Update port 1 reg
             int port_1_reg_addr = 0xA0 + ch + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            if(p_opts->is_a0_b0_aligned) {
+                p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
+            }
 
             port_1_reg_addr = 0xB0 + ch + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
         } else if (keyon_prev && !keyon_new) {
             // KeyOn -> KeyOff（negedge）：B>A
             opl3_debug_log(p_opts, "[SEQ1] ch=%d KeyOn -> KeyOff A=%02X B=%02X (rhythm=%d) port1: B(%02X)->A(%02X)\n",
-                ch, detunedA, detunedB, p_state->rhythm_mode, detunedB, detunedA);
-            opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB);
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-            opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+                ch, detunedA, detunedB, p_vpmctx->opl3_state.rhythm_mode, detunedB, detunedA);
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xB0 + ch, detunedB);
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, detunedA);
+            }
             // Update port 1 reg
             int port_1_reg_addr = 0xA0 + ch + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
 
             port_1_reg_addr = 0xB0 + ch + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
         } else {
             // Supposing OPL3 Extend mode
-            if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
+            if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
                 opl3_debug_log(p_opts, "[SEQ1] ch=%d %s mode=%s A=%02X B=%02X (rhythm=%d) ",
                     ch, (keyon_prev) ? "KeyOn" : "KeyOff", 
-                    g_freqseq_mode == FREQSEQ_BAB ? "BAB" : "AB", detunedA, detunedB, p_state->rhythm_mode);
+                    g_freqseq_mode == FREQSEQ_BAB ? "BAB" : "AB", detunedA, detunedB, p_vpmctx->opl3_state.rhythm_mode);
                 if (g_freqseq_mode == FREQSEQ_BAB) {
                     opl3_debug_log(p_opts, "port1: B(%02X)->A(%02X)->B(%02X)\n", detunedB, detunedA, detunedB);
-                    opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB);
-                    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-                    opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
-                    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-                    opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB);
-                    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+                    if (p_opts->is_port1_enabled) {
+                        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xB0 + ch, detunedB);
+                        if(p_opts->is_a0_b0_aligned) {
+                            addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, detunedA);
+                            addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xB0 + ch, detunedB);
+                        }
+                    }
 
                     // Update port 1 reg
                     int port_1_reg_addr = 0xA0 + ch + 0x100;
-                    p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-                    p_state->reg[port_1_reg_addr] = val;
+                    p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                    p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
 
                     port_1_reg_addr = 0xB0 + ch + 0x100;
-                    p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-                    p_state->reg[port_1_reg_addr] = val;
+                    p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                    p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
                 } else {
                     opl3_debug_log(p_opts, "port1: A(%02X)->B(%02X)\n", detunedA, detunedB);
-                    opl3_write_reg(p_state, p_music_data, 1, 0xA0 + ch, detunedA);
-                    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-                    opl3_write_reg(p_state, p_music_data, 1, 0xB0 + ch, detunedB);
-                    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+                    if (p_opts->is_port1_enabled) {
+                        if(p_opts->is_a0_b0_aligned) {
+                        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xA0 + ch, detunedA);
+                        }
+                        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xB0 + ch, detunedB);
+                    }
                     // Update port 1 reg
                     int port_1_reg_addr = 0xA0 + ch + 0x100;
-                    p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-                    p_state->reg[port_1_reg_addr] = val;
+                    p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                    p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
 
                     port_1_reg_addr = 0xB0 + ch + 0x100;
-                    p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-                    p_state->reg[port_1_reg_addr] = val;
+                    p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+                    p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
                 }
             }
         }
         if ( p_opts->opl3_keyon_wait > 0)
-            vgm_wait_samples(p_music_data, p_vstatus, p_opts->opl3_keyon_wait);
+            addtional_bytes += vgm_wait_samples(p_vpmctx, p_opts->opl3_keyon_wait);
         
-        // p_state->reg_stamp[reg]更新
-        p_state->reg_stamp[reg] = val;
+        // p_vpmctx->opl3_state.reg_stamp[reg]更新
+        p_vpmctx->opl3_state.reg_stamp[reg] = val;
     } else if (reg >= 0xC0 && reg <= 0xC8) {
         int ch = reg - 0xC0;
         // Stereo panning implementation based on channel number
@@ -638,45 +661,49 @@ int duplicate_write_opl3(
             port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
         }
 
-        opl3_write_reg(p_state, p_music_data, 0, 0xC0 + ch, (0xF & val) | port0_panning);
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xC0 + ch, (0xF & val) | port0_panning);
         // C0 is always copy to port 1 because DAM and DVB should be applied to port 1 even if it is in Rhythm mode
-        //if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
-        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, (0xF & val) | port1_panning); 
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        //if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xC0 + ch, (0xF & val) | port1_panning); 
+        }
         //}
         // Update port 1 reg
         int port_1_reg_addr = reg + 0x100;
-        p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-        p_state->reg[port_1_reg_addr] = val;
+        p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+        p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
     } else if (reg == 0xBD) {
-        p_state->rhythm_mode = (val & 0x20) != 0;
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); 
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        p_vpmctx->opl3_state.rhythm_mode = (val & 0x20) != 0;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val); 
+        }
             // Update port 1 reg
             int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
     } else if (reg >= 0xE0 && reg <= 0xF5) {
         int ch = reg - 0xE0;
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
-            opl3_write_reg(p_state, p_music_data, 1, reg, val); 
-            if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
+        if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
+            if (p_opts->is_port1_enabled) {
+                addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val); 
+            }
             // Update port 1 reg
             int port_1_reg_addr = reg + 0x100;
-            p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-            p_state->reg[port_1_reg_addr] = val;
+            p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+            p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
         }
     } else {
         // Write to both ports
-        opl3_write_reg(p_state, p_music_data, 0, reg, val);
-        opl3_write_reg(p_state, p_music_data, 1, reg, val); 
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, reg, val);
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, val); 
+        }
         // Update port 1 reg
         int port_1_reg_addr = reg + 0x100;
-        p_state->reg_stamp[port_1_reg_addr] = p_state->reg[port_1_reg_addr];
-        p_state->reg[port_1_reg_addr] = val;
+        p_vpmctx->opl3_state.reg_stamp[port_1_reg_addr] = p_vpmctx->opl3_state.reg[port_1_reg_addr];
+        p_vpmctx->opl3_state.reg[port_1_reg_addr] = val;
     }
     return addtional_bytes;
 }
@@ -685,14 +712,14 @@ int duplicate_write_opl3(
  * OPL3 initialization sequence for both ports.
  * Sets FM chip type in OPL3State and initializes register mirror.
  */
-int opl3_init(VGMBuffer *p_music_data, VGMStatus *p_vstatus, OPL3State *p_state, FMChipType source_fmchip, const CommandOptions *p_opts) {
-    if (!p_vstatus) return 0;
+int opl3_init(VGMContext *p_vpmctx, FMChipType source_fmchip, const CommandOptions *p_opts) {
+    if (!p_vpmctx) return 0;
 
-    memset(p_state->reg, 0, sizeof(p_state->reg));
-    memset(p_state->reg_stamp, 0, sizeof(p_state->reg_stamp));
-    p_state->rhythm_mode = false;
-    p_state->opl3_mode_initialized = false;
-    p_state->source_fmchip = source_fmchip;
+    memset(p_vpmctx->opl3_state.reg, 0, sizeof(p_vpmctx->opl3_state.reg));
+    memset(p_vpmctx->opl3_state.reg_stamp, 0, sizeof(p_vpmctx->opl3_state.reg_stamp));
+    p_vpmctx->opl3_state.rhythm_mode = false;
+    p_vpmctx->opl3_state.opl3_mode_initialized = false;
+    p_vpmctx->opl3_state.source_fmchip = source_fmchip;
 
     // Get 'ESEOPL3_FREQSEQ' enviornement variable
     const char *seq = getenv("ESEOPL3_FREQSEQ");
@@ -706,25 +733,22 @@ int opl3_init(VGMBuffer *p_music_data, VGMStatus *p_vstatus, OPL3State *p_state,
     int addtional_bytes = 0;
 
     // Initialize OPL3VoiceDB
-    opl3_voice_db_init(&p_state->voice_db);
+    opl3_voice_db_init(&p_vpmctx->opl3_state.voice_db);
 
+    if (p_opts->is_port1_enabled) {
     // OPL3 global registers (Port 1 only)
-    opl3_write_reg(p_state, p_music_data, 1, 0x05, 0x01);  // OPL3 enable
-    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-
-    opl3_write_reg(p_state, p_music_data, 1, 0x04, 0x00);  // Waveform select
-    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0x05, 0x01);  // OPL3 enable
+        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0x04, 0x00);  // Waveform select
+    }
 
     // Port 0 general init
-    opl3_write_reg(p_state, p_music_data, 0, 0x01, 0x00);  // LSI TEST
-    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+    addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0x01, 0x00);  // LSI TEST
+    addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0x08, 0x00);  // NTS
 
-    opl3_write_reg(p_state, p_music_data, 0, 0x08, 0x00);  // NTS
-    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-
-    // Port 1 general init
-    opl3_write_reg(p_state, p_music_data, 1, 0x01, 0x00);
-    if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+    if (p_opts->is_port1_enabled) {
+        // Port 1 general init
+        addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0x01, 0x00);
+    }
 
     // Channel-level control
     for (uint8_t ch = 0; ch < 9; ++ch) {
@@ -745,25 +769,26 @@ int opl3_init(VGMBuffer *p_music_data, VGMStatus *p_vstatus, OPL3State *p_state,
             port1_panning = 0x50;  // Right channel (bit 4 and bit 6)
         }
 
-        opl3_write_reg(p_state, p_music_data, 0, 0xC0 + ch, port0_panning);
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, 0xC0 + ch, port0_panning);
         // C0 is always copy to port 1 because DAM and DVB should be applied to port 1 even if it is in Rhythm mode
-        //if (!(p_state->rhythm_mode && ch >= 6 && ch <= 8)) {
-        opl3_write_reg(p_state, p_music_data, 1, 0xC0 + ch, port1_panning); 
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        //if (!(p_vpmctx->opl3_state.rhythm_mode && ch >= 6 && ch <= 8)) {
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, 0xC0 + ch, port1_panning); 
+        }
     }
 
     // Waveform select registers (port 0 and 1)
     const uint8_t ext_regs[] = {0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF};
     for (size_t i = 0; i < sizeof(ext_regs) / sizeof(ext_regs[0]); ++i) {
-        opl3_write_reg(p_state, p_music_data, 0, ext_regs[i], 0x00);
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
-        opl3_write_reg(p_state, p_music_data, 1, ext_regs[i], 0x00);
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        addtional_bytes += opl3_write_reg(p_vpmctx, 0, ext_regs[i], 0x00);
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, ext_regs[i], 0x00);
+        }
     }
     for (uint8_t reg = 0xF0; reg <= 0xF5; ++reg) {
-        opl3_write_reg(p_state, p_music_data, 1, reg, 0x00);
-        if (opl3_should_account_port1(p_vstatus)) addtional_bytes += 3;
+        if (p_opts->is_port1_enabled) {
+            addtional_bytes += opl3_write_reg(p_vpmctx, 1, reg, 0x00);
+        }
     }
 
     return addtional_bytes;

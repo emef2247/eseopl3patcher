@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "../compat_bool.h"
 
 #define OPL3_DB_INITIAL_SIZE 64
 #define OPL3_NUM_CHANNELS    18   // 9 (port0) + 9 (port1)
