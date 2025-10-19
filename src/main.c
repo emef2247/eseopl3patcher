@@ -124,7 +124,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
         printf(
             "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
             "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--wait <val>]\n"
-            "          [--convert-ymXXXX ...] [--keep_source_vgm] [--override <overrides.json>]\n"
+            "          [--convert-ymXXXX ...] [--preset <YM2413|VRC7|YMF281B>] [--keep_source_vgm] [--override <overrides.json>]\n"
             "          [--strip-non-opl] [--test-tone] [--fast-attack]\n"
             "          [--no-post-keyon-tl] [--single-port]\n"
             "          [--carrier-tl-clamp <val>] [--emergency-boost <val>] [--force-retrigger-each-note]\n"
@@ -139,6 +139,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
             "  --ch_panning <val>         Channel panning mode (0=mono, 1=alternate L/R, ...).\n"
             "  --vr0 <val>                Port0 volume ratio (default: 1.0).\n"
             "  --vr1 <val>                Port1 volume ratio (default: 0.8).\n"
+            "  --preset <YM2413|VRC7|YMF281B>   Voice preset table for YM2413 conversion (YM2413, VRC7, YMF281B). Default: YM2413\n"
             "  --keep_source_vgm          Output original vgm command \n"
             "  -o, --output <file>        Output file name (otherwise auto-generated).\n"
             "  --convert-ymXXXX           Explicit chip selection (YM2413, YM3812, YM3526, Y8950).\n"
@@ -173,16 +174,18 @@ static void print_usage(const char *progname, DebugOpts *debug) {
     } else {
         printf(
             "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
-            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--wait <val>]\n"
+            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--preset <YM2413|VRC7|YMF281B>] [--keep_source_vgm]  [--wait <val>]\n"
             "          [other options, see --help]\n"
             "\n"
             "Most commonly-used options:\n"
-            "  --detune <val>             Detune percentage.\n"
-            "  --detune_limit <val>       Maximum detune value.\n"
-            "  --ch_panning <val>         Channel panning mode.\n"
-            "  --vr0 <val>, --vr1 <val>   Port0/Port1 volume ratios.\n"
-            "  -o <output.vgm>            Output file name.\n"
-            "  -h, --help                 Show this help message.\n"
+            "  --detune <val>                   Detune percentage.\n"
+            "  --detune_limit <val>             Maximum detune value.\n"
+            "  --ch_panning <val>               Channel panning mode.\n"
+            "  --vr0 <val>, --vr1 <val>         Port0/Port1 volume ratios.\n"
+            "  --preset <YM2413|VRC7|YMF281B>   Voice preset table for YM2413 conversion (YM2413, VRC7, YMF281B). Default: YM2413\n"
+            "  --keep_source_vgm                Output original vgm command \n"
+            "  -o <output.vgm>                  Output file name.\n"
+            "  -h, --help                       Show this help message.\n"
             "\n"
             "Example:\n"
             "  %s music.vgm --detune 1.0 -o out.vgm --ch_panning 1\n",
@@ -962,6 +965,10 @@ int main(int argc, char *argv[]) {
     /** Update the clock information in new header */
     vgm_header_postprocess(p_header_buf, &vgmctx, &cmd_opts);
 
+    if (cmd_opts.is_keep_source_vgm && vgmctx.source_fmchip == FMCHIP_YM2413) {
+        printf(" YM2413:%s clock=%u (0x%0x)\n", chip_flags.has_ym2413?"Y":"N", chip_flags.ym2413_clock, chip_flags.ym2413_clock);
+        set_ym2413_clock(p_header_buf,chip_flags.ym2413_clock);
+    }
    
     FILE *p_wf = fopen(p_output_path, "wb");
     if (!p_wf) {

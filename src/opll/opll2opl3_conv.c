@@ -338,40 +338,44 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     if (!p_vp) return;
     memset(p_vp, 0, sizeof(*p_vp));
 
-    // --- パッチデータの参照元決定 ---
     uint8_t user_patch[8];
-    const uint8_t *src = NULL;
-    const uint8_t *source_preset = NULL;
-    if (p_opts->preset == OPLL_PresetType_YM2413) {
-        if (inst == 0) {
-            for (int i = 0; i < 8; ++i)
-                user_patch[i] = p_vgmctx->opll_state.reg[i];
-            src = user_patch;
-        } else if (inst >= 1 && inst <= 20) {
-            src = YM2413_VOICES[inst - 1];
-        } else {
-            src = YM2413_VOICES[0];
-        }
-    } else if (p_opts->preset == OPLL_PresetType_VRC7) {
-        if (inst == 0) {
-            for (int i = 0; i < 8; ++i)
-                user_patch[i] = p_vgmctx->opll_state.reg[i];
-            src = user_patch;
-        } else if (inst >= 1 && inst <= 20) {
-            src = VRC7_VOICES[inst - 1];
-        } else {
-            src = VRC7_VOICES[0];
-        }
-    } else if (p_opts->preset == OPLL_PresetType_YMF281B) {
-        if (inst == 0) {
-            for (int i = 0; i < 8; ++i)
-                user_patch[i] = p_vgmctx->opll_state.reg[i];
-            src = user_patch;
-        } else if (inst >= 1 && inst <= 20) {
-            src = YMF281B_VOICES[inst - 1];
-        } else {
-            src = YMF281B_VOICES[0];
-        }
+    const unsigned char (*source_preset)[8] = YM2413_VOICES; // Default
+
+    // Select the preset table
+    switch (p_opts->preset) {
+        case OPLL_PresetType_YM2413:
+            source_preset = YM2413_VOICES;
+            break;
+        case OPLL_PresetType_VRC7:
+            source_preset = VRC7_VOICES;
+            break;
+        case OPLL_PresetType_YMF281B:
+            source_preset = YMF281B_VOICES;
+            break;
+        default:
+            source_preset = YM2413_VOICES;
+            break;
+    }
+
+    // Select patch
+    const unsigned char *src = NULL;
+    if (inst == 0) {
+        // User patch (from registers)
+        for (int i = 0; i < 8; ++i)
+            user_patch[i] = p_vgmctx->opll_state.reg[i];
+        src = user_patch;
+    } else if (inst >= 1 && inst <= 19) {
+        src = source_preset[inst - 1]; // [1]..[19] are preset patches
+    } else if (source_preset >= 20) {
+        src = source_preset[19]; // Fallback: last preset
+    } else {
+        src = source_preset[0];  // Fallback: first preset
+    }
+
+    // Defensive: if src is NULL, abort
+    if (!src) {
+        fprintf(stderr, "[ERROR] src is NULL in opll_load_voice (inst=%d)\n", inst);
+        return;
     }
 
     // --- Modulator ---
@@ -513,7 +517,10 @@ int opll2opl3_apply_voice(VGMContext *p_vgmctx, int ch, int mod_volume, int car_
     return wrote_bytes;
 }
 
-/* --- _updateVoice 等価 --- */
+/**
+ * Update OPL3 voice for the specified channel.
+ * This function loads the voice and applies it to the OPL3 channel.
+ */
 int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p_opts)
 {
     OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
@@ -529,7 +536,7 @@ int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p
     OPL3VoiceParam vp;
 
     if (rflag && ch >= 6) {
-        // リズムモード時はリズム音色適用
+        // Rhythm mode: use rhythm voice presets
         switch (ch) {
             case 6:
                 opll_load_voice(p_vgmctx, 16, ch, &vp, p_opts); // BD
@@ -545,7 +552,7 @@ int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p
                 break;
         }
     } else if (!rflag && ch >= 6) {
-        // リズム解除時はch6/7/8も通常音色に戻す
+        // Rhythm mode off: restore normal voice for ch6/7/8
         int inst_normal = (regs[0x30 + ch] >> 4) & 0x0F;
         if (inst_normal == 0) {
             // User patch
@@ -556,7 +563,7 @@ int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p
             wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
         }
     } else {
-        // 通常のメロディックチャンネル
+        // Normal melodic channel
         int inst_normal = (regs[0x30 + ch] >> 4) & 0x0F;
         if (inst_normal == 0) {
             opll_load_voice(p_vgmctx, 0, ch, &vp, p_opts);
@@ -579,12 +586,11 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
     int wrote_bytes = 0;
     if (reg == 0x0e) {
         OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
-        int lfoDepth = OPLL_LFO_DEPTH; // 通常3固定
+        int lfoDepth = OPLL_LFO_DEPTH; 
 
         bool prev_rhythm_mode = p_vgmctx->opll_state.is_rhythm_mode;
         bool now_rhythm_mode  = (val & 0x20) != 0;
 
-         // --- ch6,7,8 operator slot計算関数（例） ---
         int mod_slots[3] = { opl3_opreg_addr(0, 6, 0), opl3_opreg_addr(0, 7, 0), opl3_opreg_addr(0, 8, 0) };
         int car_slots[3] = { opl3_opreg_addr(0, 6, 1), opl3_opreg_addr(0, 7, 1), opl3_opreg_addr(0, 8, 1) };
 
@@ -630,13 +636,13 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts);
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts);
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts);
-            // 1. LFO深度=0で1回書く（0xc0 | (val & 0x3f)）
+            // 1. Write LFO Depth = 0 once（0xc0 | (val & 0x3f)）
             wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, 0xc0 | (val & 0x3f), p_opts);
         } else {
                 // Only update the flag (no edge)
                 p_vgmctx->opll_state.is_rhythm_mode = (val & 0x20) ? true : false;
         }
-         // 2. LFOデプス値で必ず1回書く（全ケース共通）
+         // 2. Write LFO Depth at least once for all cases
         wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, (lfoDepth << 6) | (val & 0x3f), p_opts);
         return wrote_bytes;
     }
@@ -652,7 +658,7 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
         bool keybit   = (val & 0x80) != 0;
         if (p_opts && p_opts->debug.verbose) {
             fprintf(stderr,
-                "[DEBUG] OPLL→OPL3変換前: block=%u, fnum=0x%03X (dec %u) src_clock=%.1f dst_clock=%.1f\n",
+                "[DEBUG] OPLL→OPL3 Before conversion: block=%u, fnum=0x%03X (dec %u) src_clock=%.1f dst_clock=%.1f\n",
                 p->block, p->fnum_comb & 0x3FF, p->fnum_comb & 0x3FF,
                 p_vgmctx->source_fm_clock, p_vgmctx->target_fm_clock);
         }
@@ -668,7 +674,7 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
             &dst_block);
         if (p_opts && p_opts->debug.verbose) {
             fprintf(stderr,
-                "[DEBUG] OPLL→OPL3変換後: dst_block=%u, dst_fnum=0x%03X (dec %u)\n",
+                "[DEBUG] OPLL→OPL3 After conversion: dst_block=%u, dst_fnum=0x%03X (dec %u)\n",
                 dst_block, dst_fnum, dst_fnum);
         }
 
