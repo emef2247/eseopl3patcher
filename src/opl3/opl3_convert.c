@@ -824,44 +824,4 @@ static inline uint8_t ym2413_vol_to_tl_add(uint8_t vol) {
 }
 #endif
 
-#ifndef YM2413_VOL_MAP_STEP
-#define YM2413_VOL_MAP_STEP 2
-#endif
-/*
- * make_carrier_40_from_vol
- * Reflect YM2413 $3n register (reg3n) lower 4 bits (VOL) into OPL3 Carrier TL,
- * and return the value to write to 0x40 + slotCar (KSL/TL).
- *  - vp->op[1].ksl: upper 2 bits (KSL)
- *  - vp->op[1].tl : base TL
- *  - VOL nibble   : added to TL (0=add 0, 15=maximum add)
- * Clip: if over 63, set to 63.
- */
-/* Fully replaces old make_carrier_40_from_vol */
-uint8_t make_carrier_40_from_vol(VGMContext *p_vgmctx,const OPL3VoiceParam *vp, uint8_t reg3n, const CommandOptions *p_opts)
-{
-    /* YM2413 volume nibble: 0=loudest .. 15=softest */
-    uint8_t vol = reg3n & 0x0F;          // 0..15
-    uint8_t base_tl = (uint8_t)(vp->op[1].tl & 0x3F);
 
-    /* STEP: 2 => slightly less than 3dB per step (0.75dB * 2 ≈1.5dB). Make this configurable if needed */
-    const uint8_t STEP = YM2413_VOL_MAP_STEP;
-
-    uint16_t tl = (uint16_t)base_tl + (uint16_t)vol * STEP;
-    if (tl > 63) tl = 63;
-
-    /* KSL bits preserved */
-    uint8_t ksl_bits = (vp->op[1].ksl & 0x03) << 6;
-
-    /* For debugging (only first few times) */
-    static int dbg_cnt = 0;
-    if (dbg_cnt < 8) {
-        if(p_opts->debug.verbose) {
-            fprintf(stderr,
-            "[VOLMAP] reg3n=%02X vol=%u baseTL=%u => newTL=%u (STEP=%u)\n",
-            reg3n, vol, base_tl, (unsigned)tl, STEP);
-        }
-        dbg_cnt++;
-    }
-
-    return (uint8_t)(ksl_bits | (uint8_t)tl);
-}
