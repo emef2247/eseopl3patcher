@@ -2,13 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "compat_string.h"
-#include "compat_bool.h"
 #include "vgm/vgm_helpers.h"
 #include "vgm/vgm_header.h"
 #include "opl3/opl3_convert.h"
 #include "opl3/opl3_debug_util.h"
-#include "opll/opll_to_opl3_wrapper.h"
 #include "opll/opll2opl3_conv.h"
 #include "vgm/gd3_util.h"
 
@@ -495,8 +492,6 @@ int main(int argc, char *argv[]) {
     {
         int written_bytes = opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
         pre_loop_output_bytes += written_bytes;
-        opll_set_program_args(argc, argv);
-        opll_init(&vgmctx, &cmd_opts);
         opll2opl3_init_scheduler(&vgmctx, &cmd_opts);
     }
 

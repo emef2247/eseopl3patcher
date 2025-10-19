@@ -10,6 +10,9 @@
         "ym2413_voice_rom.h": "c",
         "opll_to_opl3_wrapper.h": "c",
         "*.bak": "c",
-        "opll_state.h": "c"
+        "opll_state.h": "c",
+        "nukedopll_voice_rom.h": "c",
+        "opll2opl3_conv.h": "c",
+        "stdbool.h": "c"
     }
 }

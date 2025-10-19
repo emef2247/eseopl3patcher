@@ -1,6 +1,5 @@
 #include "opl3_convert.h"
 #include "opl3_voice.h"
-#include "../opll/opll_to_opl3_wrapper.h"
 #include "../opll/opll_state.h"
 #include "../vgm/vgm_helpers.h"
 #include "../vgm/vgm_header.h"       /* OPL3_CLOCK */

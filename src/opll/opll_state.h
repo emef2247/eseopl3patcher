@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "../compat_bool.h"
 
 typedef uint64_t sample_t; // sample 単位の時間
 

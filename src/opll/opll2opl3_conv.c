@@ -5,7 +5,6 @@
 #include "../vgm/vgm_header.h"
 #include "../vgm/vgm_helpers.h"
 #include "../opll/ym2413_voice_roms.h"
-#include "../opll/nukedopll_voice_rom.h"
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>  // getenv
@@ -818,3 +817,4 @@ int opll2opl3_command_handler (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, u
 
     return wrote_bytes;
 }
+

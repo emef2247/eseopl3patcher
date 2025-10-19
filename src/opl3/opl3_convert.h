@@ -3,7 +3,6 @@
 
 #include "../vgm/vgm_helpers.h"   /* FMChipType, CommandOptions, VGMBuffer, VGMStatus */
 #include "opl3_state.h"
-#include "../compat_bool.h"
 #include "../vgm/vgm_helpers.h"
 #include "../vgm/vgm_header.h"       /* OPL3_CLOCK */
 #ifdef __cplusplus
