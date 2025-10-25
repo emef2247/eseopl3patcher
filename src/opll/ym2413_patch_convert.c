@@ -161,8 +161,8 @@ void ym2413_patch_to_opl3_with_fb(int inst,
     /* ソース選択 */
     const uint8_t *src;
     if (inst == 0 && p_ym2413_regs)         src = p_ym2413_regs;
-    else if (inst >= 1 && inst <= 20)       src = YM2413_VOICES[inst - 1];
-    else                                    src = YM2413_VOICES[0];
+    else if (inst >= 1 && inst <= 20)       src = YMVOICE_YM2413_VOICES[inst - 1];
+    else                                    src = YMVOICE_YM2413_VOICES[0];
 
     if (p_opts && p_opts->debug.verbose) {
         fprintf(stderr,

@@ -164,6 +164,7 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
  * If none is selected, returns "UNKNOWN".
  */
 const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags) {
+    if (!chip_flags) return "UNKNOWN"; // ← NULL防御
     if (chip_flags->has_ym2413)  return "YM2413";
     if (chip_flags->has_ym3812)  return "YM3812";
     if (chip_flags->has_ym3526)  return "YM3526";

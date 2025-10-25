@@ -890,32 +890,18 @@ int main(int argc, char *argv[]) {
     
     if (vgmctx.source_fmchip == FMCHIP_YM2413) {
         snprintf(note_append, sizeof(note_append),
-            "Converted from YM2413 to OPL3. "
-            "Detune:%.2f%% "
-            "audible_sanity:%s "
-            "min_gate:%u "
-            "pre_on:%u "
-            "off_on:%u "
-            "boost:%d "
-            "clamp:%s(%u)",
-            detune,
-            cmd_opts.debug.audible_sanity ? "ON":"OFF",
-            (unsigned)(cmd_opts.min_gate_samples ? cmd_opts.min_gate_samples : 0),
-            (unsigned)(cmd_opts.pre_keyon_wait_samples ? cmd_opts.pre_keyon_wait_samples : 0),
-            (unsigned)(cmd_opts.min_off_on_wait_samples ? cmd_opts.min_off_on_wait_samples : 0),
-            cmd_opts.emergency_boost_steps,
-            cmd_opts.carrier_tl_clamp_enabled ? "ON":"OFF",
-            cmd_opts.carrier_tl_clamp);
+                ", Converted from %s to OPL3. Preset:[%s] Detune:%.2f%%(max:+-%f) KEY ON/OFF wait:%d "
+                "Ch Panning mode:%d port0 volume:%.2f%% port1 `volume:%.2f%% debug_verbose:%s",
+                get_converted_opl_chip_name(&chip_flags),preset_str, detune, detune_limit, opl3_keyon_wait,
+                ch_panning, v_ratio0 * 100, v_ratio1 * 100,
+                debug_opts.verbose ? "ON" : "OFF");
     } else {
         snprintf(note_append, sizeof(note_append),
-                ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d "
-                "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%% carrier_tl_clamp:%s(%u) audible_sanity:%s debug_verbose:%s",
-                get_converted_opl_chip_name(&chip_flags), detune, opl3_keyon_wait,
+                ", Converted from %s to OPL3. Detune:%.2f%%(max:+-%f) KEY ON/OFF wait:%d "
+                "Ch Panning mode:%d port0 volume:%.2f%% port1 `volume:%.2f%% debug_verbose:%s",
+                get_converted_opl_chip_name(&chip_flags), detune, detune_limit, opl3_keyon_wait,
                 ch_panning, v_ratio0 * 100, v_ratio1 * 100,
-                carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp,
-                debug_opts.audible_sanity ? "ON" : "OFF",
-                debug_opts.verbose ? "ON" : "OFF"
-        );
+                debug_opts.verbose ? "ON" : "OFF");
     }
 
 
