@@ -338,21 +338,21 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     memset(p_vp, 0, sizeof(*p_vp));
 
     uint8_t user_patch[8];
-    const unsigned char (*source_preset)[8] = YMVOICE_YM2413_VOICES; // Default
+    const unsigned char (*source_preset)[8] = YM2413_VOICES; // Default
 
     // Select the preset table
     switch (p_opts->preset) {
         case OPLL_PresetType_YM2413:
-            source_preset = YMVOICE_YM2413_VOICES;
+            source_preset = YM2413_VOICES;
             break;
         case OPLL_PresetType_VRC7:
-            source_preset = FAMITRACKER_VRC7_VOICES;
+            source_preset = VRC7_VOICES;
             break;
         case OPLL_PresetType_YMF281B:
-            source_preset = YMVOICE_YMF281B_VOICES;
+            source_preset = YMF281B_VOICES;
             break;
         default:
-            source_preset = YMVOICE_YM2413_VOICES;
+            source_preset = YM2413_VOICES;
             break;
     }
 
@@ -543,11 +543,11 @@ int opll2opl3_update_voice(VGMContext *p_vgmctx, int ch, const CommandOptions *p
                 break;
             case 7:
                 opll_load_voice(p_vgmctx, 17, ch, &vp, p_opts); // SD/TOM
-                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(-1, 0) ,toTL(volume, 0), key,&vp, p_opts);
+                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
             case 8:
                 opll_load_voice(p_vgmctx, 18, ch, &vp, p_opts); // CYM/HH
-                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(-1, 0) ,toTL(volume, 0), key,&vp, p_opts);
+                wrote_bytes += opll2opl3_apply_voice(p_vgmctx, ch, toTL(inst, 0) ,toTL(volume, 0), key,&vp, p_opts);
                 break;
         }
     } else if (!rflag && ch >= 6) {
