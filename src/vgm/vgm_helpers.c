@@ -179,7 +179,7 @@ const char* get_opll_preset_type(const OPLL_PresetType type) {
 }
 
 const char* get_opll_preset_source(const OPLL_PresetSource source) {
-    if (source == OPLL_PresetSource_YMVOICE)  return "YMVOICE";
+    if (source == OPLL_PresetSource_YMVOICE)  return "YM-VOICE";
     if (source == OPLL_PresetSource_YMFM)  return "YMFM";
     return "UNKNOWN";
 }

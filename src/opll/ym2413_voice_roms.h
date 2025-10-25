@@ -1,0 +1,303 @@
+#ifndef YM2413_VOICE_ROM_H
+#define YM2413_VOICE_ROM_H
+
+/*
+ * YM2413 (OPLL) Built-in Instrument ROM Table
+ * -------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by Mitsutaka Okazaki (digital-sound-antiques/ym-voice).
+ *   - https://github.com/digital-sound-antiques/ym-voice
+ *   - Not an official ROM dump, nor based on GPL-derived sets; these are original, license-free patches.
+ *   - Intended for safe use in OSS/commercial projects, and distinct from community "standard" ROM sets.
+ *
+ * License Notice:
+ *   - Data, format, and code adapted from ym-voice.
+ *   - Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ *   - ISC License (see below)
+ *   - You may use, copy, modify, and distribute this file freely as long as this notice and the ISC License remain.
+ *
+ * ISC License:
+ * Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ * Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted,
+ * provided that the above copyright notice and this permission notice appear in all copies.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
+ * OF THIS SOFTWARE.
+ */
+static const unsigned char YMVOICE_YM2413_VOICES[20][8] = {
+    {0x71, 0x61, 0x1e, 0x17, 0xd0, 0x78, 0x00, 0x17}, // 1: Violin
+    {0x13, 0x41, 0x1a, 0x0d, 0xd8, 0xf7, 0x23, 0x13}, // 2: Guitar
+    {0x13, 0x01, 0x99, 0x00, 0xf2, 0xd4, 0x21, 0x23}, // 3: Piano
+    {0x11, 0x61, 0x0e, 0x07, 0x8d, 0x64, 0x70, 0x27}, // 4: Flute
+    {0x32, 0x21, 0x1e, 0x06, 0xe1, 0x76, 0x01, 0x28}, // 5: Clarinet
+    {0x31, 0x22, 0x16, 0x05, 0xe0, 0x71, 0x00, 0x18}, // 6: Oboe
+    {0x21, 0x61, 0x1d, 0x07, 0x82, 0x81, 0x11, 0x07}, // 7: Trumpet
+    {0x33, 0x21, 0x2d, 0x13, 0xb0, 0x70, 0x00, 0x07}, // 8: Organ
+    {0x61, 0x61, 0x1b, 0x06, 0x64, 0x65, 0x10, 0x17}, // 9: Horn
+    {0x41, 0x61, 0x0b, 0x18, 0x85, 0xf0, 0x81, 0x07}, // 10: Synthesizer
+    {0x33, 0x01, 0x83, 0x11, 0xea, 0xef, 0x10, 0x04}, // 11: Harpsichord
+    {0x17, 0xc1, 0x24, 0x07, 0xf8, 0xf8, 0x22, 0x12}, // 12: Vibraphone
+    {0x61, 0x50, 0x0c, 0x05, 0xd2, 0xf5, 0x40, 0x42}, // 13: Synthsizer Bass
+    {0x01, 0x01, 0x55, 0x03, 0xe4, 0x90, 0x03, 0x02}, // 14: Acoustic Bass
+    {0x41, 0x41, 0x89, 0x03, 0xf1, 0xe4, 0xc0, 0x13}, // 15: Electric Guitar
+    {0x01, 0x01, 0x18, 0x0f, 0xdf, 0xf8, 0x6a, 0x6d}, // 16: R: Bass Drum
+    {0x01, 0x01, 0x00, 0x00, 0xc8, 0xd8, 0xa7, 0x68}, // 17: R: High-Hat(M)/Snare Drum(C)
+    {0x05, 0x01, 0x00, 0x00, 0xf8 ,0xaa, 0x59, 0x55}, // 18: R: Tom-tom(M)/Top Cymbal(C)
+};
+
+
+/*
+ * VRC7 (Konami) Built-in Instrument ROM Table
+ * -------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by Mitsutaka Okazaki for ym-voice
+ *     (https://github.com/digital-sound-antiques/ym-voice)
+ *   - This is not an official ROM dump nor derived from GPL or community-standard ROM sets.
+ *   - These are original, license-free patches designed for safe use in OSS and commercial projects.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *   - The VRC7 is a Konami custom variant of OPLL, found in NES "Lagrange Point" and others.
+ *
+ * License Notice:
+ *   - Data, format, and code adapted from ym-voice (https://github.com/digital-sound-antiques/ym-voice)
+ *   - Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ *   - ISC License (see below)
+ *   - You may use, copy, modify, and distribute this file freely as long as this notice and the ISC License remain.
+ *
+ * ISC License:
+ * Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ * Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted,
+ * provided that the above copyright notice and this permission notice appear in all copies.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
+ * OF THIS SOFTWARE.
+ */
+static const unsigned char YMVOICE_VRC7_VOICES[20][8] = {
+    {0x03, 0x21, 0x05, 0x06, 0xe8, 0x81, 0x42, 0x27}, //  1: Bell
+    {0x13, 0x41, 0x14, 0x0d, 0xd8, 0xf6, 0x23, 0x12}, //  2: Guitar
+    {0x11, 0x11, 0x08, 0x08, 0xfa, 0xb2, 0x20, 0x12}, //  3: Piano
+    {0x31, 0x61, 0x0c, 0x07, 0xa8, 0x64, 0x61, 0x27}, //  4: Flute
+    {0x32, 0x21, 0x1e, 0x06, 0xe1, 0x76, 0x01, 0x28}, //  5: Clarinet
+    {0x02, 0x01, 0x06, 0x00, 0xa3, 0xe2, 0xf4, 0xf4}, //  6: Synth Brass
+    {0x21, 0x61, 0x1d, 0x07, 0x82, 0x81, 0x11, 0x07}, //  7: Trumpet
+    {0x23, 0x21, 0x22, 0x17, 0xa2, 0x72, 0x01, 0x17}, //  8: Organ
+    {0x35, 0x11, 0x25, 0x00, 0x40, 0x73, 0x72, 0x01}, //  9: Horn
+    {0xb5, 0x01, 0x0f, 0x0f, 0xa8, 0xa5, 0x51, 0x02}, // 10: Synth
+    {0x17, 0xc1, 0x24, 0x07, 0xf8, 0xf8, 0x22, 0x12}, // 11: Harpsichord
+    {0x71, 0x23, 0x11, 0x06, 0x65, 0x74, 0x18, 0x16}, // 12: Vibraphone
+    {0x01, 0x02, 0xd3, 0x05, 0xc9, 0x95, 0x03, 0x02}, // 13: Acoustic Bass
+    {0x61, 0x63, 0x0c, 0x00, 0x94, 0xc0, 0x33, 0xf6}, // 14: Electric Guitar
+    {0x21, 0x72, 0x0d, 0x00, 0xc1, 0xd5, 0x56, 0x06}, // 15: Bass Synth
+    {0x01, 0x01, 0x18, 0x0f, 0xdf, 0xf8, 0x6a, 0x6d}, // 16: R: Drum kit (percussion)
+    {0x01, 0x01, 0x00, 0x00, 0xc8, 0xd8, 0xa7, 0x68}, // 17: R: High-Hat(M)/Snare Drum(C)
+    {0x05, 0x01, 0x00, 0x00, 0xf8, 0xaa, 0x59, 0x55}, // 18: R: Tom-tom(M)/Top Cymbal(C)
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // 19: unused/dummy
+};
+
+/*
+ * YMF281B (VRC7+) Built-in Instrument ROM Table
+ * ---------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by Mitsutaka Okazaki for ym-voice
+ *     (https://github.com/digital-sound-antiques/ym-voice)
+ *   - This is not an official ROM dump nor derived from GPL or community-standard ROM sets.
+ *   - These are original, license-free patches designed for safe use in OSS and commercial projects.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *   - The YMF281B is a Yamaha OPLL-family chip used in some Konami and Yamaha products as an enhanced VRC7+.
+ *
+ * License Notice:
+ *   - Data, format, and code adapted from ym-voice (https://github.com/digital-sound-antiques/ym-voice)
+ *   - Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ *   - ISC License (see below)
+ *   - You may use, copy, modify, and distribute this file freely as long as this notice and the ISC License remain.
+ *
+ * ISC License:
+ * Copyright (c) 2023 Mitsutaka Okazaki and Contributors
+ * Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted,
+ * provided that the above copyright notice and this permission notice appear in all copies.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
+ * OF THIS SOFTWARE.
+ */
+static const unsigned char YMVOICE_YMF281B_VOICES[20][8] = {
+    {0x62, 0x21, 0x1a, 0x07, 0xf0, 0x6f, 0x00, 0x16}, // 1: Electric Strings (form Chabin's patch)
+    {0x40, 0x10, 0x45, 0x00, 0xf6, 0x83, 0x73, 0x63}, // 2: Bow Wow (based on plgDavid's patch, KSL fixed)
+    {0x13, 0x01, 0x99, 0x00, 0xf2, 0xc3, 0x21, 0x23}, // 3: Electric Guitar (similar to YM2413 but different DR(C))
+    {0x01, 0x61, 0x0b, 0x0f, 0xf9, 0x64, 0x70, 0x17}, // 4: Organ (based on Chabin, TL/DR fixed)
+    {0x32, 0x21, 0x1e, 0x06, 0xe1, 0x76, 0x01, 0x28}, // 5: Clarinet (identical to YM2413)
+    {0x60, 0x01, 0x82, 0x0e, 0xf9, 0x61, 0x20, 0x27}, // 6: Saxophone (based on plgDavid, PM/EG fixed)
+    {0x21, 0x61, 0x1c, 0x07, 0x84, 0x81, 0x11, 0x07}, // 7: Trumpet (similar to YM2413 but different TL/DR(M))
+    {0x37, 0x32, 0xc9, 0x01, 0x66, 0x64, 0x40, 0x28}, // 8: Street Organ (from Chabin)
+    {0x01, 0x21, 0x07, 0x03, 0xa5, 0x71, 0x51, 0x07}, // 9: Synth Brass (based on Chabin, TL fixed)
+    {0x06, 0x01, 0x5e, 0x07, 0xf3, 0xf3, 0xf6, 0x13}, // 10: Electric Piano (based on Chabin, DR/RR/KR fixed)
+    {0x00, 0x00, 0x18, 0x06, 0xf5, 0xf3, 0x20, 0x23}, // 11: Bass (based on Chabin, EG fixed)
+    {0x17, 0xc1, 0x24, 0x07, 0xf8, 0xf8, 0x22, 0x12}, // 12: Vibraphone (identical to YM2413)
+    {0x35, 0x64, 0x00, 0x00, 0xff, 0xf3, 0x77, 0xf5}, // 13: Chimes (from plgDavid)
+    {0x11, 0x31, 0x00, 0x07, 0xdd, 0xf3, 0xff, 0xfb}, // 14: Tom Tom II (from plgDavid)
+    {0x3a, 0x21, 0x00, 0x07, 0x80, 0x84, 0x0f, 0xf5}, // 15: Noise (based on plgDavid, AR fixed)
+    {0x01, 0x01, 0x18, 0x0f, 0xdf, 0xf8, 0x6a, 0x6d}, // 16: R: Bass Drum
+    {0x01, 0x01, 0x00, 0x00, 0xc8, 0xd8, 0xa7, 0x68}, // 17: R: High-Hat(M)/Snare Drum(C)
+    {0x05, 0x01, 0x00, 0x00, 0xf8 ,0xaa, 0x59, 0x55}, // 18: R: Tom-tom(M)/Top Cymbal(C)
+};
+
+/*
+ * YMFM_YM2413_VOICES - YM2413 (OPLL) Instrument Table
+ * ---------------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by David Viens and Hubert Lamontagne
+ *     (see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches)
+ *   - These are not official ROM dumps, nor derived from GPL or community-standard ROM sets.
+ *   - This table is a license-free, public domain patch set suitable for safe use in OSS and commercial projects.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *
+ * License Notice:
+ *   - This patch set is released under CC0/Public Domain by the original authors.
+ *   - You may use, copy, modify, and distribute this file freely, with or without attribution.
+ *   - For details, see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches
+ */
+static const unsigned char YMFM_YM2413_VOICES[18][8] =
+{
+	//April 2015 David Viens, tweaked May 19-21th 2015 Hubert Lamontagne
+	{ 0x71, 0x61, 0x1E, 0x17, 0xEF, 0x7F, 0x00, 0x17 },  1. //Violin
+	{ 0x13, 0x41, 0x1A, 0x0D, 0xF8, 0xF7, 0x23, 0x13 },  2. //Guitar
+	{ 0x13, 0x01, 0x99, 0x00, 0xF2, 0xC4, 0x11, 0x23 },  3. //Piano
+	{ 0x31, 0x61, 0x0E, 0x07, 0x98, 0x64, 0x70, 0x27 },  4. //Flute
+	{ 0x22, 0x21, 0x1E, 0x06, 0xBF, 0x76, 0x00, 0x28 },  5. //Clarinet
+	{ 0x31, 0x22, 0x16, 0x05, 0xE0, 0x71, 0x0F, 0x18 },  6. //Oboe
+	{ 0x21, 0x61, 0x1D, 0x07, 0x82, 0x8F, 0x10, 0x07 },  7. //Trumpet
+	{ 0x23, 0x21, 0x2D, 0x14, 0xFF, 0x7F, 0x00, 0x07 },  8. //Organ
+	{ 0x41, 0x61, 0x1B, 0x06, 0x64, 0x65, 0x10, 0x17 },  9. //Horn
+	{ 0x61, 0x61, 0x0B, 0x18, 0x85, 0xFF, 0x81, 0x07 }, 10. //Synthesizer
+	{ 0x13, 0x01, 0x83, 0x11, 0xFA, 0xE4, 0x10, 0x04 }, 11. //Harpsichord
+	{ 0x17, 0x81, 0x23, 0x07, 0xF8, 0xF8, 0x22, 0x12 }, 12. //Vibraphone
+	{ 0x61, 0x50, 0x0C, 0x05, 0xF2, 0xF5, 0x29, 0x42 }, 13. //Synthesizer Bass
+	{ 0x01, 0x01, 0x54, 0x03, 0xC3, 0x92, 0x03, 0x02 }, 14. //Acoustic Bass
+	{ 0x41, 0x41, 0x89, 0x03, 0xF1, 0xE5, 0x11, 0x13 }, 15. //Electric Guitar
+	{ 0x01, 0x01, 0x18, 0x0F, 0xDF, 0xF8, 0x6A, 0x6D }, 16. //rhythm 1
+	{ 0x01, 0x01, 0x00, 0x00, 0xC8, 0xD8, 0xA7, 0x48 }, 17. //rhythm 2
+	{ 0x05, 0x01, 0x00, 0x00, 0xF8, 0xAA, 0x59, 0x55 }  18. //rhythm 3
+};
+
+/*
+ * YMFM_VRC7_VOICES - VRC7 (Konami OPLL variant) Instrument Table
+ * -------------------------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by David Viens and Hubert Lamontagne
+ *     (see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches)
+ *   - These are not official ROM dumps, nor derived from GPL or community-standard ROM sets.
+ *   - This table is a license-free, public domain patch set suitable for safe use in OSS and commercial projects.
+ *   - The VRC7 is a Konami custom variant of the Yamaha OPLL, found in NES "Lagrange Point" and others.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *
+ * License Notice:
+ *   - This patch set is released under CC0/Public Domain by the original authors.
+ *   - You may use, copy, modify, and distribute this file freely, with or without attribution.
+ *   - For details, see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches
+ */
+static const unsigned char YMFM_VRC7_VOICES[18][8] = {
+// May 15th 2015 Hubert Lamontagne & David Viens
+    { 0x03, 0x21, 0x05, 0x06, 0xC8, 0x81, 0x42, 0x27 }, // 1. Buzzy Bell
+    { 0x13, 0x41, 0x14, 0x0D, 0xF8, 0xF7, 0x23, 0x12 }, // 2. Guitar
+    { 0x31, 0x11, 0x08, 0x08, 0xFA, 0xC2, 0x28, 0x22 }, // 3. Wurly
+    { 0x31, 0x61, 0x0C, 0x07, 0xF8, 0x64, 0x60, 0x27 }, // 4. Flute
+    { 0x22, 0x21, 0x1E, 0x06, 0xFF, 0x76, 0x00, 0x28 }, // 5. Clarinet
+    { 0x02, 0x01, 0x05, 0x00, 0xAC, 0xF2, 0x03, 0x02 }, // 6. Synth
+    { 0x21, 0x61, 0x1D, 0x07, 0x82, 0x8F, 0x10, 0x07 }, // 7. Trumpet
+    { 0x23, 0x21, 0x22, 0x17, 0xFF, 0x73, 0x00, 0x17 }, // 8. Organ
+    { 0x15, 0x11, 0x25, 0x00, 0x41, 0x71, 0x00, 0xF1 }, // 9. Bells
+    { 0x95, 0x01, 0x10, 0x0F, 0xB8, 0xAA, 0x50, 0x02 }, // 10. Vibes
+    { 0x17, 0xC1, 0x5E, 0x07, 0xFA, 0xF8, 0x22, 0x12 }, // 12. Vibraphone
+    { 0x71, 0x23, 0x11, 0x06, 0x65, 0x74, 0x10, 0x16 }, // 13. Tutti
+    { 0x01, 0x02, 0xD3, 0x05, 0xF3, 0x92, 0x83, 0xF2 }, // 14. Fretless
+    { 0x61, 0x63, 0x0C, 0x00, 0xA4, 0xFF, 0x30, 0x06 }, // 15. Synth Bass
+    { 0x21, 0x62, 0x0D, 0x00, 0xA1, 0xFF, 0x50, 0x08 }, // 16. Sweep
+};
+
+/*
+ * YMFM_YMF281B_VOICES - YMF281B (VRC7+) Instrument Table
+ * ------------------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by David Viens and Hubert Lamontagne
+ *     (see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches)
+ *   - These are not official ROM dumps, nor derived from GPL or community-standard ROM sets.
+ *   - This table is a license-free, public domain patch set suitable for safe use in OSS and commercial projects.
+ *   - The YMF281B is an OPLL-family chip used in Yamaha and Konami products as an enhanced VRC7+.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *
+ * License Notice:
+ *   - This patch set is released under CC0/Public Domain by the original authors.
+ *   - You may use, copy, modify, and distribute this file freely, with or without attribution.
+ *   - For details, see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches
+ */
+static const unsigned char YMFM_YMF281B_VOICES[18][8] =
+{
+	// May 14th 2015 Hubert Lamontagne
+	{ 0x72, 0x21, 0x1A, 0x07, 0xF6, 0x64, 0x01, 0x16 }, //  1. Clarinet ~~ Electric String 	Square wave with vibrato
+	{ 0x00, 0x10, 0x45, 0x00, 0xF6, 0x83, 0x73, 0x63 }, //  2. Synth Bass ~~ Bow wow 	Triangular wave
+	{ 0x13, 0x01, 0x96, 0x00, 0xF1, 0xF4, 0x31, 0x23 }, //  3. Piano ~~ Electric Guitar 	Despite of its name, same as Piano of YM2413.
+	{ 0x71, 0x21, 0x0B, 0x0F, 0xF9, 0x64, 0x70, 0x17 }, //  4. Flute ~~ Organ 	Sine wave
+	{ 0x02, 0x21, 0x1E, 0x06, 0xF9, 0x76, 0x00, 0x28 }, //  5. Square Wave ~~ Clarinet 	Same as ones of YM2413.
+	{ 0x00, 0x61, 0x82, 0x0E, 0xF9, 0x61, 0x20, 0x27 }, //  6. Space Oboe ~~ Saxophone 	Saw wave with vibrato
+	{ 0x21, 0x61, 0x1B, 0x07, 0x84, 0x8F, 0x10, 0x07 }, //  7. Trumpet ~~ Trumpet 	Same as ones of YM2413.
+	{ 0x37, 0x32, 0xCA, 0x02, 0x66, 0x64, 0x47, 0x29 }, //  8. Wow Bell ~~ Street Organ 	Calliope
+	{ 0x41, 0x41, 0x07, 0x03, 0xF5, 0x70, 0x51, 0xF5 }, //  9. Electric Guitar ~~ Synth Brass 	Same as Synthesizer of YM2413.
+	{ 0x36, 0x01, 0x5E, 0x07, 0xF2, 0xF3, 0xF7, 0xF7 }, // 10. Vibes ~~ Electric Piano 	Simulate of Rhodes Piano
+	{ 0x00, 0x00, 0x18, 0x06, 0xC5, 0xF3, 0x20, 0xF2 }, // 11. Bass ~~ Bass 	Electric bass
+	{ 0x17, 0x81, 0x25, 0x07, 0xF7, 0xF3, 0x21, 0xF7 }, // 12. Vibraphone ~~ Vibraphone	Same as ones of YM2413.
+	{ 0x35, 0x64, 0x00, 0x00, 0xFF, 0xF3, 0x77, 0xF5 }, // 13. Vibrato Bell ~~ Chime 	Bell
+	{ 0x11, 0x31, 0x00, 0x07, 0xDD, 0xF3, 0xFF, 0xFB }, // 14. Click Sine ~~ Tom Tom II 	Tom
+	{ 0x3A, 0x21, 0x00, 0x07, 0x95, 0x84, 0x0F, 0xF5 }, // 15. Noise and Tone ~~ Noise 	for S.E.
+	{ 0x01, 0x01, 0x18, 0x0F, 0xDF, 0xF8, 0x6A, 0x6D }, // 16. rhythm 1
+	{ 0x01, 0x01, 0x00, 0x00, 0xC8, 0xD8, 0xA7, 0x48 }, // 17. rhythm 2
+	{ 0x05, 0x01, 0x00, 0x00, 0xF8, 0xAA, 0x59, 0x55 }  // 18. rhythm 3
+};
+
+/*
+ * YMFM_YM2423_VOICES - YM2423 (OPLL variant) Instrument Table
+ * ----------------------------------------------------------
+ * Data Source:
+ *   - Independently reconstructed and estimated by Hubert Lamontagne
+ *     (see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches)
+ *   - These are not official ROM dumps, nor derived from GPL or community-standard ROM sets.
+ *   - This table is a license-free, public domain patch set suitable for safe use in OSS and commercial projects.
+ *   - The YM2423 is an OPLL-family FM synthesizer chip with unique presets, found in some Yamaha and Konami hardware.
+ *   - Reference: Yamaha YM2413 Application Manual (1986), Table 3 & Table 4
+ *                https://map.grauw.nl/resources/sound/yamaha_ym2413.pdf
+ *
+ * License Notice:
+ *   - This patch set is released under CC0/Public Domain by the original author(s).
+ *   - You may use, copy, modify, and distribute this file freely, with or without attribution.
+ *   - For details, see: https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches
+ */
+static const unsigned char YMFM_YM2423_VOICES[18][8] =
+{
+// May 4-6 2016 Hubert Lamontagne
+// Doesn't seem to have any diff between opllx-x and opllx-y
+// Drums seem identical to regular opll
+    { 0x61, 0x61, 0x1B, 0x07, 0x94, 0x5F, 0x10, 0x06 }, //1	Strings	Saw wave with vibrato Violin
+    { 0x93, 0xB1, 0x51, 0x04, 0xF3, 0xF2, 0x70, 0xFB }, //2	Guitar	Jazz GuitarPiano
+    { 0x41, 0x21, 0x11, 0x85, 0xF2, 0xF2, 0x70, 0x75 }, //3	Electric Guitar	Same as OPLL No.15 Synth 
+    { 0x93, 0xB2, 0x28, 0x07, 0xF3, 0xF2, 0x70, 0xB4 }, //4	Electric Piano 2	Slow attack, tremoloDing-a-ling
+    { 0x72, 0x31, 0x97, 0x05, 0x51, 0x6F, 0x60, 0x09 }, //5 	Flute	Same as OPLL No.4Clarinet
+    { 0x13, 0x30, 0x18, 0x06, 0xF7, 0xF4, 0x50, 0x85 }, //6	Marimba 	Also be used as steel drumXyophone
+    { 0x51, 0x31, 0x1C, 0x07, 0x51, 0x71, 0x20, 0x26 }, //7	Trumpet 	Same as OPLL No.7Trumpet
+    { 0x41, 0xF4, 0x1B, 0x07, 0x74, 0x34, 0x00, 0x06 }, //8	Harmonica Harmonica synth
+    { 0x50, 0x30, 0x4D, 0x03, 0x42, 0x65, 0x20, 0x06 }, //9	Tuba Tuba
+    { 0x40, 0x20, 0x10, 0x85, 0xF3, 0xF5, 0x20, 0x04 }, //10 	Synth Brass 2 Synth sweep
+    { 0x61, 0x61, 0x1B, 0x07, 0xC5, 0x96, 0xF3, 0xF6 }, //11 	Short Saw	Saw wave with short envelopeSynth hit
+    { 0xF9, 0xF1, 0xDC, 0x00, 0xF5, 0xF3, 0x77, 0xF2 }, //12 	Vibraphone	Bright vibraphoneVibes
+    { 0x60, 0xA2, 0x91, 0x03, 0x94, 0xC1, 0xF7, 0xF7 }, //13 	Electric Guitar 2	Clean guitar with feedbackHarmonic bass
+    { 0x30, 0x30, 0x17, 0x06, 0xF3, 0xF1, 0xB7, 0xFC }, //14 	Synth Bass 2Snappy bass
+    { 0x31, 0x36, 0x0D, 0x05, 0xF2, 0xF4, 0x27, 0x9C }, //15 	Sitar	Also be used as ShamisenBanjo
+}
+#endif // YM2413_VOICE_ROM_H
