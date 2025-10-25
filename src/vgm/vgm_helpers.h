@@ -58,6 +58,12 @@ typedef enum {
 } FM_MappingStyle;
 
 typedef enum {
+    OPLL_PresetSource_YMVOICE,
+    OPLL_PresetSource_YMFM,
+} OPLL_PresetSource;
+
+
+typedef enum {
     OPLL_PresetType_YM2413,
     OPLL_PresetType_VRC7,
     OPLL_PresetType_YMF281B,
@@ -99,6 +105,7 @@ typedef struct {
     bool is_a0_b0_aligned;
     bool is_keep_source_vgm;
     OPLL_PresetType preset;
+    OPLL_PresetSource preset_source;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -288,6 +295,9 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
  */
 const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags);
 
+const char* get_opll_preset_type(const OPLL_PresetType type);
+
+const char* get_opll_preset_source(const OPLL_PresetSource source);
 #ifdef __cplusplus
 }
 #endif

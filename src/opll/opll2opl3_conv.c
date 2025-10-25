@@ -338,21 +338,21 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     memset(p_vp, 0, sizeof(*p_vp));
 
     uint8_t user_patch[8];
-    const unsigned char (*source_preset)[8] = YM2413_VOICES; // Default
+    const unsigned char (*source_preset)[8] = YMVOICE_YM2413_VOICES; // Default
 
     // Select the preset table
     switch (p_opts->preset) {
         case OPLL_PresetType_YM2413:
-            source_preset = YM2413_VOICES;
+            source_preset = (p_opts->preset_source == OPLL_PresetSource_YMVOICE) ? YMVOICE_YM2413_VOICES : YMFM_YM2413_VOICES;
             break;
         case OPLL_PresetType_VRC7:
-            source_preset = VRC7_VOICES;
+            source_preset = YMFM_VRC7_VOICES;
             break;
         case OPLL_PresetType_YMF281B:
-            source_preset = YMF281B_VOICES;
+            source_preset = (p_opts->preset_source == OPLL_PresetSource_YMVOICE) ? YMVOICE_YMF281B_VOICES : YMFM_YMF281B_VOICES;
             break;
         default:
-            source_preset = YM2413_VOICES;
+            source_preset = YMVOICE_YM2413_VOICES;
             break;
     }
 
@@ -407,39 +407,75 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
 
     uint8_t fb = src[3] & 0x07;
 
-    // Modulator
-    p_vp->op[0].am   = m_am;
-    p_vp->op[0].vib  = m_vib;
-    p_vp->op[0].egt  = m_egt;
-    p_vp->op[0].ksr  = m_ksr;
-    p_vp->op[0].mult = m_mult;
-    p_vp->op[0].ksl  = m_kl;
-    p_vp->op[0].tl   = m_tl;
-    p_vp->op[0].ar   = m_ar;
-    p_vp->op[0].dr   = m_dr;
-    p_vp->op[0].sl   = m_sl;
-    p_vp->op[0].rr   = m_rr;
-    p_vp->op[0].ws   = m_ws;
+    if (p_opts->preset_source == OPLL_PresetSource_YMFM) {
+        // Modulator
+        p_vp->op[0].am   = m_am;
+        p_vp->op[0].vib  = m_vib;
+        p_vp->op[0].egt  = m_egt;
+        p_vp->op[0].ksr  = m_ksr;
+        p_vp->op[0].mult = opll2opl_mult[m_mult];
+        p_vp->op[0].ksl  = opll2opl_ksl[m_kl];
+        p_vp->op[0].tl   = opll2opl_tl(m_tl);
+        p_vp->op[0].ar   = opll2opl_ar[m_ar];
+        p_vp->op[0].dr   = opll2opl_dr[m_dr];
+        p_vp->op[0].sl   = m_sl;
+        p_vp->op[0].rr   = opll2opl_rr[m_rr];
+        p_vp->op[0].ws   = m_ws;
 
-    // Carrier
-    p_vp->op[1].am   = c_am;
-    p_vp->op[1].vib  = c_vib;
-    p_vp->op[1].egt  = c_egt;
-    p_vp->op[1].ksr  = c_ksr;
-    p_vp->op[1].mult = c_mult;
-    p_vp->op[1].ksl  = c_kl;
-    p_vp->op[1].tl   = c_tl;
-    p_vp->op[1].ar   = c_ar;
-    p_vp->op[1].dr   = c_dr;
-    p_vp->op[1].sl   = c_sl;
-    p_vp->op[1].rr   = c_rr;
-    p_vp->op[1].ws   = c_ws;
+        // Carrier
+        p_vp->op[1].am   = c_am;
+        p_vp->op[1].vib  = c_vib;
+        p_vp->op[1].egt  = c_egt;
+        p_vp->op[1].ksr  = c_ksr;
+        p_vp->op[1].mult = opll2opl_mult[c_mult];
+        p_vp->op[1].ksl  = opll2opl_ksl[c_kl];
+        p_vp->op[1].tl   = opll2opl_tl(c_tl);
+        p_vp->op[1].ar   = opll2opl_ar[c_ar];
+        p_vp->op[1].dr   = opll2opl_dr[c_dr];
+        p_vp->op[1].sl   = c_sl;
+        p_vp->op[1].rr   = opll2opl_rr[c_rr];
+        p_vp->op[1].ws   = c_ws;
 
-    p_vp->fb[0] = fb;
-    p_vp->cnt[0] = 0;
-    p_vp->is_4op = 0;
-    p_vp->voice_no = inst;
-    p_vp->source_fmchip = 0x01; // YM2413
+        p_vp->fb[0] = fb;
+        p_vp->cnt[0] = 0;
+        p_vp->is_4op = 0;
+        p_vp->voice_no = inst;
+        p_vp->source_fmchip = 0x01; // YM2413
+    } else {
+        // Modulator
+        p_vp->op[0].am   = m_am;
+        p_vp->op[0].vib  = m_vib;
+        p_vp->op[0].egt  = m_egt;
+        p_vp->op[0].ksr  = m_ksr;
+        p_vp->op[0].mult = m_mult;
+        p_vp->op[0].ksl  = m_kl;
+        p_vp->op[0].tl   = m_tl;
+        p_vp->op[0].ar   = m_ar;
+        p_vp->op[0].dr   = m_dr;
+        p_vp->op[0].sl   = m_sl;
+        p_vp->op[0].rr   = m_rr;
+        p_vp->op[0].ws   = m_ws;
+
+        // Carrier
+        p_vp->op[1].am   = c_am;
+        p_vp->op[1].vib  = c_vib;
+        p_vp->op[1].egt  = c_egt;
+        p_vp->op[1].ksr  = c_ksr;
+        p_vp->op[1].mult = c_mult;
+        p_vp->op[1].ksl  = c_kl;
+        p_vp->op[1].tl   = c_tl;
+        p_vp->op[1].ar   = c_ar;
+        p_vp->op[1].dr   = c_dr;
+        p_vp->op[1].sl   = c_sl;
+        p_vp->op[1].rr   = c_rr;
+        p_vp->op[1].ws   = c_ws;
+
+        p_vp->fb[0] = fb;
+        p_vp->cnt[0] = 0;
+        p_vp->is_4op = 0;
+        p_vp->voice_no = inst;
+        p_vp->source_fmchip = 0x01; // YM2413
+    }
 
     if (p_opts && p_opts->debug.verbose) {
         fprintf(stderr, "[YM2413->OPL3] inst=%d RAW: %02X %02X %02X %02X  %02X %02X %02X %02X\n",

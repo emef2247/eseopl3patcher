@@ -171,7 +171,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
     } else {
         printf(
             "Usage: %s <input.vgm> <detune> [wait] [creator]\n"
-            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--preset <YM2413|VRC7|YMF281B>] [--keep_source_vgm]  [--wait <val>]\n"
+            "          [-o <output.vgm>] [--ch_panning <val>] [--vr0 <val>] [--vr1 <val>] [--detune <val>] [--detune_limit <val>] [--preset <YM2413|VRC7|YMF281B>] [--preset <YMVOICE|YMFM>]  [--keep_source_vgm]  [--wait <val>]\n"
             "          [other options, see --help]\n"
             "\n"
             "Most commonly-used options:\n"
@@ -180,6 +180,7 @@ static void print_usage(const char *progname, DebugOpts *debug) {
             "  --ch_panning <val>               Channel panning mode.\n"
             "  --vr0 <val>, --vr1 <val>         Port0/Port1 volume ratios.\n"
             "  --preset <YM2413|VRC7|YMF281B>   Voice preset table for YM2413 conversion (YM2413, VRC7, YMF281B). Default: YM2413\n"
+            "  --preset_source <YMVOICE|YMFM>   Voice preset reference (YMVOICE, YMFM). Default: YMVOICE\n"
             "  --keep_source_vgm                Output original vgm command \n"
             "  -o <output.vgm>                  Output file name.\n"
             "  -h, --help                       Show this help message.\n"
@@ -202,6 +203,18 @@ static OPLL_PresetType decode_preset_type(const char *str) {
     if (strcasecmp(str, "VRC7") == 0)   return OPLL_PresetType_VRC7;
     if (strcasecmp(str, "YMF281B") == 0) return OPLL_PresetType_YMF281B;
     return OPLL_PresetType_YM2413; // default fallback
+}
+
+/**
+ * Decode preset string to OPLL_PresetSource enum.
+ * Supported values: "YMVOICE", "YMFM"
+ * Returns OPLL_PresetType_YM2413 for unknown input.
+ */
+static OPLL_PresetType decode_preset_source(const char *str) {
+    if (!str) return OPLL_PresetType_YM2413;
+    if (strcasecmp(str, "YMVOICE") == 0) return OPLL_PresetSource_YMVOICE;
+    if (strcasecmp(str, "YMFM") == 0)   return OPLL_PresetSource_YMFM;
+    return OPLL_PresetSource_YMVOICE; // default fallback
 }
 
 static int update_is_adding_bytes(VGMContext *vgmctx, uint32_t orig_loop_offset, uint32_t current_addr) {
@@ -244,7 +257,10 @@ int main(int argc, char *argv[]) {
     bool force_retrigger_each_note = false;
     bool is_keep_source_vgm = false;
     OPLL_PresetType preset = OPLL_PresetType_YM2413;
+    OPLL_PresetSource preset_source = OPLL_PresetSource_YMVOICE;
+
     const char *preset_str = "YM2413";
+    const char *preset_source_str = "YMVOICE";
 
     // Added: audible-sanity runtime value (if 0, use build-time default)
     uint16_t min_gate_samples        = 8196; // Equivalent to OPLL_MIN_GATE_SAMPLES
@@ -322,7 +338,16 @@ int main(int argc, char *argv[]) {
             preset_str = argv[++i];
             preset = decode_preset_type(preset_str);
             continue;
+        } else if ((strcmp(argv[i], "-preset_source") == 0 || strcmp(argv[i], "--preset_source") == 0) && i + 1 < argc) {
+            preset_source_str = argv[++i];
+            preset_source = decode_preset_source(preset_source_str);
+            continue;
         }
+    }
+
+    // If the preset is VRC7, the preset source is always set to YMFM.
+    if (preset == OPLL_PresetType_VRC7) {
+        preset_source = OPLL_PresetSource_YMFM;
     }
 
     // Parse chip flags and debug options
@@ -351,6 +376,7 @@ int main(int argc, char *argv[]) {
         .is_a0_b0_aligned = false,
         .is_keep_source_vgm = is_keep_source_vgm,
         .preset = preset,
+        .preset_source = preset_source,
         .debug = debug_opts
     };
 
@@ -890,31 +916,29 @@ int main(int argc, char *argv[]) {
     
     if (vgmctx.source_fmchip == FMCHIP_YM2413) {
         snprintf(note_append, sizeof(note_append),
-            "Converted from YM2413 to OPL3. "
-            "Detune:%.2f%% "
-            "audible_sanity:%s "
-            "min_gate:%u "
-            "pre_on:%u "
-            "off_on:%u "
-            "boost:%d "
-            "clamp:%s(%u)",
+            ", Conversion from %s to OPL3 with Preset:%s/%s Detune:%.2f%%(max:+-%.2f) KEY ON/OFF wait:%d "
+            "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%% debug_verbose:%s",
+            get_converted_opl_chip_name(&chip_flags), get_opll_preset_type(preset), get_opll_preset_source(preset_source),
             detune,
-            cmd_opts.debug.audible_sanity ? "ON":"OFF",
-            (unsigned)(cmd_opts.min_gate_samples ? cmd_opts.min_gate_samples : 0),
-            (unsigned)(cmd_opts.pre_keyon_wait_samples ? cmd_opts.pre_keyon_wait_samples : 0),
-            (unsigned)(cmd_opts.min_off_on_wait_samples ? cmd_opts.min_off_on_wait_samples : 0),
-            cmd_opts.emergency_boost_steps,
-            cmd_opts.carrier_tl_clamp_enabled ? "ON":"OFF",
-            cmd_opts.carrier_tl_clamp);
+            (double)detune_limit,
+            (int)opl3_keyon_wait,
+            (int)ch_panning,
+            v_ratio0 * 100,
+            v_ratio1 * 100,
+            debug_opts.verbose ? "ON" : "OFF"
+        );
     } else {
         snprintf(note_append, sizeof(note_append),
-                ", Converted from %s to OPL3. Detune:%.2f%% KEY ON/OFF wait:%d "
-                "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%% carrier_tl_clamp:%s(%u) audible_sanity:%s debug_verbose:%s",
-                get_converted_opl_chip_name(&chip_flags), detune, opl3_keyon_wait,
-                ch_panning, v_ratio0 * 100, v_ratio1 * 100,
-                carrier_tl_clamp_enabled ? "ON" : "OFF", carrier_tl_clamp,
-                debug_opts.audible_sanity ? "ON" : "OFF",
-                debug_opts.verbose ? "ON" : "OFF"
+            ", Conversion from %s to OPL3. Detune:%.2f%%(max:+-%.2f) KEY ON/OFF wait:%d "
+            "Ch Panning mode:%d port0 volume:%.2f%% port1 volume:%.2f%% debug_verbose:%s",
+            get_converted_opl_chip_name(&chip_flags),
+            detune,
+            (double)detune_limit,
+            (int)opl3_keyon_wait,
+            (int)ch_panning,
+            v_ratio0 * 100,
+            v_ratio1 * 100,
+            debug_opts.verbose ? "ON" : "OFF"
         );
     }
 
@@ -996,7 +1020,8 @@ int main(int argc, char *argv[]) {
         //printf("[YM2413] Minimum gate duration [samples]:%u \n",min_gate_samples);
         //printf("[YM2413] Minimum gate :%u \n", pre_keyon_wait_samples);
         //printf("[YM2413] Min weight samples:%u \n", min_off_on_wait_samples);
-        printf("[YM2413] Preset(-preset): %s\n",preset_str);
+        printf("[YM2413] Preset(-preset): %s\n",get_opll_preset_type(preset));
+        printf("[YM2413] Preset source(-preset_source): %s\n",get_opll_preset_source(preset_source));
 
     }
 

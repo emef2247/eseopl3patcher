@@ -170,3 +170,16 @@ const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags) {
     if (chip_flags->has_y8950)   return "Y8950";
     return "UNKNOWN";
 }
+
+const char* get_opll_preset_type(const OPLL_PresetType type) {
+    if (type == OPLL_PresetType_YM2413)  return "YM2413";
+    if (type == OPLL_PresetType_VRC7)  return "VRC7";
+    if (type == OPLL_PresetType_YMF281B)  return "YMF281B";
+    return "UNKNOWN";
+}
+
+const char* get_opll_preset_source(const OPLL_PresetSource source) {
+    if (source == OPLL_PresetSource_YMVOICE)  return "YMVOICE";
+    if (source == OPLL_PresetSource_YMFM)  return "YMFM";
+    return "UNKNOWN";
+}
