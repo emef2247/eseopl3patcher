@@ -30,7 +30,7 @@ YM2413/OPLL変換時は、VRC7やYMF281B, YM2423の音色プリセットも選�
 - OPL2/OPLL系コマンドをOPL3(YMF262)コマンドへ変換
 - OPL3の拡張チャンネル（ch9～17）でデチューン・コーラス効果
 - パンニング・ボリューム調整 (`-ch_panning`, `-vr0`, `-vr1`)
-- YM2413変換時に音色ROM（YM2413, VRC7, YMF281B, YM2423）選択可能（`--preset`）【v2.1.0より】
+- YM2413変換時に音色プリセット（YM2413, VRC7, YMF281B, YM2423）選択可能（`--preset`）【v2.1.0より】
 - GD3タグ自動生成（変換情報・パラメータ記録）
 - 詳細デバッグモード（`-verbose`）
 - 複数OPL系チップ混在時の自動判定または明示選択
@@ -99,7 +99,7 @@ YM2413/OPLL変換時は、VRC7やYMF281B, YM2423の音色プリセットも選�
 | `-vr0 <float>` | Port0ボリューム比 | 1.0 |
 | `-vr1 <float>` | Port1ボリューム比 | 0.8 |
 | `-detune_limit <float>` | デチューン量の上限 | 4.0 |
-| `--preset <YM2413|VRC7|YMF281B|YM2423>` | YM2413変換時の音色ROM | YM2413 |
+| `--preset <YM2413|VRC7|YMF281B|YM2423>` | YM2413変換時の音色プリセット | YM2413 |
 | `--preset_source <YMVOICE|YMFM|EXPERIMENT>` | プリセット音色の生成元 | YMFM |
 | `--keep_source_vgm` | YM2413コマンドを残し、OPL3と同時演奏 | 無効 |
 | `--convert-ym2413` | YM2413のみ変換 | (自動判定) |
