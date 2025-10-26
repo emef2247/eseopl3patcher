@@ -313,80 +313,78 @@ void convert_ymfm_2413_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
-    // 0: Violin
+    // 1: Violin
     exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // TL
-    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x08; // DR（下位4bit 0x8固定）
+    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x08; //
 
-    // 1: Guitar
-    exp[1][4] = (ymfm[1][4] & 0xF8) | 0xD8; // 0xF8→0xD8
+    // 2: Guitar
+    exp[1][4] = (ymfm[1][4] & 0xF8) | 0xD8; 
 
-    // 2: Piano
-    exp[2][5] = ymfm[2][5] + 0x10; // 0xC4→0xD4
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21; // 0x11→0x21
+    // 3: Piano
+    exp[2][5] = ymfm[2][5] + 0x10;
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21;
 
-    // 3: Flute
-    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11; // 0x31→0x11
-    exp[3][4] = (ymfm[3][4] & 0xF0) | 0x8D; // 0x98→0x8D
+    // 4: Flute
+    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11;
+    exp[3][4] = (ymfm[3][4] & 0xF0) | 0x8D;
 
-    // 4: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // 0x22→0x32
-    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1; // 0xBF→0xE1
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01; // 0x00→0x01
+    // 5: Clarinet
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
+    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
 
-    // 5: Oboe
-    exp[5][6] = ymfm[5][6] & 0xF0; // 0x0F→0x00
+    // 6: Oboe
+    exp[5][6] = ymfm[5][6] & 0xF0;
 
-    // 6: Trumpet
-    exp[6][5] = ymfm[6][5] & ~0x0E; // 0x8F→0x81
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // 0x10→0x11
+    // 7: Trumpet
+    exp[6][5] = ymfm[6][5] & ~0x0E; 
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
 
-    // 7: Organ
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33; // 0x23→0x33
-    exp[7][2] = ymfm[7][2];                 // 0x2D→0x2D
-    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13; // 0x14→0x13
-    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xB0; // 0xFF→0xB0
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70; // 0x7F→0x70
+    // 8: Organ
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33;
+    exp[7][2] = ymfm[7][2];                
+    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13;
+    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xB0;
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70;
 
-    // 8: Horn
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61; // 0x41→0x61
+    // 9: Horn
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61;
 
-    // 9: Synthesizer
-    exp[9][0] = ymfm[9][0]; // 0x41→0x41
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0; // 0xFF→0xF0
+    // 10: Synthesizer
+    exp[9][0] = ymfm[9][0];
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0;
 
-    // 10: Harpsichord
-    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33; // 0x13→0x33
-    exp[10][4] = (ymfm[10][4] & 0xF0) | 0xEA; // 0xFA→0xEA
-    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF; // 0xE4→0xEF
+    // 11: Harpsichord
+    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33;
+    exp[10][4] = (ymfm[10][4] & 0xF0) | 0xEA;
+    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF;
 
-    // 11: Vibraphone
-    exp[11][0] = ymfm[11][0]; // 0x17
-    exp[11][1] = (ymfm[11][1] & 0xC0) | 0xC1; // 0x81→0xC1
-    exp[11][2] = ymfm[11][2] & ~((1 << 1) | (1 << 2) | (1 << 5)); // 0x23→0x24
+    // 12: Vibraphone
+    exp[11][0] = ymfm[11][0];
+    exp[11][1] = (ymfm[11][1] & 0xC0) | 0xC1;
+    exp[11][2] = ymfm[11][2] & ~((1 << 1) | (1 << 2) | (1 << 5));
 
-    // 12: Synth Bass
-    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xD2; // 0xF2→0xD2
-    exp[12][5] = ymfm[12][5];                  // 0xF5
-    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;  // 0x29→0x40
+    // 13: Synth Bass
+    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xD2;
+    exp[12][5] = ymfm[12][5];                
+    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;
 
-    // 13: Acoustic Bass
-    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55; // 0x54→0x55
-    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4; // 0xC3→0xE4
-    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90; // 0x92→0x90
+    // 14: Acoustic Bass
+    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;
+    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4;
+    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90;
 
-    // 14: Electric Guitar
-    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xF1; // 0xF1→0xF1
-    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4; // 0xE5→0xE4
-    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0; // 0x11→0xC0
+    // 15: Electric Guitar
+    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xF1;
+    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4;
+    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;
 
-    // 15: Rhythm1 (BD)
-    // そのまま
+    // 16: Rhythm1 (BD)
 
-    // 16: Rhythm2 (SD/HH)
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68; // 0x48→0x68
+    // 17: Rhythm2 (SD/HH)
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
 
-    // 17: Rhythm3 (TT/CYM)
-    // そのまま
+    // 18: Rhythm3 (TT/CYM)
 }
 
 /*
@@ -394,51 +392,50 @@ void convert_ymfm_2413_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
  * Each voice is commented with its number and English instrument name.
  */
 void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
-    // 全コピー
     for (int i = 0; i < 18; ++i)
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
-    // 0: Bell
-    exp[0][4] = ymfm[0][4] + 0x20; // C8→E8
+    // 1: Bell
+    exp[0][4] = ymfm[0][4] + 0x20;
 
-    // 1: Guitar
-    exp[1][4] = ymfm[1][4] - 0x20; // F8→D8
-    exp[1][5] = ymfm[1][5] - 1;    // F7→F6
+    // 2: Guitar
+    exp[1][4] = ymfm[1][4] - 0x20;
+    exp[1][5] = ymfm[1][5] - 1;
 
-    // 2: Piano
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11; // 31→11
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11; // 11→11
-    exp[2][5] = ymfm[2][5] - 0x10; // C2→B2
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20; // 28→20
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12; // 22→12
+    // 3: Piano
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;
+    exp[2][5] = ymfm[2][5] - 0x10; 
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;
 
-    // 3: Flute
-    exp[3][4] = ymfm[3][4] - 0x50; // F8→A8
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61; // 60→61
+    // 4: Flute
+    exp[3][4] = ymfm[3][4] - 0x50;
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;
 
-    // 4: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // 22→32
-    exp[4][4] = ymfm[4][4] & 0xE1; // FF→E1
-    exp[4][6] = ymfm[4][6] | 0x01; // 00→01
+    // 5: Clarinet
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
+    exp[4][4] = ymfm[4][4] & 0xE1;
+    exp[4][6] = ymfm[4][6] | 0x01;
 
-    // 5: Synth Brass
-    exp[5][2] = ymfm[5][2] + 1;    // 05→06
-    exp[5][4] = ymfm[5][4] - 0x09; // AC→A3
-    exp[5][5] = ymfm[5][5] - 0x10; // F2→E2
+    // 6: Synth Brass
+    exp[5][2] = ymfm[5][2] + 1;   
+    exp[5][4] = ymfm[5][4] - 0x09;
+    exp[5][5] = ymfm[5][5] - 0x10;
     exp[5][6] = 0xF4;
     exp[5][7] = 0xF4;
 
-    // 6: Trumpet
-    exp[6][5] = ymfm[6][5] & ~0x0E; // 8F→81
+    // 7: Trumpet
+    exp[6][5] = ymfm[6][5] & ~0x0E; 
     exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // 10→11
 
-    // 7: Organ
+    // 8: Organ
     exp[7][4] = (ymfm[7][4] == 0xFF) ? 0xA2 : ymfm[7][4]; // FF→A2
     exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72; // 73→72
     exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01; // 00→01
 
-    // 8: Horn
+    // 9: Horn
     exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35; // 15→35
     exp[8][1] = ymfm[8][1]; // 11
     exp[8][2] = ymfm[8][2]; // 25
@@ -447,7 +444,7 @@ void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72; // 00→72
     exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01; // F1→01
 
-    // 9: Synth
+    // 10: Synth
     exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5; // 95→B5
     exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F; // 10→0F
     exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F; // 0F→0F
@@ -455,32 +452,32 @@ void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[9][5] = (ymfm[9][5] & 0xF0) | 0xA5; // AA→A5
     exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51; // 50→51
 
-    // 10: Harpsichord
+    // 11: Harpsichord
     exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 5E→24
 
-    // 11: Vibraphone
+    // 12: Vibraphone
     exp[11][6] = (ymfm[11][6] & 0xF0) | 0x18; // 10→18
 
-    // 12: Acoustic Bass
+    // 13: Acoustic Bass
     exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
     exp[12][5] = (ymfm[12][5] & 0xF0) | 0x95;
     exp[12][6] = ymfm[12][6] & 0x0F;
     exp[12][7] = ymfm[12][7] & 0x0F;
 
-    // 13: Electric Guitar
+    // 14: Electric Guitar
     exp[13][4] = ymfm[13][4] - 0x10;
     exp[13][5] = ymfm[13][5] & ~0x3F;
     exp[13][6] = ymfm[13][6] | 0x03;
     exp[13][7] = ymfm[13][7] | 0xF0;
 
-    // 14: Bass Synth
+    // 15: Bass Synth
     exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
     exp[14][4] = ymfm[14][4] | 0x20;
     exp[14][5] = ymfm[14][5] & 0xF5;
     exp[14][6] = ymfm[14][6] | 0x06;
     exp[14][7] = ymfm[14][7] & 0xFE;
 
-    // 15: Drum kit
+    // 16: Drum kit
     exp[15][2] = ymfm[15][2] | 0x18;
     exp[15][3] = ymfm[15][3] | 0x0F;
     exp[15][4] = ymfm[15][4] | 0x1F;
@@ -488,7 +485,7 @@ void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[15][6] = ymfm[15][6] & 0x7A;
     exp[15][7] = ymfm[15][7] | 0x05;
 
-    // 16: Rhythm2
+    // 17: Rhythm2
     exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
 }
 
@@ -501,20 +498,20 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
-    // 0: Bell
+    // 1: Bell
     exp[0][0] = (ymfm[0][0] & 0xF0) | 0x03;
     exp[0][4] = (ymfm[0][4] & 0x0F) | 0xE8;
     exp[0][5] = (ymfm[0][5] & 0x0F) | 0x81;
     exp[0][6] = (ymfm[0][6] & 0xF0) | 0x42;
 
-    // 1: Guitar
+    // 2: Guitar
     exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
     exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD8;
     exp[1][5] = (ymfm[1][5] & 0x0F) | 0xF6;
     exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
     exp[1][7] = (ymfm[1][7] & 0xF0) | 0x12;
 
-    // 2: Piano
+    // 3: Piano
     exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;
     exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;
     exp[2][4] = (ymfm[2][4] & 0xF0) | 0xFA;
@@ -522,16 +519,16 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
     exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;
     exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;
 
-    // 3: Flute
+    // 4: Flute
     exp[3][4] = (ymfm[3][4] & 0xF0) | 0xA8;
     exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;
 
-    // 4: Clarinet
+    // 5: Clarinet
     exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
     exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;
     exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
 
-    // 5: Synth Brass
+    // 6: Synth Brass
     exp[5][0] = (ymfm[5][0] & 0xF0) | 0x02;
     exp[5][1] = (ymfm[5][1] & 0xF0) | 0x01;
     exp[5][2] = (ymfm[5][2] & 0xF0) | 0x06;
@@ -540,20 +537,20 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
     exp[5][6] = (ymfm[5][6] & 0xF0) | 0xF4;
     exp[5][7] = (ymfm[5][7] & 0xF0) | 0xF4;
 
-    // 6: Trumpet
+    // 7: Trumpet
     exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
     exp[6][4] = (ymfm[6][4] & 0xF0) | 0x82;
     exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;
     exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
 
-    // 7: Organ
+    // 8: Organ
     exp[7][0] = (ymfm[7][0] & 0xF0) | 0x23;
     exp[7][2] = (ymfm[7][2] & 0xF0) | 0x22;
     exp[7][4] = (ymfm[7][4] & 0xF0) | 0xA2;
     exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72;
     exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01;
 
-    // 8: Horn
+    // 9: Horn
     exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35;
     exp[8][1] = (ymfm[8][1] & 0xF0) | 0x11;
     exp[8][2] = (ymfm[8][2] & 0xF0) | 0x25;
@@ -562,7 +559,7 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
     exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72;
     exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01;
 
-    // 9: Synth
+    // 10: Synth
     exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5;
     exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F;
     exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F;
@@ -570,34 +567,34 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
     exp[9][5] = (ymfm[9][5] & 0x0F) | 0xA0;
     exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51;
 
-    // 10: Harpsichord
+    // 11: Harpsichord
     exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 0x5E→0x24
     exp[10][4] = ymfm[10][4] | 0x08; // 0xF8→0xF8
     exp[10][5] = ymfm[10][5] | 0x08; // 0xF8→0xF8
 
-    // 11: Vibraphone
+    // 12: Vibraphone
     exp[11][6] = ymfm[11][6] | 0x08; // 0x10→0x18
 
-    // 12: Acoustic Bass
+    // 13: Acoustic Bass
     exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
     exp[12][5] = (ymfm[12][5] | 0x03) & 0x95;
     exp[12][6] = ymfm[12][6] & 0x0F;
     exp[12][7] = ymfm[12][7] & 0x0F;
 
-    // 13: Electric Guitar
+    // 14: Electric Guitar
     exp[13][4] = ymfm[13][4] - 0x10;
     exp[13][5] = ymfm[13][5] & ~0x3F;
     exp[13][6] = ymfm[13][6] | 0x03;
     exp[13][7] = ymfm[13][7] | 0xF0;
 
-    // 14: Bass Synth
+    // 15: Bass Synth
     exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
     exp[14][4] = ymfm[14][4] | 0x20;
     exp[14][5] = ymfm[14][5] & 0xF5;
     exp[14][6] = ymfm[14][6] | 0x06;
     exp[14][7] = ymfm[14][7] & 0xFE;
 
-    // 15: Drum kit
+    // 16: Drum kit
     exp[15][2] = ymfm[15][2] | 0x18;
     exp[15][3] = ymfm[15][3] | 0x0F;
     exp[15][4] = ymfm[15][4] | 0x1F;
@@ -605,10 +602,10 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
     exp[15][6] = ymfm[15][6] & 0x7A;
     exp[15][7] = ymfm[15][7] | 0x05;
 
-    // 16: Rhythm2 (SD/HH)
+    // 17: Rhythm2 (SD/HH)
     exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
 
-    // 17: Rhythm3 (TT/CYM) そのまま
+    // 18: Rhythm3 (TT/CYM)
     // exp[17][k] = ymfm[17][k]; 
 }
 
@@ -617,7 +614,7 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
  * Each voice is commented with its number and English instrument name.
  */
 void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
-    // Violin (ch=0)
+    // 1. Violin (ch=0)
     exp[0][0] = (ymfm[0][0] & 0xF0) | 0x11;
     exp[0][1] = (ymfm[0][1] & 0xF0) | 0x61;
     exp[0][2] = (ymfm[0][2] & 0xF0) | 0x1E;
@@ -627,7 +624,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[0][6] = (ymfm[0][6] & 0xF0) | 0x00;
     exp[0][7] = (ymfm[0][7] & 0xF0) | 0x17;
 
-    // Guitar (ch=1)
+    // 2. Guitar (ch=1)
     exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
     exp[1][1] = (ymfm[1][1] & 0xF0) | 0x41;
     exp[1][2] = (ymfm[1][2] & 0xF0) | 0x1A;
@@ -637,7 +634,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
     exp[1][7] = (ymfm[1][7] & 0xF0) | 0x13;
 
-    // Piano (ch=2)
+    // 3. Piano (ch=2)
     exp[2][0] = (ymfm[2][0] & 0xF0) | 0x13;
     exp[2][1] = (ymfm[2][1] & 0xF0) | 0x01;
     exp[2][2] = (ymfm[2][2] & 0xF0) | 0x99;
@@ -647,7 +644,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21;
     exp[2][7] = (ymfm[2][7] & 0xF0) | 0x23;
 
-    // Flute (ch=3)
+    // 4. Flute (ch=3)
     exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11;
     exp[3][1] = (ymfm[3][1] & 0xF0) | 0x61;
     exp[3][2] = (ymfm[3][2] & 0xF0) | 0x0E;
@@ -657,7 +654,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[3][6] = (ymfm[3][6] & 0xF0) | 0x70;
     exp[3][7] = (ymfm[3][7] & 0xF0) | 0x27;
 
-    // Clarinet (ch=4)
+    // 5. Clarinet (ch=4)
     exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
     exp[4][1] = (ymfm[4][1] & 0xF0) | 0x21;
     exp[4][2] = (ymfm[4][2] & 0xF0) | 0x1E;
@@ -667,7 +664,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
     exp[4][7] = (ymfm[4][7] & 0xF0) | 0x28;
 
-    // Oboe (ch=5)
+    // 6. Oboe (ch=5)
     exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31;
     exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22;
     exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16;
@@ -677,7 +674,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00;
     exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18;
 
-    // Trumpet (ch=6)
+    // 7. Trumpet (ch=6)
     exp[6][0] = (ymfm[6][0] & 0xF0) | 0x21;
     exp[6][1] = (ymfm[6][1] & 0xF0) | 0x61;
     exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
@@ -687,7 +684,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
     exp[6][7] = (ymfm[6][7] & 0xF0) | 0x07;
 
-    // Organ (ch=7)
+    // 8. Organ (ch=7)
     exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33;
     exp[7][1] = (ymfm[7][1] & 0xF0) | 0x21;
     exp[7][2] = (ymfm[7][2] & 0xF0) | 0x2D;
@@ -697,7 +694,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[7][6] = (ymfm[7][6] & 0xF0) | 0x00;
     exp[7][7] = (ymfm[7][7] & 0xF0) | 0x07;
 
-    // Horn (ch=8)
+    // 9. Horn (ch=8)
     exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61;
     exp[8][1] = (ymfm[8][1] & 0xF0) | 0x61;
     exp[8][2] = (ymfm[8][2] & 0xF0) | 0x1B;
@@ -707,7 +704,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[8][6] = (ymfm[8][6] & 0xF0) | 0x10;
     exp[8][7] = (ymfm[8][7] & 0xF0) | 0x17;
 
-    // Synthesizer (ch=9)
+    // 10. Synthesizer (ch=9)
     exp[9][0] = (ymfm[9][0] & 0xF0) | 0x41;
     exp[9][1] = (ymfm[9][1] & 0xF0) | 0x61;
     exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0B;
@@ -717,7 +714,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[9][6] = (ymfm[9][6] & 0xF0) | 0x81;
     exp[9][7] = (ymfm[9][7] & 0xF0) | 0x07;
 
-    // Harpsichord (ch=10)
+    // 11. Harpsichord (ch=10)
     exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33;
     exp[10][1] = (ymfm[10][1] & 0xF0) | 0x01;
     exp[10][2] = (ymfm[10][2] & 0xF0) | 0x83;
@@ -727,7 +724,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[10][6] = (ymfm[10][6] & 0xF0) | 0x10;
     exp[10][7] = (ymfm[10][7] & 0xF0) | 0x04;
 
-    // Vibraphone (ch=11)
+    // 12. Vibraphone (ch=11)
     exp[11][0] = (ymfm[11][0] & 0xF0) | 0x17;
     exp[11][1] = (ymfm[11][1] & 0xF0) | 0xC1;
     exp[11][2] = (ymfm[11][2] & 0xF0) | 0x24;
@@ -737,7 +734,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[11][6] = (ymfm[11][6] & 0xF0) | 0x22;
     exp[11][7] = (ymfm[11][7] & 0xF0) | 0x12;
 
-    // Synth Bass (ch=12)
+    // 13. Synth Bass (ch=12)
     exp[12][0] = (ymfm[12][0] & 0xF0) | 0x61;
     exp[12][1] = (ymfm[12][1] & 0xF0) | 0x50;
     exp[12][2] = (ymfm[12][2] & 0xF0) | 0x0C;
@@ -747,7 +744,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;
     exp[12][7] = (ymfm[12][7] & 0xF0) | 0x42;
 
-    // Acoustic Bass (ch=13)
+    // 14. Acoustic Bass (ch=13)
     exp[13][0] = (ymfm[13][0] & 0xF0) | 0x01;
     exp[13][1] = (ymfm[13][1] & 0xF0) | 0x01;
     exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;
@@ -757,7 +754,7 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[13][6] = (ymfm[13][6] & 0xF0) | 0x03;
     exp[13][7] = (ymfm[13][7] & 0xF0) | 0x02;
 
-    // Electric Guitar (ch=14)
+    // 15. Electric Guitar (ch=14)
     exp[14][0] = (ymfm[14][0] & 0xF0) | 0x41;
     exp[14][1] = (ymfm[14][1] & 0xF0) | 0x41;
     exp[14][2] = (ymfm[14][2] & 0xF0) | 0x89;
@@ -767,12 +764,14 @@ void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
     exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;
     exp[14][7] = (ymfm[14][7] & 0xF0) | 0x13;
 
-    // Rhythm1 (BD) ch=15
+    // 16. Rhythm1 (BD) ch=15
     for(int j=0; j<8; ++j) exp[15][j] = ymfm[15][j];
-    // Rhythm2 (SD/HH) ch=16
+    
+    // 17. Rhythm2 (SD/HH) ch=16
     for(int j=0; j<8; ++j) exp[16][j] = ymfm[16][j];
     exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
-    // Rhythm3 (TT/CYM) ch=17
+    
+    // 18. Rhythm3 (TT/CYM) ch=17
     for(int j=0; j<8; ++j) exp[17][j] = ymfm[17][j];
 }
 
