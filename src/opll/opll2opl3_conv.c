@@ -309,14 +309,13 @@ static inline uint8_t ym2413_to_opl3_tl(uint8_t inst_tl, uint8_t volume) {
  * Each voice is commented with its number and English instrument name.
  */
 void convert_ymfm_2413_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
-    // まず全コピー
     for (int i = 0; i < 18; ++i)
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
     // 0: Violin
-    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // 0xEF→0xD0
-    exp[0][5] = (ymfm[0][5] & 0x0F) | 0x70; // 0x7F→0x78
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // TL
+    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x08; // DR（下位4bit 0x8固定）
 
     // 1: Guitar
     exp[1][4] = (ymfm[1][4] & 0xF8) | 0xD8; // 0xF8→0xD8
@@ -395,183 +394,169 @@ void convert_ymfm_2413_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
  * Each voice is commented with its number and English instrument name.
  */
 void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
+    // 全コピー
     for (int i = 0; i < 18; ++i)
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
-    // 0: Bell (Buzzy Bell)
-    exp[0][4] = ymfm[0][4] + 0x20; // 0xC8→0xE8
+    // 0: Bell
+    exp[0][4] = ymfm[0][4] + 0x20; // C8→E8
 
     // 1: Guitar
-    exp[1][4] = ymfm[1][4] - 0x20; // 0xF8→0xD8
-    exp[1][5] = ymfm[1][5] - 1;    // 0xF7→0xF6
-
-    // 2: Piano (Wurly)
-    exp[2][0] = ymfm[2][0] & 0x1F; // 0x31→0x11
-    exp[2][1] = ymfm[2][1] & 0x1F; // 0x11→0x11
-    exp[2][5] = ymfm[2][5] - 0x10; // 0xC2→0xB2
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20; // 0x28→0x20
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12; // 0x22→0x12
-
-    // 3: Flute
-    exp[3][4] = ymfm[3][4] - 0x50; // 0xF8→0xA8
-    exp[3][6] = ymfm[3][6] | 0x01; // 0x60→0x61
-
-    // 4: Clarinet
-    exp[4][0] = ymfm[4][0] | 0x10; // 0x22→0x32
-    exp[4][4] = ymfm[4][4] & 0xE1; // 0xFF→0xE1
-    exp[4][6] = ymfm[4][6] | 0x01; // 0x00→0x01
-
-    // 5: Synth Brass (Synth)
-    exp[5][2] = ymfm[5][2] + 1;    // 0x05→0x06
-    exp[5][4] = ymfm[5][4] - 0x09; // 0xAC→0xA3
-    exp[5][5] = ymfm[5][5] - 0x10; // 0xF2→0xE2
-    exp[5][6] = 0xF4;              // 強制 0xF4
-    exp[5][7] = 0xF4;              // 強制 0xF4
-
-    // 6: Trumpet
-    exp[6][5] = ymfm[6][5] & ~0x0E; // 0x8F→0x81
-
-    // 7: Organ
-    exp[7][4] = (ymfm[7][4] == 0xFF) ? 0xA2 : ymfm[7][4]; // 0xFF→0xA2
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x02; // 0x73→0x72
-    exp[7][6] = ymfm[7][6] | 0x01;          // 0x00→0x01
-
-    // 8: Horn (Bells)
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35; // 0x15→0x35
-    exp[8][4] = ymfm[8][4] & ~0x01;         // 0x41→0x40
-    exp[8][5] = (ymfm[8][5] & ~0x02) | 0x03; // 0x71→0x73
-    exp[8][6] = ymfm[8][6] | 0x72;          // 0x00→0x72
-    exp[8][7] = 0x01;                       // 強制 0x01
-
-    // 9: Synth (Vibes)
-    exp[9][0] = (ymfm[9][0] & 0x3F) | 0xB0; // 0x95→0xB5
-    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F; // 0x10→0x0F
-    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F; // 0x0F→0x0F
-    exp[9][4] = (ymfm[9][4] & 0x0F) | 0xA0; // 0xB8→0xA8
-    exp[9][5] = (ymfm[9][5] & 0x0F) | 0xA0; // 0xAA→0xA5
-    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51; // 0x50→0x51
-
-    // 10: Harpsichord (Vibraphone)
-    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 0x5E→0x24
-    exp[10][4] = ymfm[10][4] | 0x08; // 0xFA→0xF8
-    exp[10][5] = ymfm[10][5] | 0x08; // 0xF8→0xF8
-
-    // 11: Vibraphone (Tutti)
-    exp[11][6] = ymfm[11][6] | 0x08; // 0x10→0x18
-
-    // 12: Acoustic Bass (Fretless)
-    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9; // 0xF3→0xC9
-    exp[12][5] = (ymfm[12][5] | 0x03) & 0x95;  // 0x92→0x95
-    exp[12][6] = ymfm[12][6] & 0x0F;           // 0x83→0x03
-    exp[12][7] = ymfm[12][7] & 0x0F;           // 0xF2→0x02
-
-    // 13: Electric Guitar (Synth Bass)
-    exp[13][4] = ymfm[13][4] - 0x10;           // 0xA4→0x94
-    exp[13][5] = ymfm[13][5] & ~0x3F;          // 0xFF→0xC0
-    exp[13][6] = ymfm[13][6] | 0x03;           // 0x30→0x33
-    exp[13][7] = ymfm[13][7] | 0xF0;           // 0x06→0xF6
-
-    // 14: Bass Synth (Sweep)
-    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72; // 0x62→0x72
-    exp[14][4] = ymfm[14][4] | 0x20;          // 0xA1→0xC1
-    exp[14][5] = ymfm[14][5] & 0xF5;          // 0xFF→0xD5
-    exp[14][6] = ymfm[14][6] | 0x06;          // 0x50→0x56
-    exp[14][7] = ymfm[14][7] & 0xFE;          // 0x08→0x06
-
-    // 15: Drum kit
-    exp[15][2] = ymfm[15][2] | 0x18;          // 0x00→0x18
-    exp[15][3] = ymfm[15][3] | 0x0F;          // 0x0F→0x0F
-    exp[15][4] = ymfm[15][4] | 0x1F;          // 0xC8→0xDF
-    exp[15][5] = ymfm[15][5] | 0x18;          // 0xD8→0xF8
-    exp[15][6] = ymfm[15][6] & 0x7A;          // 0xA7→0x6A
-    exp[15][7] = ymfm[15][7] | 0x05;          // 0x68→0x6D
-
-    // 16: Rhythm2 (SD/HH)
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68; // 0x48→0x68
-
-}
-
-void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8])
-{
-    // 0: Bell (from Clarinet/Electric String)
-    exp[0][0] = (ymfm[0][0] & 0x0F) | 0x03;  // lower 4 bits: copy, upper 4 bits: set to 0x0 for envelope
-    exp[0][1] = ymfm[0][1];                   // copy unchanged
-    exp[0][2] = ymfm[0][2];                   // copy unchanged
-    exp[0][3] = ymfm[0][3];                   // copy unchanged
-    exp[0][4] = (ymfm[0][4] & 0xF0) | 0xE8;  // upper 4 bits: keep, lower 4 bits: set envelope/feedback
-    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x81;  // upper 4 bits: keep, lower 4 bits: decay
-    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x42;  // upper 4 bits: keep, lower 4 bits: sustain/volume
-    exp[0][7] = ymfm[0][7];                   // copy unchanged
-
-    // 1: Guitar
-    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;  // upper 4 bits: keep, lower 4 bits: set operator
-    exp[1][1] = ymfm[1][1];                   // copy unchanged
-    exp[1][2] = ymfm[1][2];                   // copy unchanged
-    exp[1][3] = ymfm[1][3];                   // copy unchanged
-    exp[1][4] = (ymfm[1][4] & 0xF0) | 0xD8;  // upper 4 bits: keep, lower 4 bits: feedback
-    exp[1][5] = (ymfm[1][5] & 0xF0) | 0xF6;  // upper 4 bits: keep, lower 4 bits: decay
-    exp[1][6] = ymfm[1][6];                   // copy unchanged
-    exp[1][7] = ymfm[1][7];                   // copy unchanged
+    exp[1][4] = ymfm[1][4] - 0x20; // F8→D8
+    exp[1][5] = ymfm[1][5] - 1;    // F7→F6
 
     // 2: Piano
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;  // upper 4 bits: keep, lower 4 bits: operator
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;  // adjust bits for envelope
-    exp[2][2] = ymfm[2][2];                   // copy unchanged
-    exp[2][3] = ymfm[2][3];                   // copy unchanged
-    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xFA;  // lower 4 bits: envelope/feedback
-    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xB2;  // lower 4 bits: decay
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;  // lower 4 bits: sustain
-    exp[2][7] = ymfm[2][7];                   // copy unchanged
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11; // 31→11
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11; // 11→11
+    exp[2][5] = ymfm[2][5] - 0x10; // C2→B2
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20; // 28→20
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12; // 22→12
 
     // 3: Flute
-    exp[3][0] = ymfm[3][0];                   // copy unchanged
-    exp[3][1] = ymfm[3][1];                   // copy unchanged
-    exp[3][2] = ymfm[3][2];                   // copy unchanged
-    exp[3][3] = ymfm[3][3];                   // copy unchanged
-    exp[3][4] = (ymfm[3][4] & 0xF0) | 0xA8;  // lower 4 bits: envelope/feedback
-    exp[3][5] = ymfm[3][5];                   // copy unchanged
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;  // lower 4 bits: sustain
-    exp[3][7] = ymfm[3][7];                   // copy unchanged
+    exp[3][4] = ymfm[3][4] - 0x50; // F8→A8
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61; // 60→61
 
     // 4: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;  // operator bits
-    exp[4][1] = ymfm[4][1];                   // copy unchanged
-    exp[4][2] = ymfm[4][2];                   // copy unchanged
-    exp[4][3] = ymfm[4][3];                   // copy unchanged
-    exp[4][4] = (ymfm[4][4] & 0xF0) | 0xE1;  // envelope/feedback
-    exp[4][5] = ymfm[4][5];                   // copy unchanged
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;  // sustain
-    exp[4][7] = ymfm[4][7];                   // copy unchanged
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // 22→32
+    exp[4][4] = ymfm[4][4] & 0xE1; // FF→E1
+    exp[4][6] = ymfm[4][6] | 0x01; // 00→01
 
     // 5: Synth Brass
-    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x02;  // operator bits
-    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x01;  // upper bits keep, lower adjust
-    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x06;  // operator adjustment
-    exp[5][3] = ymfm[5][3];                   // copy unchanged
-    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xA3;  // feedback/envelope
-    exp[5][5] = (ymfm[5][5] & 0xF0) | 0xE2;  // decay
-    exp[5][6] = (ymfm[5][6] & 0xF0) | 0xF4;  // sustain
-    exp[5][7] = (ymfm[5][7] & 0xF0) | 0xF4;  // release
+    exp[5][2] = ymfm[5][2] + 1;    // 05→06
+    exp[5][4] = ymfm[5][4] - 0x09; // AC→A3
+    exp[5][5] = ymfm[5][5] - 0x10; // F2→E2
+    exp[5][6] = 0xF4;
+    exp[5][7] = 0xF4;
 
     // 6: Trumpet
-    for (int k = 0; k < 8; k++) exp[6][k] = ymfm[6][k]; // copy all
+    exp[6][5] = ymfm[6][5] & ~0x0E; // 8F→81
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // 10→11
 
     // 7: Organ
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x23;  // operator
-    exp[7][1] = ymfm[7][1];                   // copy
-    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x22;  // operator
-    exp[7][3] = ymfm[7][3];                   // copy
-    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xA2;  // feedback
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72;  // decay
-    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01;  // sustain
-    exp[7][7] = ymfm[7][7];                   // copy
+    exp[7][4] = (ymfm[7][4] == 0xFF) ? 0xA2 : ymfm[7][4]; // FF→A2
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72; // 73→72
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01; // 00→01
+
+    // 8: Horn
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35; // 15→35
+    exp[8][1] = ymfm[8][1]; // 11
+    exp[8][2] = ymfm[8][2]; // 25
+    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40; // 41→40
+    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73; // 71→73
+    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72; // 00→72
+    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01; // F1→01
+
+    // 9: Synth
+    exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5; // 95→B5
+    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F; // 10→0F
+    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F; // 0F→0F
+    exp[9][4] = (ymfm[9][4] & 0xF0) | 0xA8; // B8→A8
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xA5; // AA→A5
+    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51; // 50→51
+
+    // 10: Harpsichord
+    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 5E→24
+
+    // 11: Vibraphone
+    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x18; // 10→18
+
+    // 12: Acoustic Bass
+    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
+    exp[12][5] = (ymfm[12][5] & 0xF0) | 0x95;
+    exp[12][6] = ymfm[12][6] & 0x0F;
+    exp[12][7] = ymfm[12][7] & 0x0F;
+
+    // 13: Electric Guitar
+    exp[13][4] = ymfm[13][4] - 0x10;
+    exp[13][5] = ymfm[13][5] & ~0x3F;
+    exp[13][6] = ymfm[13][6] | 0x03;
+    exp[13][7] = ymfm[13][7] | 0xF0;
+
+    // 14: Bass Synth
+    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
+    exp[14][4] = ymfm[14][4] | 0x20;
+    exp[14][5] = ymfm[14][5] & 0xF5;
+    exp[14][6] = ymfm[14][6] | 0x06;
+    exp[14][7] = ymfm[14][7] & 0xFE;
+
+    // 15: Drum kit
+    exp[15][2] = ymfm[15][2] | 0x18;
+    exp[15][3] = ymfm[15][3] | 0x0F;
+    exp[15][4] = ymfm[15][4] | 0x1F;
+    exp[15][5] = ymfm[15][5] | 0x18;
+    exp[15][6] = ymfm[15][6] & 0x7A;
+    exp[15][7] = ymfm[15][7] | 0x05;
+
+    // 16: Rhythm2
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
+}
+
+/*
+ * YMFM_YMF281B_VOICES[18][8] → EXPERIMENT_YMF281B_PRESET[18][8]
+ * Each voice is commented with its number and English instrument name.
+ */
+void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
+    for (int i = 0; i < 18; ++i)
+        for (int j = 0; j < 8; ++j)
+            exp[i][j] = ymfm[i][j];
+
+    // 0: Bell
+    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x03;
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xE8;
+    exp[0][5] = (ymfm[0][5] & 0x0F) | 0x81;
+    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x42;
+
+    // 1: Guitar
+    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
+    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD8;
+    exp[1][5] = (ymfm[1][5] & 0x0F) | 0xF6;
+    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
+    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x12;
+
+    // 2: Piano
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;
+    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xFA;
+    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xB2;
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;
+
+    // 3: Flute
+    exp[3][4] = (ymfm[3][4] & 0xF0) | 0xA8;
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;
+
+    // 4: Clarinet
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
+    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
+
+    // 5: Synth Brass
+    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x02;
+    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x01;
+    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x06;
+    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xA3;
+    exp[5][5] = (ymfm[5][5] & 0xF0) | 0xE2;
+    exp[5][6] = (ymfm[5][6] & 0xF0) | 0xF4;
+    exp[5][7] = (ymfm[5][7] & 0xF0) | 0xF4;
+
+    // 6: Trumpet
+    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
+    exp[6][4] = (ymfm[6][4] & 0xF0) | 0x82;
+    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
+
+    // 7: Organ
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x23;
+    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x22;
+    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xA2;
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72;
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01;
 
     // 8: Horn
     exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35;
-    exp[8][1] = ymfm[8][1];
+    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x11;
     exp[8][2] = (ymfm[8][2] & 0xF0) | 0x25;
-    exp[8][3] = ymfm[8][3];
     exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40;
     exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73;
     exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72;
@@ -579,236 +564,216 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
 
     // 9: Synth
     exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5;
-    exp[9][1] = ymfm[9][1];
     exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F;
     exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F;
-    exp[9][4] = (ymfm[9][4] & 0xF0) | 0xA8;
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xA5;
+    exp[9][4] = (ymfm[9][4] & 0x0F) | 0xA0;
+    exp[9][5] = (ymfm[9][5] & 0x0F) | 0xA0;
     exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51;
-    exp[9][7] = (ymfm[9][7] & 0xF0) | 0x02;
 
     // 10: Harpsichord
-    for (int k = 0; k < 8; k++) exp[10][k] = ymfm[10][k]; // copy
+    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 0x5E→0x24
+    exp[10][4] = ymfm[10][4] | 0x08; // 0xF8→0xF8
+    exp[10][5] = ymfm[10][5] | 0x08; // 0xF8→0xF8
 
     // 11: Vibraphone
-    exp[11][0] = ymfm[11][0];
-    exp[11][1] = ymfm[11][1];
-    exp[11][2] = ymfm[11][2];
-    exp[11][3] = ymfm[11][3];
-    exp[11][4] = ymfm[11][4];
-    exp[11][5] = ymfm[11][5];
-    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x18;  // lower 4 bits changed
-    exp[11][7] = (ymfm[11][7] & 0xF0) | 0x16;
+    exp[11][6] = ymfm[11][6] | 0x08; // 0x10→0x18
 
     // 12: Acoustic Bass
-    exp[12][0] = (ymfm[12][0] & 0xF0) | 0x01;
-    exp[12][1] = (ymfm[12][1] & 0xF0) | 0x02;
-    exp[12][2] = (ymfm[12][2] & 0xF0) | 0xD3;
-    exp[12][3] = (ymfm[12][3] & 0xF0) | 0x05;
-    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xC9;
-    exp[12][5] = (ymfm[12][5] & 0xF0) | 0x95;
-    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x03;
-    exp[12][7] = (ymfm[12][7] & 0xF0) | 0x02;
+    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
+    exp[12][5] = (ymfm[12][5] | 0x03) & 0x95;
+    exp[12][6] = ymfm[12][6] & 0x0F;
+    exp[12][7] = ymfm[12][7] & 0x0F;
 
     // 13: Electric Guitar
-    exp[13][0] = ymfm[13][0];
-    exp[13][1] = ymfm[13][1];
-    exp[13][2] = ymfm[13][2];
-    exp[13][3] = ymfm[13][3];
-    exp[13][4] = (ymfm[13][4] & 0xF0) | 0x94;
-    exp[13][5] = (ymfm[13][5] & 0xF0) | 0xC0;
-    exp[13][6] = (ymfm[13][6] & 0xF0) | 0x33;
-    exp[13][7] = (ymfm[13][7] & 0xF0) | 0xF6;
+    exp[13][4] = ymfm[13][4] - 0x10;
+    exp[13][5] = ymfm[13][5] & ~0x3F;
+    exp[13][6] = ymfm[13][6] | 0x03;
+    exp[13][7] = ymfm[13][7] | 0xF0;
 
     // 14: Bass Synth
-    exp[14][0] = ymfm[14][0];
     exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
-    exp[14][2] = ymfm[14][2];
-    exp[14][3] = ymfm[14][3];
-    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xC1;
-    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xD5;
-    exp[14][6] = (ymfm[14][6] & 0xF0) | 0x56;
-    exp[14][7] = (ymfm[14][7] & 0xF0) | 0x06;
+    exp[14][4] = ymfm[14][4] | 0x20;
+    exp[14][5] = ymfm[14][5] & 0xF5;
+    exp[14][6] = ymfm[14][6] | 0x06;
+    exp[14][7] = ymfm[14][7] & 0xFE;
 
     // 15: Drum kit
-    for (int k = 0; k < 8; k++) exp[15][k] = ymfm[15][k]; // copy
+    exp[15][2] = ymfm[15][2] | 0x18;
+    exp[15][3] = ymfm[15][3] | 0x0F;
+    exp[15][4] = ymfm[15][4] | 0x1F;
+    exp[15][5] = ymfm[15][5] | 0x18;
+    exp[15][6] = ymfm[15][6] & 0x7A;
+    exp[15][7] = ymfm[15][7] | 0x05;
 
-    // 16: Rhythm2
-    for (int k = 0; k < 8; k++) exp[16][k] = ymfm[16][k]; // copy
+    // 16: Rhythm2 (SD/HH)
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
 
-    // 17: Rhythm3
-    for (int k = 0; k < 8; k++) exp[17][k] = ymfm[17][k]; // copy
+    // 17: Rhythm3 (TT/CYM) そのまま
+    // exp[17][k] = ymfm[17][k]; 
 }
 
 /*
  * YMFM_YM2423_VOICES[18][8] → EXPERIMENT_YM2423_PRESET[18][8]
  * Each voice is commented with its number and English instrument name.
  */
-void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8])
-{
-    // 1: Violin
-    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x11; // Modulator AR: preserve upper 4 bits, set lower 4 bits to 0b0001
-    exp[0][2] = (ymfm[0][2] & 0xF0) | 0x0E; // Modulator SL: preserve upper 4 bits, set lower 4 bits to 0b1110
-    exp[0][4] = (ymfm[0][4] & 0xF0) | 0xD0; // Carrier TL: preserve upper 4 bits, set lower 4 bits
-    exp[0][7] = (ymfm[0][7] & 0xF0) | 0x17; // Carrier RR/AM/FM: preserve upper 4 bits, set lower 4 bits
+void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
+    // Violin (ch=0)
+    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x11;
+    exp[0][1] = (ymfm[0][1] & 0xF0) | 0x61;
+    exp[0][2] = (ymfm[0][2] & 0xF0) | 0x1E;
+    exp[0][3] = (ymfm[0][3] & 0xF0) | 0x17;
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0;
+    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x78;
+    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x00;
+    exp[0][7] = (ymfm[0][7] & 0xF0) | 0x17;
 
-    // 2: Guitar
-    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x03; // Modulator AR
-    exp[1][1] = (ymfm[1][1] & 0xF0) | 0x41; // Modulator DR
-    exp[1][2] = (ymfm[1][2] & 0xF0) | 0x1A; // Modulator SL
-    exp[1][3] = (ymfm[1][3] & 0xF0) | 0x0D; // Modulator RR
-    exp[1][4] = (ymfm[1][4] & 0xF0) | 0xD8; // Carrier TL
-    exp[1][5] = (ymfm[1][5] & 0xF0) | 0xF7; // Carrier DR
-    exp[1][6] = (ymfm[1][6] & 0xFC) | 0x23; // Carrier SR: preserve upper 6 bits, set lower 2 bits
-    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x13; // Carrier RR/AM/FM
+    // Guitar (ch=1)
+    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
+    exp[1][1] = (ymfm[1][1] & 0xF0) | 0x41;
+    exp[1][2] = (ymfm[1][2] & 0xF0) | 0x1A;
+    exp[1][3] = (ymfm[1][3] & 0xF0) | 0x0D;
+    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD0 | 0x08; // D8
+    exp[1][5] = (ymfm[1][5] & 0xF0) | 0xF7;
+    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
+    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x13;
 
-    // 3: Piano
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x13; // Modulator AR
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x01; // Modulator DR
-    exp[2][2] = (ymfm[2][2] & 0xF0) | 0x99; // Modulator SL
-    exp[2][3] = (ymfm[2][3] & 0xF0) | 0x00; // Modulator RR
-    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xF2; // Carrier TL
-    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xD4; // Carrier DR
-    exp[2][6] = (ymfm[2][6] & 0xFC) | 0x21; // Carrier SR: preserve upper 6 bits, set lower 2 bits
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x23; // Carrier RR/AM/FM
+    // Piano (ch=2)
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x13;
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x01;
+    exp[2][2] = (ymfm[2][2] & 0xF0) | 0x99;
+    exp[2][3] = (ymfm[2][3] & 0xF0) | 0x00;
+    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xF2;
+    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xD4;
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21;
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x23;
 
-    // 4: Flute
-    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11; // Modulator AR: keep upper 4 bits (bits 7-4) of original, set lower 4 bits (bits 3-0) to 0x1 (attack rate)
-    exp[3][1] = (ymfm[3][1] & 0xF0) | 0x61; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) and bit 6 = 1 (special flag if used)
-    exp[3][2] = (ymfm[3][2] & 0xF0) | 0x0E; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xE (sustain level)
-    exp[3][3] = (ymfm[3][3] & 0xF0) | 0x07; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x7 (release rate)
-    exp[3][4] = (ymfm[3][4] & 0xF0) | 0x8D; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0xD (total level) and bit 7 = 1 (some envelope flag)
-    exp[3][5] = (ymfm[3][5] & 0xF0) | 0x64; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x4 (decay rate) and bit 6 = 1 (special flag)
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x70; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x0 and bit 6-4 = 111 (sustain rate + flags)
-    exp[3][7] = (ymfm[3][7] & 0xF0) | 0x27; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x7 (release rate), bit 5 = 1 (AM), bit 1 = 1 (FM) as needed
+    // Flute (ch=3)
+    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11;
+    exp[3][1] = (ymfm[3][1] & 0xF0) | 0x61;
+    exp[3][2] = (ymfm[3][2] & 0xF0) | 0x0E;
+    exp[3][3] = (ymfm[3][3] & 0xF0) | 0x07;
+    exp[3][4] = (ymfm[3][4] & 0x0F) | 0x8D;
+    exp[3][5] = (ymfm[3][5] & 0xF0) | 0x64;
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x70;
+    exp[3][7] = (ymfm[3][7] & 0xF0) | 0x27;
 
-    // 5: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x2 (attack rate) and bit 5 = 1 (flag)
-    exp[4][1] = (ymfm[4][1] & 0xF0) | 0x21; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) and bit 5 = 0, bit 6 = 1 (flag)
-    exp[4][2] = (ymfm[4][2] & 0xF0) | 0x1E; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xE (sustain level) and bit 4 = 1 (flag)
-    exp[4][3] = (ymfm[4][3] & 0xF0) | 0x06; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x6 (release rate)
-    exp[4][4] = (ymfm[4][4] & 0xF0) | 0xE1; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x1 (total level) and bit 7-4 = 1110 (flags)
-    exp[4][5] = (ymfm[4][5] & 0xF0) | 0x76; //     // 6: Oboe
-    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31; // Modulator AR
-    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22; // Modulator DR
-    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16; // Modulator SL
-    exp[5][3] = (ymfm[5][3] & 0xF0) | 0x05; // Modulator RR
-    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xE0; // Carrier TL
-    exp[5][5] = (ymfm[5][5] & 0xF0) | 0x71; // Carrier DR
-    exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00; // Carrier SR
-    exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18; // Carrier RR/AM/FMCarrier DR: keep upper 4 bits, set lower 4 bits to 0x6 (decay rate) and bit 6-4 = 111 (flags)
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x1 (sustain rate)
-    exp[4][7] = (ymfm[4][7] & 0xF0) | 0x28; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x8 (release rate) and bit 5 = 1 (AM) / bit 3 = 0 (FM)  
+    // Clarinet (ch=4)
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
+    exp[4][1] = (ymfm[4][1] & 0xF0) | 0x21;
+    exp[4][2] = (ymfm[4][2] & 0xF0) | 0x1E;
+    exp[4][3] = (ymfm[4][3] & 0xF0) | 0x06;
+    exp[4][4] = (ymfm[4][4] & 0x0F) | 0xE0 | 0x01; // E1
+    exp[4][5] = (ymfm[4][5] & 0xF0) | 0x76;
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
+    exp[4][7] = (ymfm[4][7] & 0xF0) | 0x28;
 
-    // 6: Oboe
-    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x1 (attack rate) with bit 4 = 1 (flag)
-    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x2 (decay rate) with bit 5 = 1 (flag)
-    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0x6 (sustain level) with bit 4 = 1 (flag)
-    exp[5][3] = (ymfm[5][3] & 0xF0) | 0x05; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x5 (release rate)
-    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xE0; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x0 (total level) with bit 7-4 = 1110 (flags)
-    exp[5][5] = (ymfm[5][5] & 0xF0) | 0x71; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 6-4 = 111 (flags)
-    exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x0 (sustain rate)
-    exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x8 (release rate) with AM/FM flags
+    // Oboe (ch=5)
+    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31;
+    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22;
+    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16;
+    exp[5][3] = (ymfm[5][3] & 0xF0) | 0x05;
+    exp[5][4] = (ymfm[5][4] & 0x0F) | 0xE0;
+    exp[5][5] = (ymfm[5][5] & 0xF0) | 0x71;
+    exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00;
+    exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18;
 
-    // 7: Trumpet
-    exp[6][0] = (ymfm[6][0] & 0xF0) | 0x21; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x1 (attack rate) with bit 5 = 1 (flag)
-    exp[6][1] = (ymfm[6][1] & 0xF0) | 0x61; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 6 = 1 (flag)
-    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xD (sustain level) with bit 4 = 1 (flag)
-    exp[6][3] = (ymfm[6][3] & 0xF0) | 0x07; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x7 (release rate)
-    exp[6][4] = (ymfm[6][4] & 0xF0) | 0x82; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x2 (total level) with bit 7 = 1 (flag)
-    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 7 = 1 (flag)
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x1 (sustain rate) with bit 4 = 1 (flag)
-    exp[6][7] = (ymfm[6][7] & 0xF0) | 0x07; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x7 (release rate) with AM/FM flags
+    // Trumpet (ch=6)
+    exp[6][0] = (ymfm[6][0] & 0xF0) | 0x21;
+    exp[6][1] = (ymfm[6][1] & 0xF0) | 0x61;
+    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
+    exp[6][3] = (ymfm[6][3] & 0xF0) | 0x07;
+    exp[6][4] = (ymfm[6][4] & 0x0F) | 0x80 | 0x02; // 82
+    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
+    exp[6][7] = (ymfm[6][7] & 0xF0) | 0x07;
 
-    // 8: Organ
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x3 (attack rate) with bit 4 = 1 (flag)
-    exp[7][1] = (ymfm[7][1] & 0xF0) | 0x21; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 5 = 1 (flag)
-    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x2D; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xD (sustain level) with bit 5 = 1 (flag)
-    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x3 (release rate) with bit 4 = 1 (flag)
-    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xB0; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x0 (total level) with bits 7,5 = 1 (flags)
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x0 (decay rate) with bits 6,5 = 1 (flags)
-    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x00; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x0 (sustain rate)
-    exp[7][7] = (ymfm[7][7] & 0xF0) | 0x07; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x7 (release rate) with AM/FM flags
+    // Organ (ch=7)
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33;
+    exp[7][1] = (ymfm[7][1] & 0xF0) | 0x21;
+    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x2D;
+    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13;
+    exp[7][4] = (ymfm[7][4] & 0x0F) | 0xB0;
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70;
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x00;
+    exp[7][7] = (ymfm[7][7] & 0xF0) | 0x07;
 
-    // 9: Horn
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x1 (attack rate) with bit 6 = 1 (flag)
-    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x61; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 6 = 1 (flag)
-    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x1B; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xB (sustain level) with bit 4 = 1 (flag)
-    exp[8][3] = (ymfm[8][3] & 0xF0) | 0x06; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x6 (release rate)
-    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x64; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x4 (total level) with bit 6 = 1 (flag)
-    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x65; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x5 (decay rate) with bit 6 = 1 (flag)
-    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x10; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x0 (sustain rate) with bit 4 = 1 (flag)
-    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x17; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x7 (release rate) with AM/FM flags
+    // Horn (ch=8)
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61;
+    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x61;
+    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x1B;
+    exp[8][3] = (ymfm[8][3] & 0xF0) | 0x06;
+    exp[8][4] = (ymfm[8][4] & 0x0F) | 0x60 | 0x04; // 64
+    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x65;
+    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x10;
+    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x17;
 
-    // 10: Synthesizer
-    exp[9][0] = (ymfm[9][0] & 0xF0) | 0x41; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x1 (attack rate) with bit 6 = 1 (flag)
-    exp[9][1] = (ymfm[9][1] & 0xF0) | 0x61; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate) with bit 6 = 1 (flag)
-    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0B; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0xB (sustain level)
-    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x18; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x8 (release rate) with bit 4 = 1 (flag)
-    exp[9][4] = (ymfm[9][4] & 0xF0) | 0x85; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0x5 (total level) with bit 7 = 1 (flag)
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0x0 (decay rate) with bits 4-7 = 0xF (flags)
-    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x81; // Carrier SR: keep upper 4 bits, set lower 4 bits to 0x1 (sustain rate) with bit 7 = 1 (flag)
-    exp[9][7] = (ymfm[9][7] & 0xF0) | 0x07; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x7 (release rate) with AM/FM flags
+    // Synthesizer (ch=9)
+    exp[9][0] = (ymfm[9][0] & 0xF0) | 0x41;
+    exp[9][1] = (ymfm[9][1] & 0xF0) | 0x61;
+    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0B;
+    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x18;
+    exp[9][4] = (ymfm[9][4] & 0x0F) | 0x80 | 0x05; // 85
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0;
+    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x81;
+    exp[9][7] = (ymfm[9][7] & 0xF0) | 0x07;
 
-    // 11: Harpsichord
-    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33; // Modulator AR: keep upper 4 bits, set lower 4 bits to 0x3 (attack rate) with bit 4 = 1 (flag)
-    exp[10][1] = (ymfm[10][1] & 0xF0) | 0x01; // Modulator DR: keep upper 4 bits, set lower 4 bits to 0x1 (decay rate)
-    exp[10][2] = (ymfm[10][2] & 0xF0) | 0x83; // Modulator SL: keep upper 4 bits, set lower 4 bits to 0x3 (sustain level) with bit 7 = 1 (flag)
-    exp[10][3] = (ymfm[10][3] & 0xF0) | 0x11; // Modulator RR: keep upper 4 bits, set lower 4 bits to 0x1 (release rate) with bit 4 = 1 (flag)
-    exp[10][4] = (ymfm[10][4] & 0xF0) | 0xEA; // Carrier TL: keep upper 4 bits, set lower 4 bits to 0xA (total level) with bits 4-7 = 0xE (flags)
-    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF; // Carrier DR: keep upper 4 bits, set lower 4 bits to 0xF (decay rate) with bits 4-7 = 0xE (flags)
-    exp[10][6] = (ymfm[10][6] & 0xF8) | 0x02; // Carrier SR: preserve upper 5 bits, set lower 3 bits to 0x2 (sustain rate)
-    exp[10][7] = (ymfm[10][7] & 0xF0) | 0x04; // Carrier RR/AM/FM: keep upper 4 bits, set lower 4 bits to 0x4 (release rate/AM/FM flags)
+    // Harpsichord (ch=10)
+    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33;
+    exp[10][1] = (ymfm[10][1] & 0xF0) | 0x01;
+    exp[10][2] = (ymfm[10][2] & 0xF0) | 0x83;
+    exp[10][3] = (ymfm[10][3] & 0xF0) | 0x11;
+    exp[10][4] = (ymfm[10][4] & 0x0F) | 0xEA;
+    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF;
+    exp[10][6] = (ymfm[10][6] & 0xF0) | 0x10;
+    exp[10][7] = (ymfm[10][7] & 0xF0) | 0x04;
 
+    // Vibraphone (ch=11)
+    exp[11][0] = (ymfm[11][0] & 0xF0) | 0x17;
+    exp[11][1] = (ymfm[11][1] & 0xF0) | 0xC1;
+    exp[11][2] = (ymfm[11][2] & 0xF0) | 0x24;
+    exp[11][3] = (ymfm[11][3] & 0xF0) | 0x07;
+    exp[11][4] = (ymfm[11][4] & 0x0F) | 0xF8;
+    exp[11][5] = (ymfm[11][5] & 0xF0) | 0xF8;
+    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x22;
+    exp[11][7] = (ymfm[11][7] & 0xF0) | 0x12;
 
-    // 12: Vibraphone
-    exp[11][0] = (ymfm[11][0] & 0xF0) | 0x17; // Modulator AR
-    exp[11][1] = (ymfm[11][1] & 0xC0) | 0xC1; // Modulator DR: preserve upper 2 bits
-    exp[11][2] = (ymfm[11][2] & 0xFE) | 0x04; // Modulator SL: preserve upper 7 bits
-    exp[11][3] = ymfm[11][3]; // Modulator RR: unchanged
-    exp[11][4] = (ymfm[11][4] & 0xF0) | 0xF8; // Carrier TL
-    exp[11][5] = (ymfm[11][5] & 0xF0) | 0xF8; // Carrier DR
-    exp[11][6] = (ymfm[11][6] & 0xF8) | 0x22; // Carrier SR
-    exp[11][7] = (ymfm[11][7] & 0xF0) | 0x12; // Carrier RR/AM/FM
+    // Synth Bass (ch=12)
+    exp[12][0] = (ymfm[12][0] & 0xF0) | 0x61;
+    exp[12][1] = (ymfm[12][1] & 0xF0) | 0x50;
+    exp[12][2] = (ymfm[12][2] & 0xF0) | 0x0C;
+    exp[12][3] = (ymfm[12][3] & 0xF0) | 0x05;
+    exp[12][4] = (ymfm[12][4] & 0x0F) | 0xD2;
+    exp[12][5] = (ymfm[12][5] & 0xF0) | 0xF5;
+    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;
+    exp[12][7] = (ymfm[12][7] & 0xF0) | 0x42;
 
-    // 13: Synth Bass
-    exp[12][0] = (ymfm[12][0] & 0xF0) | 0x61; // Modulator AR
-    exp[12][1] = (ymfm[12][1] & 0xF0) | 0x50; // Modulator DR
-    exp[12][2] = (ymfm[12][2] & 0xF0) | 0x0C; // Modulator SL
-    exp[12][3] = (ymfm[12][3] & 0xF0) | 0x05; // Modulator RR
-    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xD2; // Carrier TL
-    exp[12][5] = (ymfm[12][5] & 0xF0) | 0xF5; // Carrier DR
-    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40; // Carrier SR
-    exp[12][7] = (ymfm[12][7] & 0xF0) | 0x42; // Carrier RR/AM/FM
+    // Acoustic Bass (ch=13)
+    exp[13][0] = (ymfm[13][0] & 0xF0) | 0x01;
+    exp[13][1] = (ymfm[13][1] & 0xF0) | 0x01;
+    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;
+    exp[13][3] = (ymfm[13][3] & 0xF0) | 0x03;
+    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4;
+    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90;
+    exp[13][6] = (ymfm[13][6] & 0xF0) | 0x03;
+    exp[13][7] = (ymfm[13][7] & 0xF0) | 0x02;
 
-    // 14: Acoustic Bass
-    exp[13][0] = (ymfm[13][0] & 0xF0) | 0x01; // Modulator AR
-    exp[13][1] = (ymfm[13][1] & 0xF0) | 0x01; // Modulator DR
-    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55; // Modulator SL
-    exp[13][3] = (ymfm[13][3] & 0xF0) | 0x03; // Modulator RR
-    exp[13][4] = (ymfm[13][4] & 0xF0) | 0xE4; // Carrier TL
-    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90; // Carrier DR
-    exp[13][6] = (ymfm[13][6] & 0xF0) | 0x03; // Carrier SR
-    exp[13][7] = (ymfm[13][7] & 0xF0) | 0x02; // Carrier RR/AM/FM
+    // Electric Guitar (ch=14)
+    exp[14][0] = (ymfm[14][0] & 0xF0) | 0x41;
+    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x41;
+    exp[14][2] = (ymfm[14][2] & 0xF0) | 0x89;
+    exp[14][3] = (ymfm[14][3] & 0xF0) | 0x03;
+    exp[14][4] = (ymfm[14][4] & 0x0F) | 0xF1;
+    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4;
+    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;
+    exp[14][7] = (ymfm[14][7] & 0xF0) | 0x13;
 
-    // 15: Electric Guitar
-    exp[14][0] = (ymfm[14][0] & 0xF0) | 0x41; // Modulator AR
-    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x41; // Modulator DR
-    exp[14][2] = (ymfm[14][2] & 0xF0) | 0x89; // Modulator SL
-    exp[14][3] = (ymfm[14][3] & 0xF0) | 0x03; // Modulator RR
-    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xF1; // Carrier TL
-    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4; // Carrier DR
-    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0; // Carrier SR
-    exp[14][7] = (ymfm[14][7] & 0xF0) | 0x13; // Carrier RR/AM/FM
-
-    // 16: Rhythm 1 (BD) → identical
-    for (int k = 0; k < 8; k++) exp[15][k] = ymfm[15][k]; // All parameters unchanged
-
-    // 17: Rhythm 2 (SD/HH)
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68; // RR/AM/FM only; others unchanged
-
-    // 18: Rhythm 3 (TT/CYM) → identical
-    for (int k = 0; k < 8; k++) exp[17][k] = ymfm[17][k]; // All parameters unchanged
+    // Rhythm1 (BD) ch=15
+    for(int j=0; j<8; ++j) exp[15][j] = ymfm[15][j];
+    // Rhythm2 (SD/HH) ch=16
+    for(int j=0; j<8; ++j) exp[16][j] = ymfm[16][j];
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
+    // Rhythm3 (TT/CYM) ch=17
+    for(int j=0; j<8; ++j) exp[17][j] = ymfm[17][j];
 }
 
 // vgm-conv style YM2413→OPL(3) conversion, with canonical lookup tables
@@ -902,7 +867,28 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
     uint8_t user_patch[8];
     // Select the preset table
     const unsigned char (*source_preset)[8] = select_opll_preset_table(p_opts->preset, p_opts->preset_source);
-
+    if (p_opts->preset_source == OPLL_PresetSource_EXPERIMENT) {
+        switch (p_opts->preset) {
+            case OPLL_PresetType_YM2413:
+                convert_ymfm_2413_to_experiment(YMFM_YM2413_VOICES, EXPERIMENT_YM2413_PRESET);
+                source_preset = EXPERIMENT_YM2413_PRESET;
+                break;
+            case OPLL_PresetType_VRC7:
+                convert_ymfm_vrc7_to_experiment(YMFM_VRC7_VOICES, EXPERIMENT_VRC7_PRESET);
+                source_preset = EXPERIMENT_VRC7_PRESET;
+                break;
+            case OPLL_PresetType_YMF281B:
+                convert_ymf281b_to_experiment(YMFM_YMF281B_VOICES, EXPERIMENT_YMF281B_PRESET);
+                source_preset = EXPERIMENT_YMF281B_PRESET;
+                break;
+            case OPLL_PresetType_YM2423:
+                convert_ymfm_2423_to_experiment(YMFM_YM2423_VOICES, EXPERIMENT_YM2423_PRESET);
+                source_preset = EXPERIMENT_YM2423_PRESET;
+                break;
+            default:
+                break;
+        }
+    }
     // Select patch
     const unsigned char *src = NULL;
     if (inst == 0) {
