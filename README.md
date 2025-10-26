@@ -1,6 +1,6 @@
 # eseopl3patcher
 
-YM2413, YM3812, YM3526, Y8950, VRC7, YMF281Bの VGMファイルを YMF262 (OPL3) VGMファイルに変換するツール
+YM2413, YM3812, YM3526, Y8950, VRC7, YMF281B, YM2423 の VGMファイルを YMF262 (OPL3) VGMファイルに変換するツール
 
 ---
 
@@ -8,7 +8,7 @@ YM2413, YM3812, YM3526, Y8950, VRC7, YMF281Bの VGMファイルを YMF262 (OPL3)
 
 `eseopl3patcher` は、OPL系音源（YM2413, YM3812, YM3526, Y8950）対応のVGMファイルを、OPL3 (YMF262) フォーマットに変換するコマンドラインツールです。  
 OPL3の拡張チャンネルによるコーラス（デチューン）効果や、柔軟なステレオ/ボリューム設定を特徴とします。  
-YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
+YM2413/OPLL変換時は、VRC7やYMF281B, YM2423の音色プリセットも選択可能です。
 
 ---
 
@@ -17,6 +17,7 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 - **YM2413  (OPLL)**
 - **VRC7    (OPLL VRC7プリセット)**
 - **YMF281B (OPLLP YMF281Bプリセット)**
+- **YM2423   (OPLL-X) [v2.1.0より追加]**
 - **YM3812 (OPL2)**
 - **YM3526 (OPL)**
 - **Y8950 (OPL, ADPCM部は未変換)**
@@ -29,7 +30,7 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 - OPL2/OPLL系コマンドをOPL3(YMF262)コマンドへ変換
 - OPL3の拡張チャンネル（ch9～17）でデチューン・コーラス効果
 - パンニング・ボリューム調整 (`-ch_panning`, `-vr0`, `-vr1`)
-- YM2413変換時に音色ROM（YM2413, VRC7, YMF281B）選択可能（`--preset`）
+- YM2413変換時に音色ROM（YM2413, VRC7, YMF281B, YM2423）選択可能（`--preset`）【v2.1.0より】
 - GD3タグ自動生成（変換情報・パラメータ記録）
 - 詳細デバッグモード（`-verbose`）
 - 複数OPL系チップ混在時の自動判定または明示選択
@@ -48,15 +49,23 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 
 ---
 
-## YM2413/OPLL プリセット選択
+## YM2413/OPLL プリセット＆音色ソース選択【v2.1.0より拡充】
 
-- `--preset <YM2413|VRC7|YMF281B>`  
-    YM2413(OPLL)変換時の楽器ROMを選択できます。コナミVRC7互換やYMF281Bも指定可能。
-    - `YM2413`: オリジナルOPLL音色（デフォルト）
-    - `VRC7`: VRC7音色ROM
-    - `YMF281B`: YMF281B互換ROM
+- `--preset <YM2413|VRC7|YMF281B|YM2423>`
+    - YM2413(OPLL)変換時のプリセットを選択できます。
+    - `YM2413`: OPLL互換音色プリセット（デフォルト）
+    - `VRC7`: VRC7互換音色プリセット
+    - `YMF281B`: YMF281B互換音色プリセット
+    - `YM2423`: OPLL-X音色プリセット
     - 例: `--preset VRC7`
     - 他チップ変換には効果なし
+
+- `--preset_source <YMVOICE|YMFM|EXPERIMENT>`
+    - プリセット音色の生成元を選択できます。
+        - `YMVOICE`: [ym-voice](https://github.com/digital-sound-antiques/ym-voice) プロジェクト音色
+        - `YMFM`: [Copyright-free-OPLL(x)-ROM-patches](https://github.com/plgDavid/misc/wiki/Copyright-free-OPLL(x)-ROM-patches)
+        - `EXPERIMENT`: YMFM音色をベースに独自の調整や実験的修正を加えたバージョン
+    - **YM2423の場合は `YMFM` または `EXPERIMENT` のみ有効**（`YMVOICE`を選んだ場合もYMFM相当が利用されます）
 
 ---
 
@@ -66,7 +75,7 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
     YM2413入力時のみ有効なオプションです。  
     **変換後VGMの先頭に、元のYM2413コマンド（レジスタ書き込み）をそのまま残します。**
     - これにより「YM2413（MSX-MUSIC等）とOPL3（YMF262）」が同時に鳴らせるVGMデータを生成可能です
-    - MSXのMSX Music + 似非OPL3-RAM、SoundCoreSLOT EX|EXG + 似非OPL3-RAM、NanoDrive7など、  
+    - MSXのMSX Music + 似非OPL3-RAM、SoundCoreSLOT EX|EXG + 似非OPL3-RAM、NanoDrive7など、
       YM2413とOPL3を同時に鳴らせるシステム環境で再生する用途を想定しています
     - 通常変換ではYM2413コマンドは削除されますが、このオプションで「両方の演奏」を実現できます
 
@@ -90,7 +99,8 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 | `-vr0 <float>` | Port0ボリューム比 | 1.0 |
 | `-vr1 <float>` | Port1ボリューム比 | 0.8 |
 | `-detune_limit <float>` | デチューン量の上限 | 4.0 |
-| `--preset <YM2413|VRC7|YMF281B>` | YM2413変換時の音色ROM | YM2413 |
+| `--preset <YM2413|VRC7|YMF281B|YM2423>` | YM2413変換時の音色ROM | YM2413 |
+| `--preset_source <YMVOICE|YMFM|EXPERIMENT>` | プリセット音色の生成元 | YMFM |
 | `--keep_source_vgm` | YM2413コマンドを残し、OPL3と同時演奏 | 無効 |
 | `--convert-ym2413` | YM2413のみ変換 | (自動判定) |
 | `--convert-ym3812` | YM3812のみ変換 | (自動判定) |
@@ -105,12 +115,13 @@ YM2413/OPLL変換時は、VRC7やYMF281B音色ROMも選択可能です。
 ```sh
 eseopl3patcher <input.vgm> <detune> [keyon_wait] [creator] \
     [-o output.vgm] [-ch_panning 0|1] [-vr0 <float>] [-vr1 <float>] \
-    [-detune_limit <float>] [--preset <YM2413|VRC7|YMF281B>] \
+    [-detune_limit <float>] [--preset <YM2413|VRC7|YMF281B|YM2423>] \
+    [--preset_source <YMVOICE|YMFM|EXPERIMENT>] \
     [--keep_source_vgm] [--convert-ym2413] [--convert-ym3812] [--convert-ym3526] [--convert-y8950] \
     [-verbose]
 ```
 
-**オプションは順不同・省略可。必須は`<input.vgm>`と`<detune>`のみ。**
+**オプションは順不同・省略可。必須は `<input.vgm>` と `<detune>` のみ。**
 
 ---
 
@@ -124,6 +135,7 @@ eseopl3patcher song.vgm 15 --convert-ym3526 --preset YMF281B
 eseopl3patcher song.vgm 2.5 -vr1 0.8
 eseopl3patcher song.vgm -8 -ch_panning 1 -verbose
 eseopl3patcher song.vgm 30 --keep_source_vgm
+eseopl3patcher song.vgm 10 --preset YM2423 --preset_source EXPERIMENT
 ```
 
 ---
@@ -144,24 +156,9 @@ make win
 gcc -O2 -Wall -Iinclude -o eseopl3patcher.exe src/*.c
 ```
 
----
-
-## VGMツールの取得と連携
-
-テスト・解析用に、`vgm2txt`・`VGMPlay` など公式VGMツールを `tools/` 以下へ自動取得・ビルド可能です。
-
-```bash
-bash tools/fetch_vgm_tools.sh
-```
-
-詳細は `tools/` ディレクトリのREADMEを参照。
-
----
-
 ## ライセンス
 
 MIT License  
-各外部ツールはそれぞれのライセンスに従ってください。
 
 ---
 
