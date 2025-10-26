@@ -60,6 +60,7 @@ typedef enum {
 typedef enum {
     OPLL_PresetSource_YMVOICE,
     OPLL_PresetSource_YMFM,
+    OPLL_PresetSource_EXPERIMENT,
 } OPLL_PresetSource;
 
 
@@ -67,6 +68,7 @@ typedef enum {
     OPLL_PresetType_YM2413,
     OPLL_PresetType_VRC7,
     OPLL_PresetType_YMF281B,
+    OPLL_PresetType_YM2423,
 } OPLL_PresetType;
 
 

@@ -199,9 +199,10 @@ static void print_usage(const char *progname, DebugOpts *debug) {
  */
 static OPLL_PresetType decode_preset_type(const char *str) {
     if (!str) return OPLL_PresetType_YM2413;
-    if (strcasecmp(str, "YM2413") == 0) return OPLL_PresetType_YM2413;
-    if (strcasecmp(str, "VRC7") == 0)   return OPLL_PresetType_VRC7;
-    if (strcasecmp(str, "YMF281B") == 0) return OPLL_PresetType_YMF281B;
+    if (strcasecmp(str, "YM2413") == 0 || strcasecmp(str, "OPLL") == 0) return OPLL_PresetType_YM2413;
+    if (strcasecmp(str, "VRC7") == 0 || strcasecmp(str, "DS1001") == 0)   return OPLL_PresetType_VRC7;
+    if (strcasecmp(str, "YMF281B") == 0 || strcasecmp(str, "OPLLP") == 0) return OPLL_PresetType_YMF281B;
+    if (strcasecmp(str, "YM2423") == 0 || strcasecmp(str, "OPLL-X") == 0) return OPLL_PresetType_YM2423;
     return OPLL_PresetType_YM2413; // default fallback
 }
 
@@ -210,10 +211,11 @@ static OPLL_PresetType decode_preset_type(const char *str) {
  * Supported values: "YMVOICE", "YMFM"
  * Returns OPLL_PresetType_YM2413 for unknown input.
  */
-static OPLL_PresetType decode_preset_source(const char *str) {
-    if (!str) return OPLL_PresetType_YM2413;
-    if (strcasecmp(str, "YMVOICE") == 0) return OPLL_PresetSource_YMVOICE;
+static OPLL_PresetSource decode_preset_source(const char *str) {
+    if (!str) return OPLL_PresetSource_YMVOICE;
+    if (strcasecmp(str, "YMVOICE") == 0 || strcasecmp(str, "YM-VOICE") == 0) return OPLL_PresetSource_YMVOICE;
     if (strcasecmp(str, "YMFM") == 0)   return OPLL_PresetSource_YMFM;
+    if (strcasecmp(str, "EXPERIMENT") == 0)   return OPLL_PresetSource_EXPERIMENT;
     return OPLL_PresetSource_YMVOICE; // default fallback
 }
 
@@ -343,11 +345,6 @@ int main(int argc, char *argv[]) {
             preset_source = decode_preset_source(preset_source_str);
             continue;
         }
-    }
-
-    // If the preset is VRC7, the preset source is always set to YMFM.
-    if (preset == OPLL_PresetType_VRC7) {
-        preset_source = OPLL_PresetSource_YMFM;
     }
 
     // Parse chip flags and debug options

@@ -175,11 +175,14 @@ const char* get_opll_preset_type(const OPLL_PresetType type) {
     if (type == OPLL_PresetType_YM2413)  return "YM2413";
     if (type == OPLL_PresetType_VRC7)  return "VRC7";
     if (type == OPLL_PresetType_YMF281B)  return "YMF281B";
+    if (type == OPLL_PresetType_YM2423)  return "YM2423";
     return "UNKNOWN";
 }
 
 const char* get_opll_preset_source(const OPLL_PresetSource source) {
     if (source == OPLL_PresetSource_YMVOICE)  return "YM-VOICE";
     if (source == OPLL_PresetSource_YMFM)  return "YMFM";
+    if (source == OPLL_PresetSource_EXPERIMENT)  return "EXPERIMENT";
     return "UNKNOWN";
 }
+

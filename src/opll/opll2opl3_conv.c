@@ -332,29 +332,69 @@ static inline int toTL(int vol, int off) {
     return (t > 0) ? t : 0;
 }
 
+
+static const unsigned char (*select_opll_preset_table(
+    OPLL_PresetType preset, OPLL_PresetSource preset_source
+))[8]
+{
+    switch (preset) {
+        case OPLL_PresetType_YM2413:
+            switch (preset_source) {
+                case OPLL_PresetSource_YMVOICE:
+                    return YMVOICE_YM2413_VOICES;
+                case OPLL_PresetSource_YMFM:
+                    return YMFM_YM2413_VOICES;
+                case OPLL_PresetSource_EXPERIMENT:
+                    return EXPERIMENT_YM2413_PRESET;
+                default:
+                    return YMFM_YM2413_VOICES;
+            }
+        case OPLL_PresetType_VRC7:
+            switch (preset_source) {
+                case OPLL_PresetSource_YMVOICE:
+                    return YMVOICE_VRC7_VOICES;
+                case OPLL_PresetSource_YMFM:
+                    return YMFM_VRC7_VOICES;
+                case OPLL_PresetSource_EXPERIMENT:
+                    return EXPERIMENT_VRC7_PRESET;
+                default:
+                    return YMFM_VRC7_VOICES;
+            }
+        case OPLL_PresetType_YMF281B:
+            switch (preset_source) {
+                case OPLL_PresetSource_YMVOICE:
+                    return YMVOICE_YMF281B_VOICES;
+                case OPLL_PresetSource_YMFM:
+                    return YMFM_YMF281B_VOICES;
+                case OPLL_PresetSource_EXPERIMENT:
+                    return EXPERIMENT_YMF281B_PRESET;
+                default:
+                    return YMFM_YMF281B_VOICES;
+            }
+        case OPLL_PresetType_YM2423:
+            switch (preset_source) {
+                case OPLL_PresetSource_YMFM:
+                    return YMFM_YM2423_VOICES;
+                case OPLL_PresetSource_EXPERIMENT:
+                    return EXPERIMENT_YM2423_PRESET;
+                default:
+                    return YMFM_YM2423_VOICES;
+            }
+        // 他のpresetも同様に追加
+        default:
+            return YMVOICE_YM2413_VOICES;
+    }
+}
+
+
 void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_vp, const CommandOptions *p_opts)
 {
     if (!p_vp) return;
     memset(p_vp, 0, sizeof(*p_vp));
 
     uint8_t user_patch[8];
-    const unsigned char (*source_preset)[8] = YMVOICE_YM2413_VOICES; // Default
-
     // Select the preset table
-    switch (p_opts->preset) {
-        case OPLL_PresetType_YM2413:
-            source_preset = (p_opts->preset_source == OPLL_PresetSource_YMVOICE) ? YMVOICE_YM2413_VOICES : YMFM_YM2413_VOICES;
-            break;
-        case OPLL_PresetType_VRC7:
-            source_preset = YMFM_VRC7_VOICES;
-            break;
-        case OPLL_PresetType_YMF281B:
-            source_preset = (p_opts->preset_source == OPLL_PresetSource_YMVOICE) ? YMVOICE_YMF281B_VOICES : YMFM_YMF281B_VOICES;
-            break;
-        default:
-            source_preset = YMVOICE_YM2413_VOICES;
-            break;
-    }
+    const unsigned char (*source_preset)[8] = select_opll_preset_table(p_opts->preset, p_opts->preset_source);
 
     // Select patch
     const unsigned char *src = NULL;
@@ -407,7 +447,7 @@ void opll_load_voice(VGMContext *p_vgmctx, int inst, int ch, OPL3VoiceParam *p_v
 
     uint8_t fb = src[3] & 0x07;
 
-    if (p_opts->preset_source == OPLL_PresetSource_YMFM) {
+    if (p_opts->preset_source != OPLL_PresetSource_YMVOICE) {
         // Modulator
         p_vp->op[0].am   = m_am;
         p_vp->op[0].vib  = m_vib;
