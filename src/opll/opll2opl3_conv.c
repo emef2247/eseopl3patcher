@@ -309,82 +309,86 @@ static inline uint8_t ym2413_to_opl3_tl(uint8_t inst_tl, uint8_t volume) {
  * Each voice is commented with its number and English instrument name.
  */
 void convert_ymfm_2413_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
+    // Copy all 18×8 values from YMFM as base
     for (int i = 0; i < 18; ++i)
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
     // 1: Violin
-    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // TL
-    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x08; //
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // Modulator TL: force total level upper bits to 0xD
+    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x08; // Modulator RS/AM/FM: replace lower nibble with 0x8
 
     // 2: Guitar
-    exp[1][4] = (ymfm[1][4] & 0xF8) | 0xD8; 
+    exp[1][4] = (ymfm[1][4] & 0xF8) | 0xD8; // Modulator TL: preserve upper 5 bits, set lower 3 bits to 0x18
 
     // 3: Piano
-    exp[2][5] = ymfm[2][5] + 0x10;
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21;
+    exp[2][5] = ymfm[2][5] + 0x10;          // Modulator RS/AM/FM: increase by 0x10 (adds brightness)
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21; // Carrier AR: keep upper nibble, replace lower with 0x1
 
     // 4: Flute
-    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11;
-    exp[3][4] = (ymfm[3][4] & 0xF0) | 0x8D;
+    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11; // Modulator AR: preserve upper bits, set lower to 0x1
+    exp[3][4] = (ymfm[3][4] & 0xF0) | 0x8D; // Modulator TL: change lower nibble to 0xD (softer tone)
 
     // 5: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
-    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // Modulator AR: set lower nibble to 0x2
+    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1; // Modulator TL: preserve top 3 bits, apply new lower pattern 0xE1
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01; // Carrier AR: adjust lower bits to soften attack
 
     // 6: Oboe
-    exp[5][6] = ymfm[5][6] & 0xF0;
+    exp[5][6] = ymfm[5][6] & 0xF0;          // Carrier AR: clear lower nibble (remove fast attack)
 
     // 7: Trumpet
-    exp[6][5] = ymfm[6][5] & ~0x0E; 
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
+    exp[6][5] = ymfm[6][5] & ~0x0E;         // Modulator RS/AM/FM: clear bits 1–3 (disable certain mod flags)
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // Carrier AR: preserve upper nibble, set lower to 0x1
 
     // 8: Organ
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33;
-    exp[7][2] = ymfm[7][2];                
-    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13;
-    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xB0;
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70;
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33; // Modulator AR: slightly longer attack
+    exp[7][2] = ymfm[7][2];                 // Modulator SR: unchanged
+    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13; // Modulator SL/RR: adjust lower nibble
+    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xB0; // Modulator TL: set lower nibble for mellower tone
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70; // Modulator RS/AM/FM: adjust to 0x70
 
     // 9: Horn
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61;
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61; // Modulator AR: lower nibble → 0x1 for smoother attack
 
     // 10: Synthesizer
-    exp[9][0] = ymfm[9][0];
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0;
+    exp[9][0] = ymfm[9][0];                 // Modulator AR: unchanged
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0; // Modulator RS/AM/FM: set lower nibble fully on (rich harmonics)
 
     // 11: Harpsichord
-    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33;
-    exp[10][4] = (ymfm[10][4] & 0xF0) | 0xEA;
-    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF;
+    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33; // Modulator AR: tighter attack
+    exp[10][4] = (ymfm[10][4] & 0xF0) | 0xEA; // Modulator TL: modify lower nibble (bright timbre)
+    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF; // Modulator RS/AM/FM: add strong modulation depth
 
     // 12: Vibraphone
-    exp[11][0] = ymfm[11][0];
-    exp[11][1] = (ymfm[11][1] & 0xC0) | 0xC1;
-    exp[11][2] = ymfm[11][2] & ~((1 << 1) | (1 << 2) | (1 << 5));
+    exp[11][0] = ymfm[11][0];                  // Modulator AR: unchanged
+    exp[11][1] = (ymfm[11][1] & 0xC0) | 0xC1;  // Modulator DR: preserve upper 2 bits, lower nibble 0x1
+    exp[11][2] = ymfm[11][2] & ~((1 << 1) | (1 << 2) | (1 << 5)); 
+    // Modulator SR: clear bits 1,2,5 to reduce sustain and modulation
 
     // 13: Synth Bass
-    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xD2;
-    exp[12][5] = ymfm[12][5];                
-    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;
+    exp[12][4] = (ymfm[12][4] & 0xF0) | 0xD2;  // Modulator TL: adjust brightness
+    exp[12][5] = ymfm[12][5];                  // Modulator RS/AM/FM: unchanged
+    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;  // Carrier AR: lower nibble 0x0 → slower attack
 
     // 14: Acoustic Bass
-    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;
-    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4;
-    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90;
+    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;  // Modulator SR: replace lower nibble
+    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4;  // Modulator TL: modify upper bits for softer tone
+    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90;  // Modulator RS/AM/FM: lower nibble set to 0x0
 
     // 15: Electric Guitar
-    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xF1;
-    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4;
-    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;
+    exp[14][4] = (ymfm[14][4] & 0xF0) | 0xF1;  // Modulator TL: brighten timbre
+    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4;  // Modulator RS/AM/FM: moderate modulation
+    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;  // Carrier AR: fast attack, clear tone
 
     // 16: Rhythm1 (BD)
+    // → No modification required; copied directly from YMFM data
 
     // 17: Rhythm2 (SD/HH)
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;  // RR/AM/FM: preserve upper nibble, fix lower bits for percussion tone
 
     // 18: Rhythm3 (TT/CYM)
+    // → No modification required; copied directly from YMFM data
 }
 
 /*
@@ -397,216 +401,219 @@ void convert_ymfm_vrc7_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][
             exp[i][j] = ymfm[i][j];
 
     // 1: Bell
-    exp[0][4] = ymfm[0][4] + 0x20;
+    exp[0][4] = ymfm[0][4] + 0x20; // Increase TL (modulator total level) to make the bell sound softer
 
     // 2: Guitar
-    exp[1][4] = ymfm[1][4] - 0x20;
-    exp[1][5] = ymfm[1][5] - 1;
+    exp[1][4] = ymfm[1][4] - 0x20; // Decrease TL (modulator total level) to emphasize harmonic content
+    exp[1][5] = ymfm[1][5] - 1;    // Slightly reduce feedback for a smoother tone
 
     // 3: Piano
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;
-    exp[2][5] = ymfm[2][5] - 0x10; 
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11; // Adjust AR/DR for modulator to tighten attack
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11; // Adjust AR/DR for carrier similarly
+    exp[2][5] = ymfm[2][5] - 0x10;          // Lower sustain level for better dynamic contrast
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20; // Modify waveform selection for brighter tone
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12; // Adjust feedback and connection bits for balance
 
     // 4: Flute
-    exp[3][4] = ymfm[3][4] - 0x50;
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;
+    exp[3][4] = ymfm[3][4] - 0x50;          // Decrease TL to make tone gentler
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61; // Modify waveform index for softer harmonic structure
 
     // 5: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
-    exp[4][4] = ymfm[4][4] & 0xE1;
-    exp[4][6] = ymfm[4][6] | 0x01;
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // Adjust AR/DR for better articulation
+    exp[4][4] = ymfm[4][4] & 0xE1;          // Mask TL for consistent dynamic control
+    exp[4][6] = ymfm[4][6] | 0x01;          // Enable subtle waveform variation
 
     // 6: Synth Brass
-    exp[5][2] = ymfm[5][2] + 1;   
-    exp[5][4] = ymfm[5][4] - 0x09;
-    exp[5][5] = ymfm[5][5] - 0x10;
-    exp[5][6] = 0xF4;
-    exp[5][7] = 0xF4;
+    exp[5][2] = ymfm[5][2] + 1;             // Slightly adjust DR to smoothen decay
+    exp[5][4] = ymfm[5][4] - 0x09;          // Decrease TL for more punch
+    exp[5][5] = ymfm[5][5] - 0x10;          // Reduce feedback for cleaner tone
+    exp[5][6] = 0xF4;                       // Force waveform index to bright brass tone
+    exp[5][7] = 0xF4;                       // Same for carrier
 
     // 7: Trumpet
-    exp[6][5] = ymfm[6][5] & ~0x0E; 
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // 10→11
+    exp[6][5] = ymfm[6][5] & ~0x0E;         // Clear bits to control feedback and modulation depth
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // Adjust waveform to slightly brighter brass timbre
 
     // 8: Organ
-    exp[7][4] = (ymfm[7][4] == 0xFF) ? 0xA2 : ymfm[7][4]; // FF→A2
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72; // 73→72
-    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01; // 00→01
+    exp[7][4] = (ymfm[7][4] == 0xFF) ? 0xA2 : ymfm[7][4]; // Correct invalid TL (FF → A2)
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72; // Adjust sustain and release for smoother envelope
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01; // Slight waveform tweak for realism
 
     // 9: Horn
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35; // 15→35
-    exp[8][1] = ymfm[8][1]; // 11
-    exp[8][2] = ymfm[8][2]; // 25
-    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40; // 41→40
-    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73; // 71→73
-    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72; // 00→72
-    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01; // F1→01
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35; // Adjust attack rate for stronger onset
+    exp[8][1] = ymfm[8][1];                 // Keep DR as original
+    exp[8][2] = ymfm[8][2];                 // Keep RR as original
+    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40; // Reduce TL slightly for balance
+    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73; // Adjust feedback to enhance body
+    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72; // Add brighter harmonics
+    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01; // Clean up waveform control bits
 
     // 10: Synth
-    exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5; // 95→B5
-    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F; // 10→0F
-    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F; // 0F→0F
-    exp[9][4] = (ymfm[9][4] & 0xF0) | 0xA8; // B8→A8
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xA5; // AA→A5
-    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51; // 50→51
+    exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5; // Increase AR for sharper attack
+    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F; // Modify RR to sustain longer
+    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F; // Same adjustment for carrier
+    exp[9][4] = (ymfm[9][4] & 0xF0) | 0xA8; // Slight TL correction
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xA5; // Balance modulator level
+    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51; // Waveform tweak for clarity
 
     // 11: Harpsichord
-    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 5E→24
+    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // Clear specific bits to control decay and release
 
     // 12: Vibraphone
-    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x18; // 10→18
+    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x18; // Change waveform index for metallic tone color
 
     // 13: Acoustic Bass
-    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
-    exp[12][5] = (ymfm[12][5] & 0xF0) | 0x95;
-    exp[12][6] = ymfm[12][6] & 0x0F;
-    exp[12][7] = ymfm[12][7] & 0x0F;
+    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9; // Modify TL and modulation for a rounder bass tone
+    exp[12][5] = (ymfm[12][5] & 0xF0) | 0x95;  // Adjust sustain for natural decay
+    exp[12][6] = ymfm[12][6] & 0x0F;           // Keep waveform clean
+    exp[12][7] = ymfm[12][7] & 0x0F;           // Keep feedback low
 
     // 14: Electric Guitar
-    exp[13][4] = ymfm[13][4] - 0x10;
-    exp[13][5] = ymfm[13][5] & ~0x3F;
-    exp[13][6] = ymfm[13][6] | 0x03;
-    exp[13][7] = ymfm[13][7] | 0xF0;
+    exp[13][4] = ymfm[13][4] - 0x10;           // Decrease TL for more bite
+    exp[13][5] = ymfm[13][5] & ~0x3F;          // Remove low bits to simplify modulation
+    exp[13][6] = ymfm[13][6] | 0x03;           // Enable mild waveform variation
+    exp[13][7] = ymfm[13][7] | 0xF0;           // Force waveform type to sustain harmonics
 
     // 15: Bass Synth
-    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
-    exp[14][4] = ymfm[14][4] | 0x20;
-    exp[14][5] = ymfm[14][5] & 0xF5;
-    exp[14][6] = ymfm[14][6] | 0x06;
-    exp[14][7] = ymfm[14][7] & 0xFE;
+    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;  // Adjust decay to a longer sustain
+    exp[14][4] = ymfm[14][4] | 0x20;           // Slight TL boost
+    exp[14][5] = ymfm[14][5] & 0xF5;           // Control feedback for smoother tone
+    exp[14][6] = ymfm[14][6] | 0x06;           // Enable extra harmonic content
+    exp[14][7] = ymfm[14][7] & 0xFE;           // Clean waveform bits
 
     // 16: Drum kit
-    exp[15][2] = ymfm[15][2] | 0x18;
-    exp[15][3] = ymfm[15][3] | 0x0F;
-    exp[15][4] = ymfm[15][4] | 0x1F;
-    exp[15][5] = ymfm[15][5] | 0x18;
-    exp[15][6] = ymfm[15][6] & 0x7A;
-    exp[15][7] = ymfm[15][7] | 0x05;
+    exp[15][2] = ymfm[15][2] | 0x18;           // Strengthen percussive envelope
+    exp[15][3] = ymfm[15][3] | 0x0F;           // Adjust attack and decay for snappier hits
+    exp[15][4] = ymfm[15][4] | 0x1F;           // TL correction for balanced loudness
+    exp[15][5] = ymfm[15][5] | 0x18;           // Feedback adjustment
+    exp[15][6] = ymfm[15][6] & 0x7A;           // Clean waveform mask
+    exp[15][7] = ymfm[15][7] | 0x05;           // Add waveform variation
 
     // 17: Rhythm2
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;  // Adjust waveform index for proper noise balance
 }
 
-/*
+
+/** 
  * YMFM_YMF281B_VOICES[18][8] → EXPERIMENT_YMF281B_PRESET[18][8]
- * Each voice is commented with its number and English instrument name.
+ * Convert YMFM YMF281B instrument data to experimental preset data
+ *  Each instrument is adjusted individually by modifying operator or channel parameters.
  */
 void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
+    // Copy original YMFM data as base
     for (int i = 0; i < 18; ++i)
         for (int j = 0; j < 8; ++j)
             exp[i][j] = ymfm[i][j];
 
     // 1: Bell
-    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x03;
-    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xE8;
-    exp[0][5] = (ymfm[0][5] & 0x0F) | 0x81;
-    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x42;
+    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x03;  // Modulator: adjust multiple to emphasize high overtones
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xE8;  // Carrier: higher TL (total level) for metallic tone
+    exp[0][5] = (ymfm[0][5] & 0x0F) | 0x81;  // Modulator: strong attack, quick decay
+    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x42;  // Feedback & waveform adjustment
 
     // 2: Guitar
-    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
-    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD8;
-    exp[1][5] = (ymfm[1][5] & 0x0F) | 0xF6;
-    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
-    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x12;
+    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;  // Slightly increase multiple for string-like harmonics
+    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD8;  // Carrier TL tuned for brighter attack
+    exp[1][5] = (ymfm[1][5] & 0x0F) | 0xF6;  // Fast attack & moderate sustain
+    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;  // Feedback shaping
+    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x12;  // Carrier waveform tweak
 
     // 3: Piano
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;
-    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xFA;
-    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xB2;
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x11;  // Modulator: balanced multiple
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x11;  // Carrier: same harmonic range
+    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xFA;  // Strong attack for percussive tone
+    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xB2;  // Faster decay for crispness
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x20;  // Mild feedback
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x12;  // Waveform for clean overtone
 
     // 4: Flute
-    exp[3][4] = (ymfm[3][4] & 0xF0) | 0xA8;
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;
+    exp[3][4] = (ymfm[3][4] & 0xF0) | 0xA8;  // Smooth attack, airy tone
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x61;  // Low feedback, gentle waveform
 
     // 5: Clarinet
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
-    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;  // Adjust multiple for reed-like tone
+    exp[4][4] = (ymfm[4][4] & 0xE0) | 0xE1;  // Higher TL and slower decay
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;  // Slight feedback for subtle harmonics
 
     // 6: Synth Brass
-    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x02;
-    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x01;
-    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x06;
-    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xA3;
-    exp[5][5] = (ymfm[5][5] & 0xF0) | 0xE2;
-    exp[5][6] = (ymfm[5][6] & 0xF0) | 0xF4;
-    exp[5][7] = (ymfm[5][7] & 0xF0) | 0xF4;
+    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x02;  // Low multiple for brass body
+    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x01;  // Carrier in similar range
+    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x06;  // Envelope shaping
+    exp[5][4] = (ymfm[5][4] & 0xF0) | 0xA3;  // Sharp attack
+    exp[5][5] = (ymfm[5][5] & 0xF0) | 0xE2;  // Controlled sustain
+    exp[5][6] = (ymfm[5][6] & 0xF0) | 0xF4;  // Feedback to enrich brightness
+    exp[5][7] = (ymfm[5][7] & 0xF0) | 0xF4;  // Same for carrier
 
     // 7: Trumpet
-    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
-    exp[6][4] = (ymfm[6][4] & 0xF0) | 0x82;
-    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
+    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;  // Envelope shape emphasizing attack
+    exp[6][4] = (ymfm[6][4] & 0xF0) | 0x82;  // Higher TL for brassy edge
+    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;  // Slightly faster attack
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;  // Feedback for resonance
 
     // 8: Organ
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x23;
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x23;  // Balanced multiple for organ-like harmonics
     exp[7][2] = (ymfm[7][2] & 0xF0) | 0x22;
-    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xA2;
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72;
-    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01;
+    exp[7][4] = (ymfm[7][4] & 0xF0) | 0xA2;  // Long sustain
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x72;  // Softer decay
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x01;  // Minimal feedback
 
     // 9: Horn
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35;
-    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x11;
-    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x25;
-    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40;
-    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73;
-    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72;
-    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01;
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x35;  // Modulator multiple=5 for bright brass harmonics
+    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x11;  // Modulator AR/DR gentle attack for breathy start
+    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x25;  // Carrier AR/DR for sharper attack and quick decay
+    exp[8][4] = (ymfm[8][4] & 0xF0) | 0x40;  // Feedback moderate (adds brass edge without noise)
+    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x73;  // Modulator total level — high output for body
+    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x72;  // Carrier TL slightly lower, keeps brightness
+    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x01;  // Modulation type: simple 2-op connection
 
     // 10: Synth
-    exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5;
-    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F;
+    exp[9][0] = (ymfm[9][0] & 0xF0) | 0xB5;  // High multiple for synthetic tone
+    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0F;  // Envelope mod
     exp[9][3] = (ymfm[9][3] & 0xF0) | 0x0F;
-    exp[9][4] = (ymfm[9][4] & 0x0F) | 0xA0;
+    exp[9][4] = (ymfm[9][4] & 0x0F) | 0xA0;  // Adjust total level
     exp[9][5] = (ymfm[9][5] & 0x0F) | 0xA0;
-    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51;
+    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x51;  // Feedback shaping
 
     // 11: Harpsichord
-    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // 0x5E→0x24
-    exp[10][4] = ymfm[10][4] | 0x08; // 0xF8→0xF8
-    exp[10][5] = ymfm[10][5] | 0x08; // 0xF8→0xF8
+    exp[10][2] = ymfm[10][2] & ~((1<<1)|(1<<2)|(1<<5)); // Clear bits to reduce decay → 0x5E→0x24
+    exp[10][4] = ymfm[10][4] | 0x08; // Keep strong attack
+    exp[10][5] = ymfm[10][5] | 0x08; // Same adjustment for carrier
 
     // 12: Vibraphone
-    exp[11][6] = ymfm[11][6] | 0x08; // 0x10→0x18
+    exp[11][6] = ymfm[11][6] | 0x08; // Slight feedback to add shimmer (0x10→0x18)
 
     // 13: Acoustic Bass
-    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9;
-    exp[12][5] = (ymfm[12][5] | 0x03) & 0x95;
-    exp[12][6] = ymfm[12][6] & 0x0F;
-    exp[12][7] = ymfm[12][7] & 0x0F;
+    exp[12][4] = (ymfm[12][4] & ~0x3A) | 0xC9; // Adjust attack/decay
+    exp[12][5] = (ymfm[12][5] | 0x03) & 0x95;  // Modify sustain and rate
+    exp[12][6] = ymfm[12][6] & 0x0F;           // Reduce feedback
+    exp[12][7] = ymfm[12][7] & 0x0F;           // Lower waveform emphasis
 
     // 14: Electric Guitar
-    exp[13][4] = ymfm[13][4] - 0x10;
-    exp[13][5] = ymfm[13][5] & ~0x3F;
-    exp[13][6] = ymfm[13][6] | 0x03;
-    exp[13][7] = ymfm[13][7] | 0xF0;
+    exp[13][4] = ymfm[13][4] - 0x10; // Reduce total level (brighter tone)
+    exp[13][5] = ymfm[13][5] & ~0x3F; // Shorter decay
+    exp[13][6] = ymfm[13][6] | 0x03;  // Slight feedback increase
+    exp[13][7] = ymfm[13][7] | 0xF0;  // Waveform emphasis
 
     // 15: Bass Synth
-    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72;
-    exp[14][4] = ymfm[14][4] | 0x20;
-    exp[14][5] = ymfm[14][5] & 0xF5;
-    exp[14][6] = ymfm[14][6] | 0x06;
-    exp[14][7] = ymfm[14][7] & 0xFE;
+    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x72; // Envelope tuning for deep tone
+    exp[14][4] = ymfm[14][4] | 0x20;          // Boost sustain
+    exp[14][5] = ymfm[14][5] & 0xF5;          // Control release
+    exp[14][6] = ymfm[14][6] | 0x06;          // Feedback mod
+    exp[14][7] = ymfm[14][7] & 0xFE;          // Simplify waveform
 
     // 16: Drum kit
-    exp[15][2] = ymfm[15][2] | 0x18;
-    exp[15][3] = ymfm[15][3] | 0x0F;
-    exp[15][4] = ymfm[15][4] | 0x1F;
-    exp[15][5] = ymfm[15][5] | 0x18;
-    exp[15][6] = ymfm[15][6] & 0x7A;
-    exp[15][7] = ymfm[15][7] | 0x05;
+    exp[15][2] = ymfm[15][2] | 0x18; // Emphasize attack
+    exp[15][3] = ymfm[15][3] | 0x0F; // Stronger envelope
+    exp[15][4] = ymfm[15][4] | 0x1F; // Bright transient
+    exp[15][5] = ymfm[15][5] | 0x18; // Enhanced punch
+    exp[15][6] = ymfm[15][6] & 0x7A; // Control feedback
+    exp[15][7] = ymfm[15][7] | 0x05; // Adjust waveform
 
-    // 17: Rhythm2 (SD/HH)
-    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68;
+    // 17: Rhythm2 (Snare / Hi-Hat)
+    exp[16][7] = (ymfm[16][7] & 0xF0) | 0x68; // Envelope retune
 
-    // 18: Rhythm3 (TT/CYM)
-    // exp[17][k] = ymfm[17][k]; 
+    // 18: Rhythm3 (Tom / Cymbal)
+    // exp[17][k] = ymfm[17][k]; // No modification
 }
 
 /*
@@ -615,154 +622,169 @@ void convert_ymf281b_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]
  */
 void convert_ymfm_2423_to_experiment(const uint8_t ymfm[18][8], uint8_t exp[18][8]) {
     // 1. Violin (ch=0)
-    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x11;
-    exp[0][1] = (ymfm[0][1] & 0xF0) | 0x61;
-    exp[0][2] = (ymfm[0][2] & 0xF0) | 0x1E;
-    exp[0][3] = (ymfm[0][3] & 0xF0) | 0x17;
-    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0;
-    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x78;
-    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x00;
-    exp[0][7] = (ymfm[0][7] & 0xF0) | 0x17;
+    // Smooth attack, natural sustain, and moderate modulation depth.
+    exp[0][0] = (ymfm[0][0] & 0xF0) | 0x11; // Lower AR for softer onset
+    exp[0][1] = (ymfm[0][1] & 0xF0) | 0x61; // DR tuned for smooth fade
+    exp[0][2] = (ymfm[0][2] & 0xF0) | 0x1E; // SR for natural decay
+    exp[0][3] = (ymfm[0][3] & 0xF0) | 0x17; // RR moderate
+    exp[0][4] = (ymfm[0][4] & 0x0F) | 0xD0; // TL controls tone brightness
+    exp[0][5] = (ymfm[0][5] & 0xF0) | 0x78; // AM/PM/EG bias
+    exp[0][6] = (ymfm[0][6] & 0xF0) | 0x00; // No modulation depth change
+    exp[0][7] = (ymfm[0][7] & 0xF0) | 0x17; // Carrier envelope fine-tune
 
     // 2. Guitar (ch=1)
-    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13;
-    exp[1][1] = (ymfm[1][1] & 0xF0) | 0x41;
-    exp[1][2] = (ymfm[1][2] & 0xF0) | 0x1A;
-    exp[1][3] = (ymfm[1][3] & 0xF0) | 0x0D;
-    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD0 | 0x08; // D8
-    exp[1][5] = (ymfm[1][5] & 0xF0) | 0xF7;
-    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23;
-    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x13;
+    // Sharper transient, shorter sustain; adds plucked-string edge.
+    exp[1][0] = (ymfm[1][0] & 0xF0) | 0x13; // Fast AR for percussive attack
+    exp[1][1] = (ymfm[1][1] & 0xF0) | 0x41; // Mild decay
+    exp[1][2] = (ymfm[1][2] & 0xF0) | 0x1A; // Slightly reduced sustain
+    exp[1][3] = (ymfm[1][3] & 0xF0) | 0x0D; // Quicker release
+    exp[1][4] = (ymfm[1][4] & 0x0F) | 0xD0 | 0x08; // D8 = brighter tone via TL
+    exp[1][5] = (ymfm[1][5] & 0xF0) | 0xF7; // FM modulation depth up
+    exp[1][6] = (ymfm[1][6] & 0xF0) | 0x23; // Slight feedback
+    exp[1][7] = (ymfm[1][7] & 0xF0) | 0x13; // Mild sustain curve
 
     // 3. Piano (ch=2)
-    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x13;
-    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x01;
-    exp[2][2] = (ymfm[2][2] & 0xF0) | 0x99;
-    exp[2][3] = (ymfm[2][3] & 0xF0) | 0x00;
-    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xF2;
-    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xD4;
-    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21;
-    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x23;
+    // Strong attack and fast decay, emphasizing transient and resonance.
+    exp[2][0] = (ymfm[2][0] & 0xF0) | 0x13; // Aggressive AR
+    exp[2][1] = (ymfm[2][1] & 0xF0) | 0x01; // Rapid decay
+    exp[2][2] = (ymfm[2][2] & 0xF0) | 0x99; // Longer sustain tail
+    exp[2][3] = (ymfm[2][3] & 0xF0) | 0x00; // Tight RR
+    exp[2][4] = (ymfm[2][4] & 0xF0) | 0xF2; // Bright tone
+    exp[2][5] = (ymfm[2][5] & 0xF0) | 0xD4; // Controlled harmonic content
+    exp[2][6] = (ymfm[2][6] & 0xF0) | 0x21; // Feedback slight
+    exp[2][7] = (ymfm[2][7] & 0xF0) | 0x23; // Envelope fine-tune
 
     // 4. Flute (ch=3)
-    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11;
-    exp[3][1] = (ymfm[3][1] & 0xF0) | 0x61;
-    exp[3][2] = (ymfm[3][2] & 0xF0) | 0x0E;
-    exp[3][3] = (ymfm[3][3] & 0xF0) | 0x07;
-    exp[3][4] = (ymfm[3][4] & 0x0F) | 0x8D;
-    exp[3][5] = (ymfm[3][5] & 0xF0) | 0x64;
-    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x70;
-    exp[3][7] = (ymfm[3][7] & 0xF0) | 0x27;
+    // Soft and breathy, with moderate sustain and slow release.
+    exp[3][0] = (ymfm[3][0] & 0xF0) | 0x11; // Slow AR for gentle onset
+    exp[3][1] = (ymfm[3][1] & 0xF0) | 0x61; // Smooth DR
+    exp[3][2] = (ymfm[3][2] & 0xF0) | 0x0E; // Sustain curve
+    exp[3][3] = (ymfm[3][3] & 0xF0) | 0x07; // Long release
+    exp[3][4] = (ymfm[3][4] & 0x0F) | 0x8D; // Soft TL = airy tone
+    exp[3][5] = (ymfm[3][5] & 0xF0) | 0x64; // Moderate AM depth
+    exp[3][6] = (ymfm[3][6] & 0xF0) | 0x70; // Light vibrato
+    exp[3][7] = (ymfm[3][7] & 0xF0) | 0x27; // Smooth RR
 
     // 5. Clarinet (ch=4)
-    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32;
-    exp[4][1] = (ymfm[4][1] & 0xF0) | 0x21;
-    exp[4][2] = (ymfm[4][2] & 0xF0) | 0x1E;
-    exp[4][3] = (ymfm[4][3] & 0xF0) | 0x06;
-    exp[4][4] = (ymfm[4][4] & 0x0F) | 0xE0 | 0x01; // E1
-    exp[4][5] = (ymfm[4][5] & 0xF0) | 0x76;
-    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01;
-    exp[4][7] = (ymfm[4][7] & 0xF0) | 0x28;
+    // Gentle reed tone, focused midrange resonance.
+    exp[4][0] = (ymfm[4][0] & 0xF0) | 0x32; // Mid-speed AR
+    exp[4][1] = (ymfm[4][1] & 0xF0) | 0x21; // Controlled DR
+    exp[4][2] = (ymfm[4][2] & 0xF0) | 0x1E; // Slight sustain
+    exp[4][3] = (ymfm[4][3] & 0xF0) | 0x06; // Moderate release
+    exp[4][4] = (ymfm[4][4] & 0x0F) | 0xE0 | 0x01; // E1 = warm TL curve
+    exp[4][5] = (ymfm[4][5] & 0xF0) | 0x76; // AM mod slightly stronger
+    exp[4][6] = (ymfm[4][6] & 0xF0) | 0x01; // Low feedback
+    exp[4][7] = (ymfm[4][7] & 0xF0) | 0x28; // Slight envelope bias
 
     // 6. Oboe (ch=5)
-    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31;
-    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22;
-    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16;
-    exp[5][3] = (ymfm[5][3] & 0xF0) | 0x05;
-    exp[5][4] = (ymfm[5][4] & 0x0F) | 0xE0;
-    exp[5][5] = (ymfm[5][5] & 0xF0) | 0x71;
-    exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00;
-    exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18;
+    // Reed-like, narrow resonance, slower release for realism.
+    exp[5][0] = (ymfm[5][0] & 0xF0) | 0x31; // Modulator: balanced attack, gentle bite
+    exp[5][1] = (ymfm[5][1] & 0xF0) | 0x22; // Carrier: slower decay for breathy sustain
+    exp[5][2] = (ymfm[5][2] & 0xF0) | 0x16; // Modulator TL=0x16 (adds slight nasal color)
+    exp[5][3] = (ymfm[5][3] & 0xF0) | 0x05; // Carrier TL=0x05 (near full level)
+    exp[5][4] = (ymfm[5][4] & 0x0F) | 0xE0; // Feedback: strong, narrow resonance typical of reeds
+    exp[5][5] = (ymfm[5][5] & 0xF0) | 0x71; // Moderate sustain and slower release for realism
+    exp[5][6] = (ymfm[5][6] & 0xF0) | 0x00; // Waveform: pure sine, natural tone
+    exp[5][7] = (ymfm[5][7] & 0xF0) | 0x18; // Subtle LFO depth adds expressive vibrato
 
     // 7. Trumpet (ch=6)
-    exp[6][0] = (ymfm[6][0] & 0xF0) | 0x21;
-    exp[6][1] = (ymfm[6][1] & 0xF0) | 0x61;
-    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D;
-    exp[6][3] = (ymfm[6][3] & 0xF0) | 0x07;
-    exp[6][4] = (ymfm[6][4] & 0x0F) | 0x80 | 0x02; // 82
-    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81;
-    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11;
-    exp[6][7] = (ymfm[6][7] & 0xF0) | 0x07;
+    // Bright, brassy with quick attack and shallow sustain.
+    exp[6][0] = (ymfm[6][0] & 0xF0) | 0x21; // Modulator: fast attack for brass bite
+    exp[6][1] = (ymfm[6][1] & 0xF0) | 0x61; // Carrier: strong attack and shorter decay
+    exp[6][2] = (ymfm[6][2] & 0xF0) | 0x1D; // Modulator TL=0x1D (high harmonic brightness)
+    exp[6][3] = (ymfm[6][3] & 0xF0) | 0x07; // Carrier TL=0x07 (loud presence)
+    exp[6][4] = (ymfm[6][4] & 0x0F) | 0x82; // Feedback high, bright tone core
+    exp[6][5] = (ymfm[6][5] & 0xF0) | 0x81; // Fast decay, shallow sustain
+    exp[6][6] = (ymfm[6][6] & 0xF0) | 0x11; // Waveform: adds harmonic shaping
+    exp[6][7] = (ymfm[6][7] & 0xF0) | 0x07; // Slight pitch modulation for natural brass instability
 
     // 8. Organ (ch=7)
-    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33;
-    exp[7][1] = (ymfm[7][1] & 0xF0) | 0x21;
-    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x2D;
-    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13;
-    exp[7][4] = (ymfm[7][4] & 0x0F) | 0xB0;
-    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70;
-    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x00;
-    exp[7][7] = (ymfm[7][7] & 0xF0) | 0x07;
+    // Steady amplitude, mild harmonic enhancement.
+    exp[7][0] = (ymfm[7][0] & 0xF0) | 0x33; // Modulator: moderate attack, smooth decay
+    exp[7][1] = (ymfm[7][1] & 0xF0) | 0x21; // Carrier: long sustain, constant amplitude
+    exp[7][2] = (ymfm[7][2] & 0xF0) | 0x2D; // Modulator TL=0x2D (adds light harmonic content)
+    exp[7][3] = (ymfm[7][3] & 0xF0) | 0x13; // Carrier TL=0x13 (steady loudness)
+    exp[7][4] = (ymfm[7][4] & 0x0F) | 0xB0; // Feedback medium, organ-like stability
+    exp[7][5] = (ymfm[7][5] & 0xF0) | 0x70; // Long sustain and gentle release
+    exp[7][6] = (ymfm[7][6] & 0xF0) | 0x00; // Waveform: sine for clean tone
+    exp[7][7] = (ymfm[7][7] & 0xF0) | 0x07; // Mild vibrato for rotary effect
 
     // 9. Horn (ch=8)
-    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61;
-    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x61;
-    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x1B;
-    exp[8][3] = (ymfm[8][3] & 0xF0) | 0x06;
-    exp[8][4] = (ymfm[8][4] & 0x0F) | 0x60 | 0x04; // 64
-    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x65;
-    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x10;
-    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x17;
+    // Round tone, mellow mid frequencies.
+    exp[8][0] = (ymfm[8][0] & 0xF0) | 0x61; // Modulator: strong attack for brass edge
+    exp[8][1] = (ymfm[8][1] & 0xF0) | 0x61; // Carrier: same contour for unified tone
+    exp[8][2] = (ymfm[8][2] & 0xF0) | 0x1B; // Modulator TL=0x1B (warmer harmonic content)
+    exp[8][3] = (ymfm[8][3] & 0xF0) | 0x06; // Carrier TL=0x06 (solid output)
+    exp[8][4] = (ymfm[8][4] & 0x0F) | 0x64; // Feedback moderate, darker tone
+    exp[8][5] = (ymfm[8][5] & 0xF0) | 0x65; // Envelope sustain moderate for body
+    exp[8][6] = (ymfm[8][6] & 0xF0) | 0x10; // Waveform with light shaping, not pure sine
+    exp[8][7] = (ymfm[8][7] & 0xF0) | 0x17; // Mild vibrato for expressive brass quality
 
     // 10. Synthesizer (ch=9)
-    exp[9][0] = (ymfm[9][0] & 0xF0) | 0x41;
-    exp[9][1] = (ymfm[9][1] & 0xF0) | 0x61;
-    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0B;
-    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x18;
-    exp[9][4] = (ymfm[9][4] & 0x0F) | 0x80 | 0x05; // 85
-    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0;
-    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x81;
-    exp[9][7] = (ymfm[9][7] & 0xF0) | 0x07;
+    // Modern synthetic lead; stronger modulation and sustain.
+    exp[9][0] = (ymfm[9][0] & 0xF0) | 0x41; // Modulator: moderate attack, controlled brightness
+    exp[9][1] = (ymfm[9][1] & 0xF0) | 0x61; // Carrier: fast attack and full sustain
+    exp[9][2] = (ymfm[9][2] & 0xF0) | 0x0B; // Modulator TL=0x0B (bright and cutting)
+    exp[9][3] = (ymfm[9][3] & 0xF0) | 0x18; // Carrier TL=0x18 (balanced loudness)
+    exp[9][4] = (ymfm[9][4] & 0x0F) | 0x85; // Feedback: high for crisp lead tone
+    exp[9][5] = (ymfm[9][5] & 0xF0) | 0xF0; // Long sustain for legato synth style
+    exp[9][6] = (ymfm[9][6] & 0xF0) | 0x81; // Alternate waveform for modern edge
+    exp[9][7] = (ymfm[9][7] & 0xF0) | 0x07; // Subtle LFO for pitch expressiveness
 
     // 11. Harpsichord (ch=10)
-    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33;
-    exp[10][1] = (ymfm[10][1] & 0xF0) | 0x01;
-    exp[10][2] = (ymfm[10][2] & 0xF0) | 0x83;
-    exp[10][3] = (ymfm[10][3] & 0xF0) | 0x11;
-    exp[10][4] = (ymfm[10][4] & 0x0F) | 0xEA;
-    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF;
-    exp[10][6] = (ymfm[10][6] & 0xF0) | 0x10;
-    exp[10][7] = (ymfm[10][7] & 0xF0) | 0x04;
+    // Metallic transient and fast release for plucked key sound.
+    exp[10][0] = (ymfm[10][0] & 0xF0) | 0x33; // Modulator: fast attack, short sustain
+    exp[10][1] = (ymfm[10][1] & 0xF0) | 0x01; // Carrier: very quick decay
+    exp[10][2] = (ymfm[10][2] & 0xF0) | 0x83; // Modulator TL=0x83 (adds metallic overtone)
+    exp[10][3] = (ymfm[10][3] & 0xF0) | 0x11; // Carrier TL=0x11 (bright tone level)
+    exp[10][4] = (ymfm[10][4] & 0x0F) | 0xEA; // Feedback high, strong brightness emphasis
+    exp[10][5] = (ymfm[10][5] & 0xF0) | 0xEF; // Very fast decay, percussive feel
+    exp[10][6] = (ymfm[10][6] & 0xF0) | 0x10; // Waveform slightly shaped for metallic transient
+    exp[10][7] = (ymfm[10][7] & 0xF0) | 0x04; // Fine tuning for sharper pluck definition
+
 
     // 12. Vibraphone (ch=11)
-    exp[11][0] = (ymfm[11][0] & 0xF0) | 0x17;
-    exp[11][1] = (ymfm[11][1] & 0xF0) | 0xC1;
-    exp[11][2] = (ymfm[11][2] & 0xF0) | 0x24;
-    exp[11][3] = (ymfm[11][3] & 0xF0) | 0x07;
-    exp[11][4] = (ymfm[11][4] & 0x0F) | 0xF8;
-    exp[11][5] = (ymfm[11][5] & 0xF0) | 0xF8;
-    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x22;
-    exp[11][7] = (ymfm[11][7] & 0xF0) | 0x12;
+    // Warm metallic tone with moderate vibrato depth.
+    exp[11][0] = (ymfm[11][0] & 0xF0) | 0x17; // Modulator: moderate attack, slight tremolo
+    exp[11][1] = (ymfm[11][1] & 0xF0) | 0xC1; // Carrier: long decay, smooth release
+    exp[11][2] = (ymfm[11][2] & 0xF0) | 0x24; // Modulator TL=0x24 (brightness control)
+    exp[11][3] = (ymfm[11][3] & 0xF0) | 0x07; // Carrier TL=0x07 (almost full level)
+    exp[11][4] = (ymfm[11][4] & 0x0F) | 0xF8; // Connection/feedback: strong feedback adds metallic shimmer
+    exp[11][5] = (ymfm[11][5] & 0xF0) | 0xF8; // Modulator/Carrier: max sustain, short release
+    exp[11][6] = (ymfm[11][6] & 0xF0) | 0x22; // Waveform: sine with slight shaping for metallic tone
+    exp[11][7] = (ymfm[11][7] & 0xF0) | 0x12; // Fine-tune / amplitude LFO depth moderate
 
     // 13. Synth Bass (ch=12)
-    exp[12][0] = (ymfm[12][0] & 0xF0) | 0x61;
-    exp[12][1] = (ymfm[12][1] & 0xF0) | 0x50;
-    exp[12][2] = (ymfm[12][2] & 0xF0) | 0x0C;
-    exp[12][3] = (ymfm[12][3] & 0xF0) | 0x05;
-    exp[12][4] = (ymfm[12][4] & 0x0F) | 0xD2;
-    exp[12][5] = (ymfm[12][5] & 0xF0) | 0xF5;
-    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40;
-    exp[12][7] = (ymfm[12][7] & 0xF0) | 0x42;
+    // Deep bass with strong envelope, fast attack.
+    exp[12][0] = (ymfm[12][0] & 0xF0) | 0x61; // Modulator: fast attack, low sustain
+    exp[12][1] = (ymfm[12][1] & 0xF0) | 0x50; // Carrier: quick decay for percussive edge
+    exp[12][2] = (ymfm[12][2] & 0xF0) | 0x0C; // Modulator TL=0x0C (bright tone)
+    exp[12][3] = (ymfm[12][3] & 0xF0) | 0x05; // Carrier TL=0x05 (full volume)
+    exp[12][4] = (ymfm[12][4] & 0x0F) | 0xD2; // Feedback moderate, connection mode 0
+    exp[12][5] = (ymfm[12][5] & 0xF0) | 0xF5; // Envelope: short sustain, tight bass control
+    exp[12][6] = (ymfm[12][6] & 0xF0) | 0x40; // Waveform: saw-like for synth bass texture
+    exp[12][7] = (ymfm[12][7] & 0xF0) | 0x42; // Pitch LFO moderate for “growl” movement
 
     // 14. Acoustic Bass (ch=13)
-    exp[13][0] = (ymfm[13][0] & 0xF0) | 0x01;
-    exp[13][1] = (ymfm[13][1] & 0xF0) | 0x01;
-    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55;
-    exp[13][3] = (ymfm[13][3] & 0xF0) | 0x03;
-    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4;
-    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90;
-    exp[13][6] = (ymfm[13][6] & 0xF0) | 0x03;
-    exp[13][7] = (ymfm[13][7] & 0xF0) | 0x02;
+    // Natural upright tone; slower attack, more resonance.
+    exp[13][0] = (ymfm[13][0] & 0xF0) | 0x01; // Modulator: slow attack
+    exp[13][1] = (ymfm[13][1] & 0xF0) | 0x01; // Carrier: same slow response
+    exp[13][2] = (ymfm[13][2] & 0xF0) | 0x55; // Modulator TL=0x55 (soft, woody tone)
+    exp[13][3] = (ymfm[13][3] & 0xF0) | 0x03; // Carrier TL=0x03 (moderate volume)
+    exp[13][4] = (ymfm[13][4] & 0x0F) | 0xE4; // Feedback moderate, natural resonance
+    exp[13][5] = (ymfm[13][5] & 0xF0) | 0x90; // Long sustain, slower decay for acoustic body
+    exp[13][6] = (ymfm[13][6] & 0xF0) | 0x03; // Waveform: near-sine for round bass tone
 
     // 15. Electric Guitar (ch=14)
-    exp[14][0] = (ymfm[14][0] & 0xF0) | 0x41;
-    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x41;
-    exp[14][2] = (ymfm[14][2] & 0xF0) | 0x89;
-    exp[14][3] = (ymfm[14][3] & 0xF0) | 0x03;
-    exp[14][4] = (ymfm[14][4] & 0x0F) | 0xF1;
-    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4;
-    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0;
-    exp[14][7] = (ymfm[14][7] & 0xF0) | 0x13;
+    // Bright, plucked tone with mild distortion edge.
+    exp[14][0] = (ymfm[14][0] & 0xF0) | 0x41; // Modulator: medium attack, edgy response
+    exp[14][1] = (ymfm[14][1] & 0xF0) | 0x41; // Carrier: same contour, synchronized envelope
+    exp[14][2] = (ymfm[14][2] & 0xF0) | 0x89; // Modulator TL=0x89 (adds harmonic drive)
+    exp[14][3] = (ymfm[14][3] & 0xF0) | 0x03; // Carrier TL=0x03 (strong output)
+    exp[14][4] = (ymfm[14][4] & 0x0F) | 0xF1; // Feedback high, adds slight distortion
+    exp[14][5] = (ymfm[14][5] & 0xF0) | 0xE4; // Moderate sustain, short release for pluck
+    exp[14][6] = (ymfm[14][6] & 0xF0) | 0xC0; // Waveform: saw-like for bright timbre
+    exp[14][7] = (ymfm[14][7] & 0xF0) | 0x13; // Fine detune for realism in chorus texture
 
     // 16. Rhythm1 (BD) ch=15
     for(int j=0; j<8; ++j) exp[15][j] = ymfm[15][j];
