@@ -1,5 +1,4 @@
 #include <stddef.h>                 /* NULL */
-#include <stdio.h> 
 #include "opl3_voice_registry.h"
 #include "opl3_voice.h"             /* opl3_voice_db_find_or_add */
 #include "../opll/ym2413_patch_convert.h"

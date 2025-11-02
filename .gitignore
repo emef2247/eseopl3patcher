@@ -63,6 +63,7 @@ dkms.conf
 /release_temp
 
 # executables
+
 *.exe
 eseopl3patcher
 *.patch
@@ -85,14 +86,6 @@ calibration/p??o4_*_pass*.wav
 *.tgz
 *.tar.gz
 
-# Config file
-*.ini
-.clang-format
-
-# md file
-CHANGES.md
-IMPLEMENTATION_SUMMARY.md
-
 # Keep summary & overrides
 !calibration/reports/summarize_pass1.csv
 !calibration/reports/summarize_pass2.csv
@@ -107,7 +100,6 @@ tests/equiv/txt/
 tools/bin/
 tools/vgm2txt
 tools/VGMPlay
-tools/gate_estimator
 
 # Ignore built sources and binaries
 _src/
@@ -120,6 +112,7 @@ out_no_post.log
 tools/ssh_check.log
 
 # General logs
+*.log
 out_no_post.log
 tools/ssh_check.log
 

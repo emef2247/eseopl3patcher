@@ -186,3 +186,9 @@ const char* get_opll_preset_source(const OPLL_PresetSource source) {
     return "UNKNOWN";
 }
 
+const char* get_opll_convert_method(const OPLL_ConvertMethod type) {
+    if (type == OPLL_ConvertMethod_VGMCONV)  return "VGM-CONV";
+    if (type == OPLL_ConvertMethod_COMMANDBUFFER)  return "COMMAND_BUFFER";
+    return "UNKNOWN";
+}
+

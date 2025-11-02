@@ -66,11 +66,27 @@ typedef struct {
 } OPLL2OPL3_PendingChannel;
 
 typedef struct {
+    int  ch;
+    bool has_reg0x1n;
+    bool has_reg0x2n;
+    bool has_reg0x3n;
+    bool prev_keybit;
+    uint8_t reg0x1n;
+    uint8_t reg0x2n;
+    uint8_t reg0x3n;
+    int     wait_count;
+    sample_t    wait1;
+    sample_t    wait2;
+} OPLL_CommandBuffer;
+
+typedef struct {
     sample_t    virtual_time; // 入力（解析）側の進行時間（samples）
     sample_t    emit_time;    // 出力済みVGMの進行時間（samples）
     bool        accessed[0x200];
     uint8_t     last_emitted_reg_val[0x200];
+    int         wait_count;
     OPLL2OPL3_PendingChannel ch[OPLL_NUM_CHANNELS];
+    OPLL_CommandBuffer command_buffer;
 } OPLL2OPL3_Scheduler;
 
 typedef struct {

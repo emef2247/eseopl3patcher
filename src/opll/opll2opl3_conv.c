@@ -52,11 +52,26 @@ static inline void opll2opl3_debug_log(VGMContext *p_vgmctx, char *tag1,const ch
     }
 }
 
+void opll2opl3_init_command_buffer(VGMContext *p_vgmctx, const CommandOptions *p_opts) {
+        OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+        p_command_buffer->ch = -1;
+        p_command_buffer->has_reg0x1n = false;
+        p_command_buffer->has_reg0x2n = false;
+        p_command_buffer->has_reg0x3n = false;
+        p_command_buffer->reg0x1n = 0x0;
+        p_command_buffer->reg0x2n = 0x0;
+        p_command_buffer->reg0x3n = 0x0;
+        p_command_buffer->wait_count = 0;
+        p_command_buffer->wait1 = 0;
+        p_command_buffer->wait2 = 0;
+}
+
 void opll2opl3_init_scheduler(VGMContext *p_vgmctx, const CommandOptions *p_opts) {
     OPLL2OPL3_Scheduler *s = &(p_vgmctx->opll_state.sch);
     memset(s, 0, sizeof(*s));
     s->virtual_time = 0;
     s->emit_time = 0;
+    s->wait_count = 0;
 
     for (int ch = 0; ch < OPLL_NUM_CHANNELS; ch++) {
         memset(&s->ch[ch], 0, sizeof(OPLL2OPL3_PendingChannel));
@@ -196,7 +211,6 @@ int emit_wait(VGMContext *p_vgmctx, uint16_t samples, OPLL2OPL3_Scheduler *s,con
     wrote_bytes += vgm_wait_samples(p_vgmctx, samples);
     // Advance emitted timeline
     s->emit_time += samples;
-
     if (p_opts->debug.verbose) {
         fprintf(stderr,"[EMIT][WAIT] emit_time advanced by %u -> %u\n", samples, (unsigned)s->emit_time);
     }
@@ -1185,42 +1199,12 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
 
         if (now_rhythm_mode && !prev_rhythm_mode) {
             // Rhythm mode enabled （posedge）
-            if (p_opts->is_voice_zero_clear) {
-                for (int i = 0; i < 3; ++i) {
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
-                }
-            }
             p_vgmctx->opll_state.is_rhythm_mode = true;
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts); // BD
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts); // SD/TOM
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts); // CYM/HH
         } else if (!now_rhythm_mode && prev_rhythm_mode) {
             // Rhythm mode disabled（negedge）
-            if (p_opts->is_voice_zero_clear) {
-                for (int i = 0; i < 3; ++i) {
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slots[i], 0x00, p_opts);
-                    wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + (6 + i), 0xF0, p_opts);
-                }
-            }
             p_vgmctx->opll_state.is_rhythm_mode = false;
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts);
             wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts);
@@ -1298,24 +1282,6 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
         p->block = block;
         p->last_reg_20 = val;
 
-        if (p_opts->is_voice_zero_clear) {
-            // 0x20～0x28書き込み時は毎回ゼロクリア＋voice apply（vgm-conv互換）
-            int mod_slot = opl3_opreg_addr(0, ch, 0);
-            int car_slot = opl3_opreg_addr(0, ch, 1);
-
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts);
-        }
-
         wrote_bytes += opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
         // KeyOn/KeyOff含むA0/B0レジスタ書き込み（OPLL的なNoteOn/Off反映）
@@ -1340,25 +1306,6 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
         p->voice_id = (val >> 4) & 0x0F;
         p->tl = val & 0x0F;
 
-        if (p_opts->is_voice_zero_clear) {
-            // --- ここからゼロクリア追加 ---
-            // operator slot計算(2op)
-            int mod_slot = opl3_opreg_addr(0, ch, 0);
-            int car_slot = opl3_opreg_addr(0, ch, 1);
-
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + mod_slot, 0x00, p_opts); // AM/VIB/EGT/KSR/MULT
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x20 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + mod_slot, 0x00, p_opts); // KSL/TL
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x40 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + mod_slot, 0x00, p_opts); // AR/DR
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x60 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + mod_slot, 0x00, p_opts); // SL/RR
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0x80 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + mod_slot, 0x00, p_opts); // WS
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xE0 + car_slot, 0x00, p_opts);
-            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xC0 + ch, 0xF0, p_opts); // Feedback/Algo（FM）
-        }
-
         opll2opl3_debug_log(p_vgmctx, "HANDLE", "Instrument/Volume", ch, p_opts);
         wrote_bytes += opll2opl3_update_voice(p_vgmctx, ch, p_opts);
 
@@ -1367,11 +1314,257 @@ int opll2opl3_handle_opll_command (VGMContext *p_vgmctx, uint8_t reg, uint8_t va
     return wrote_bytes;
 }
 
+int opll2opl3_flush_command_buffer (VGMContext *p_vgmctx, const CommandOptions *p_opts) {
+    int wrote_bytes = 0;
+    OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+    // Extract reg0x2n
+    bool keybit   = (p_command_buffer->reg0x2n & 0x10) != 0;
+    uint8_t reg_an = (p_command_buffer->reg0x1n & 0x7f) << 1;
+    uint8_t reg_bn = ((p_command_buffer->reg0x2n  & 0x1F) << 1) | ((p_command_buffer->reg0x1n & 0x80) >> 7);
+
+    if (p_command_buffer->prev_keybit && !keybit) {
+        // KeyBit 1 -> 0 : 0x20 (KeyOff) > 0x10(FnumL) > 0x30 (INST/Vol)
+        if (p_opts->debug.verbose) {
+        fprintf(stderr,
+            "[OPLL2OPL3][FLUSH] KeyBit 1 -> 0 :0x20:0x%02x (KeyOff) > 0x10(FnumL):0x%02x > 0x30 (INST/Vol):0x%02x \n"
+            ,p_command_buffer->reg0x2n, p_command_buffer->reg0x1n,p_command_buffer->reg0x3n
+        );
+        }
+        // reg1n
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + p_command_buffer->ch, reg_bn, p_opts);
+
+        // reg2n
+        if (p_command_buffer->wait1 > 0) {
+            wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait1, p_opts, &(p_vgmctx->opll_state.sch));
+        }
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + p_command_buffer->ch, reg_an, p_opts);
+
+        // reg3n
+        if (p_command_buffer->wait2 > 0) {
+            wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait2, p_opts, &(p_vgmctx->opll_state.sch));
+        }
+
+        
+        wrote_bytes += opll2opl3_update_voice(p_vgmctx, p_command_buffer->ch, p_opts);
+    }
+    else if (!p_command_buffer->prev_keybit && keybit) {
+        // KeyBit 0 -> 1 : 0x30 (INST/Vol) > 0x10(FnumL) > 0x20 (KeyOn)
+        fprintf(stderr,
+            "[OPLL2OPL3][FLUSH] KeyBit 0 -> 1 :0x30:0x%02x (Inst/Val)) > wait1:%d > 0x10(FnumL):0x%02x > wait2:%d > 0x20 (KeyOn):0x%02x \n"
+            ,p_command_buffer->reg0x3n, p_command_buffer->wait1, p_command_buffer->reg0x1n,  p_command_buffer->wait2, p_command_buffer->reg0x2n
+        );
+
+        // reg3n
+        wrote_bytes += opll2opl3_update_voice(p_vgmctx, p_command_buffer->ch, p_opts);
+
+        // reg 1n
+        if (p_command_buffer->wait1 > 0) {
+            wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait1, p_opts, &(p_vgmctx->opll_state.sch));
+        }
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + p_command_buffer->ch, reg_an, p_opts);
+
+        // reg2n
+        if (p_command_buffer->wait2 > 0) {
+            wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait2, p_opts, &(p_vgmctx->opll_state.sch));
+        }
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + p_command_buffer->ch, reg_bn, p_opts);
+    }
+    else {
+        // No Edge of KeyOn
+            if (!keybit) {
+            if (p_opts->debug.verbose) {
+                fprintf(stderr,
+                    "[OPLL2OPL3][FLUSH] KeyBit 0 -> 0 :0x20:0x%02x (KeyOff) > wait1:%d > 0x10(FnumL):0x%02x >wait2:%d> 0x30 (INST/Vol):0x%02x \n"
+                    ,p_command_buffer->reg0x2n,p_command_buffer->wait1, p_command_buffer->reg0x1n,p_command_buffer->wait2, p_command_buffer->reg0x3n
+                );
+            }
+            // reg1n
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xB0 + p_command_buffer->ch, reg_bn, p_opts);
+
+            // reg2n
+            if (p_command_buffer->wait1 > 0) {
+                wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait1, p_opts, &(p_vgmctx->opll_state.sch));
+            }
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xA0 + p_command_buffer->ch, reg_an, p_opts);
+
+            // reg3n
+            if (p_command_buffer->wait2 > 0) {
+                wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, p_command_buffer->wait2, p_opts, &(p_vgmctx->opll_state.sch));
+            }
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, p_command_buffer->ch, p_opts);
+            }
+    }
+    p_command_buffer->prev_keybit  = keybit;
+
+    // Reset Command Buffer
+    p_command_buffer->has_reg0x1n = false;
+    p_command_buffer->has_reg0x2n = false;
+    p_command_buffer->has_reg0x3n = false;
+    p_command_buffer->wait_count  = 0;
+    p_command_buffer->wait1  = 0;
+    p_command_buffer->wait2  = 0;
+    
+    return wrote_bytes;
+}
+
+
+int opll2opl3_handle_opll_command2 (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, const CommandOptions *p_opts) 
+{
+    int wrote_bytes = 0;
+    if (reg == 0x0e) {
+        OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
+        OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+
+        int lfoDepth = OPLL_LFO_DEPTH; 
+
+        bool prev_rhythm_mode = p_vgmctx->opll_state.is_rhythm_mode;
+        bool now_rhythm_mode  = (val & 0x20) != 0;
+
+        int mod_slots[3] = { opl3_opreg_addr(0, 6, 0), opl3_opreg_addr(0, 7, 0), opl3_opreg_addr(0, 8, 0) };
+        int car_slots[3] = { opl3_opreg_addr(0, 6, 1), opl3_opreg_addr(0, 7, 1), opl3_opreg_addr(0, 8, 1) };
+
+        if (now_rhythm_mode && !prev_rhythm_mode) {
+            // Rhythm mode enabled （posedge）
+            p_vgmctx->opll_state.is_rhythm_mode = true;
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts); // BD
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts); // SD/TOM
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts); // CYM/HH
+        } else if (!now_rhythm_mode && prev_rhythm_mode) {
+            // Rhythm mode disabled（negedge）
+            p_vgmctx->opll_state.is_rhythm_mode = false;
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 6, p_opts);
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 7, p_opts);
+            wrote_bytes += opll2opl3_update_voice(p_vgmctx, 8, p_opts);
+            // 1. Write LFO Depth = 0 once（0xc0 | (val & 0x3f)）
+            wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, 0xc0 | (val & 0x3f), p_opts);
+        } else {
+                // Only update the flag (no edge)
+                p_vgmctx->opll_state.is_rhythm_mode = (val & 0x20) ? true : false;
+        }
+         // 2. Write LFO Depth at least once for all cases
+        wrote_bytes += opll2opl3_emit_reg_write(p_vgmctx, 0xbd, (lfoDepth << 6) | (val & 0x3f), p_opts);
+        return wrote_bytes;
+    }
+    
+    OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+    /* --- FNUM Low (0x10..0x18) --- */
+    if (reg >= 0x10 && reg <= 0x18) {
+        int ch = reg & 0x0F;
+        OPLL2OPL3_PendingChannel *p = &(p_vgmctx->opll_state.sch.ch[ch]);
+        p->fnum_comb = (uint16_t)((p->fnum_comb & 0x300) | val);
+        p->has_fnum_low = true;
+        p->last_reg_10 = val;
+
+        opll2opl3_debug_log(p_vgmctx, "HANDLE", "FNUM Low",ch, p_opts);
+        bool keybit   = (val & 0x80) != 0;
+
+        // Update Command Buffer
+        p_command_buffer->has_reg0x1n = true;
+        p_command_buffer->reg0x1n = val;
+        p_command_buffer->ch = ch;
+    }
+
+    /* --- FNUM High + Block + Key (0x20..0x28) --- */
+    if (reg >= 0x20 && reg <= 0x28) {
+        int ch = reg & 0x0F;
+        OPLL2OPL3_PendingChannel *p = &(p_vgmctx->opll_state.sch.ch[ch]);
+
+        uint8_t fhi   = val & 0x03;
+        uint8_t block = (val >> 2) & 0x07;
+        bool keybit   = (val & 0x10) != 0;
+        bool prev_key = p->key_state;
+
+        // FNUM/Block/Key update
+        p->fnum_high = fhi;
+        p->fnum_comb = (uint16_t)((fhi << 8) | (p->last_reg_10 & 0xFF));
+        p->block = block;
+        p->last_reg_20 = val;
+
+        wrote_bytes += opll2opl3_update_voice(p_vgmctx, ch, p_opts);
+
+        // KeyOn/KeyOff含むA0/B0レジスタ書き込み（OPLL的なNoteOn/Off反映）
+        p->key_state = keybit;
+        p->has_fnum_high = true;
+    
+        // Update Command Buffer
+        p_command_buffer->has_reg0x2n = true;
+        p_command_buffer->reg0x2n = val;
+        p_command_buffer->ch = ch;
+    }
+
+    /* --- Instrument/Volume (0x30..0x38) --- */
+    // Instrument/Volume (0x30..0x38)
+    if (reg >= 0x30 && reg <= 0x38) {
+        int ch = reg & 0x0F;
+        OPLL2OPL3_PendingChannel *p = &(p_vgmctx->opll_state.sch.ch[ch]);
+        uint16_t dst_fnum = (uint16_t)(p->fnum_comb & 0x3FF);
+        uint8_t dst_block = p->block & 0x07;
+
+        p->last_reg_30 = val;
+        p->voice_id = (val >> 4) & 0x0F;
+        p->tl = val & 0x0F;
+
+        // Update Command Buffer
+        p_command_buffer->has_reg0x3n = true;
+        p_command_buffer->reg0x3n = val;
+        p_command_buffer->ch = ch;
+    }
+
+    if (p_command_buffer->has_reg0x1n && p_command_buffer->has_reg0x2n) {
+        // Flush 0x10, 0x20, 0x30
+        if (p_opts->debug.verbose) {
+            fprintf(stderr,
+                "[OPLL2OPL3][COMMAND2] call flush reg0x1n:0x%02x reg0x2n:0x%02x reg0x2n:0x%02x\n",
+               p_command_buffer->reg0x1n, p_command_buffer->reg0x2n, p_command_buffer->reg0x3n
+            );
+        }
+
+        opll2opl3_flush_command_buffer(p_vgmctx, p_opts);
+    }
+
+    return wrote_bytes;
+}
+
+
 int opll2opl3_schedule_wait(VGMContext *p_vgmctx, uint32_t wait_samples, const CommandOptions *p_opts, OPLL2OPL3_Scheduler *s)
 {
     int wrote_bytes = 0;
+    OPLL2OPL3_Scheduler *p_s = &(p_vgmctx->opll_state.sch);
+    p_s->wait_count++;
+    if (p_opts->debug.verbose) {
+        fprintf(stderr,
+            "[OPLL2OPL3][WAIT] wait_count: %d wait_samples:%d \n",p_s->wait_count, wait_samples
+        );
+    }
+
     wrote_bytes += emit_wait(p_vgmctx, wait_samples, s, p_opts);
     return wrote_bytes;
+}
+
+
+int opll2opl3_schedule_wait2(VGMContext *p_vgmctx, uint32_t wait_samples, const CommandOptions *p_opts, OPLL2OPL3_Scheduler *s)
+{
+    OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+
+    switch ( p_command_buffer->wait_count) {
+        case 0 : p_command_buffer->wait1 = wait_samples;
+            break;
+        case 1 : p_command_buffer->wait2 = wait_samples;
+            break;
+        default :
+            fprintf(stderr,
+            "[OPLL2OPL3][WAIT2] Too much wait !!! wait_count:%d\n",
+            p_command_buffer->wait_count
+            );
+    }
+
+    p_command_buffer->wait_count++;
+    if (p_opts->debug.verbose) {
+        fprintf(stderr,     
+            "[OPLL2OPL3][WAIT2] wait_count:%d wait_samples:%d wait1:0x%d wait2:0x%d\n",
+            p_command_buffer->wait_count, wait_samples, p_command_buffer->wait1, p_command_buffer->wait2
+        );
+    }
 }
 
 /**
@@ -1385,26 +1578,42 @@ int opll2opl3_command_handler (VGMContext *p_vgmctx, uint8_t reg, uint8_t val, u
     
     if (p_opts->debug.verbose) {
         fprintf(stderr,
-        "\n[OPLL2OPL3][HANDLER][%s] virtual_time:%llu emit_time:%llu --- reg:0x%02x val:0x%02x Sample:%d\n",
+        "[OPLL2OPL3][HANDLER][%s] virtual_time:%llu emit_time:%llu --- reg:0x%02x val:0x%02x Sample:%d\n",
         (p_vgmctx->cmd_type == VGMCommandType_RegWrite) ? "RegWrite" : "Wait",
         (unsigned long long)p_vgmctx->opll_state.sch.virtual_time,
         (unsigned long long)p_vgmctx->opll_state.sch.emit_time,reg,val,wait_samples
         );
     }
 
-    if (p_vgmctx->cmd_type == VGMCommandType_RegWrite) {
-        p_vgmctx->opll_state.reg_stamp[reg] = p_vgmctx->opll_state.reg[reg];
-        p_vgmctx->opll_state.reg[reg] = val;
-        //handle_opll_write(p_vgmctx, reg, val, p_opts, &g_scheduler );
-        wrote_bytes += opll2opl3_handle_opll_command(p_vgmctx, reg, val, p_opts);
-    } else if (p_vgmctx->cmd_type == VGMCommandType_Wait) {
-        //fprintf(stderr,"[OPLL2OPL3] opll2opl3_command_handler: wait_samples=%d\n",wait_samples);
-        p_vgmctx->opll_state.sch.virtual_time += wait_samples;
-        wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
+    if (p_opts->opll_convert_method == OPLL_ConvertMethod_VGMCONV) {
+        if (p_vgmctx->cmd_type == VGMCommandType_RegWrite) {
+            p_vgmctx->opll_state.reg_stamp[reg] = p_vgmctx->opll_state.reg[reg];
+            p_vgmctx->opll_state.reg[reg] = val;
+            wrote_bytes += opll2opl3_handle_opll_command(p_vgmctx, reg, val, p_opts);
+        } else if (p_vgmctx->cmd_type == VGMCommandType_Wait) {
+            p_vgmctx->opll_state.sch.virtual_time += wait_samples;
+            wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
+        } else {
+            // Should not be occured here
+        }
     } else {
-        // Should not be occured here
+        if (p_vgmctx->cmd_type == VGMCommandType_RegWrite) {
+            p_vgmctx->opll_state.reg_stamp[reg] = p_vgmctx->opll_state.reg[reg];
+            p_vgmctx->opll_state.reg[reg] = val;
+            wrote_bytes += opll2opl3_handle_opll_command2(p_vgmctx, reg, val, p_opts);
+        } else if (p_vgmctx->cmd_type == VGMCommandType_Wait) {
+            OPLL_CommandBuffer *p_command_buffer = &(p_vgmctx->opll_state.sch.command_buffer);
+            if (p_command_buffer->has_reg0x1n || p_command_buffer->has_reg0x2n || p_command_buffer->has_reg0x3n) {
+                wrote_bytes += opll2opl3_schedule_wait2(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
+            } else {
+                p_vgmctx->opll_state.sch.virtual_time += wait_samples;
+                wrote_bytes += opll2opl3_schedule_wait(p_vgmctx, wait_samples, p_opts, &(p_vgmctx->opll_state.sch));
+            }
+        } else {
+            // Should not be occured here
+        }
     }
-
+    
     return wrote_bytes;
 }
 

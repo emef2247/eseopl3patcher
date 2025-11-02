@@ -71,6 +71,10 @@ typedef enum {
     OPLL_PresetType_YM2423,
 } OPLL_PresetType;
 
+typedef enum {
+    OPLL_ConvertMethod_VGMCONV=0,
+    OPLL_ConvertMethod_COMMANDBUFFER,
+} OPLL_ConvertMethod;
 
 /** Global debug / diagnostic options */
 typedef struct {
@@ -108,6 +112,7 @@ typedef struct {
     bool is_keep_source_vgm;
     OPLL_PresetType preset;
     OPLL_PresetSource preset_source;
+    OPLL_ConvertMethod opll_convert_method;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -300,6 +305,9 @@ const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags);
 const char* get_opll_preset_type(const OPLL_PresetType type);
 
 const char* get_opll_preset_source(const OPLL_PresetSource source);
+
+const char* get_opll_convert_method(const OPLL_ConvertMethod type);
+
 #ifdef __cplusplus
 }
 #endif

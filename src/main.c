@@ -219,6 +219,13 @@ static OPLL_PresetSource decode_preset_source(const char *str) {
     return OPLL_PresetSource_YMVOICE; // default fallback
 }
 
+static OPLL_PresetSource decode_opll_convert_method(const char *str) {
+    if (!str) return OPLL_PresetSource_YMVOICE;
+    if (strcasecmp(str, "VGMCONV") == 0 || strcasecmp(str, "VGM-CONV") == 0) return OPLL_ConvertMethod_VGMCONV;
+    if (strcasecmp(str, "COMMAND_BUFFER") == 0)   return OPLL_ConvertMethod_COMMANDBUFFER;
+    return OPLL_ConvertMethod_VGMCONV; // default fallback
+}
+
 static int update_is_adding_bytes(VGMContext *vgmctx, uint32_t orig_loop_offset, uint32_t current_addr) {
     if (orig_loop_offset != 0xFFFFFFFF && current_addr < orig_loop_offset) {
         vgmctx->status.is_adding_port1_bytes = 1;
@@ -260,9 +267,11 @@ int main(int argc, char *argv[]) {
     bool is_keep_source_vgm = false;
     OPLL_PresetType preset = OPLL_PresetType_YM2413;
     OPLL_PresetSource preset_source = OPLL_PresetSource_YMVOICE;
+    OPLL_ConvertMethod opll_convert_method = OPLL_ConvertMethod_VGMCONV;
 
     const char *preset_str = "YM2413";
     const char *preset_source_str = "YMVOICE";
+    const char *opll_convert_method_str = "VGM-CONV";
 
     // Added: audible-sanity runtime value (if 0, use build-time default)
     uint16_t min_gate_samples        = 8196; // Equivalent to OPLL_MIN_GATE_SAMPLES
@@ -345,6 +354,11 @@ int main(int argc, char *argv[]) {
             preset_source = decode_preset_source(preset_source_str);
             continue;
         }
+        else if ((strcmp(argv[i], "-opll_convert_method") == 0 || strcmp(argv[i], "--opll_convert_method") == 0) && i + 1 < argc) {
+            opll_convert_method_str = argv[++i];
+            opll_convert_method = decode_opll_convert_method(opll_convert_method_str);
+            continue;
+        }
     }
 
     // Parse chip flags and debug options
@@ -374,6 +388,7 @@ int main(int argc, char *argv[]) {
         .is_keep_source_vgm = is_keep_source_vgm,
         .preset = preset,
         .preset_source = preset_source,
+        .opll_convert_method = opll_convert_method,
         .debug = debug_opts
     };
 
@@ -515,6 +530,7 @@ int main(int argc, char *argv[]) {
     {
         int written_bytes = opl3_init(&vgmctx, FMCHIP_YMF262,&cmd_opts);
         pre_loop_output_bytes += written_bytes;
+        opll2opl3_init_command_buffer(&vgmctx, &cmd_opts);
         opll2opl3_init_scheduler(&vgmctx, &cmd_opts);
     }
 
@@ -623,12 +639,12 @@ int main(int argc, char *argv[]) {
             #else
              if (chip_flags.convert_ym2413) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
-                    if (cmd_opts.debug.verbose) printf("Initializing OPL3 mode for YM2413...\n");
+                    if (cmd_opts.debug.verbose) fprintf(stderr,"Initializing OPL3 mode for YM2413...\n");
                     written_bytes += opl3_init(&vgmctx, FMCHIP_YM2413,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
                 }
                 int wait_samples = 0;
-                //fprintf(stderr, "[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
+                fprintf(stderr, "[MAIN] call opll2opl3_command_handler: cmd=0x%02X type=%d reg=0x%02X val=0x%02X wait=%d\n", cmd, vgmctx.cmd_type, reg, val, wait_samples);
                 written_bytes += opll2opl3_command_handler(&vgmctx, reg, val, wait_samples, &cmd_opts);
             }
             #endif
@@ -751,6 +767,8 @@ int main(int argc, char *argv[]) {
         if (cmd >= 0x70 && cmd <= 0x7F) {
             int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
+            fprintf(stderr, "[MAIN] cmd=0x%02X\n", cmd);
+
             #ifndef NEW_VGM_OPLL2OPL3
 
             vgm_wait_short(&vgmctx.buffer, &vgmctx.status, cmd);
@@ -780,14 +798,15 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x61) {
             int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
+            fprintf(stderr, "[MAIN] cmd=0x%02X\n", cmd);
             if (read_done_byte + 2 >= filesize) { fprintf(stderr,"Trunc wait 0x61\n"); break; }
-            uint16_t ws = p_vgm_data[read_done_byte + 1] | (p_vgm_data[read_done_byte + 2] << 8);
+            uint16_t ws = p_vgm_data[read_done_byte + 1] | (p_vgm_data[read_done_byte + 2] << 8) ;
         #ifndef NEW_VGM_OPLL2OPL3
             vgm_wait_samples(&vgmctx.buffer, &vgmctx, &vgmctx.status, ws);
         #else
             if (vgmctx.source_fmchip == FMCHIP_YM2413) {
                 //  Write a short wait command (0x70-0x7F) and update status.
-                int wait_samples = ws;
+                int wait_samples = ws + 1;
                 uint8_t reg = 0;
                 uint8_t val = 0;
                 if (cmd_opts.debug.verbose) {
@@ -809,6 +828,8 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x62) {
             int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_Wait;
+            fprintf(stderr, "[MAIN] cmd=0x%02X\n", cmd);
+
             #ifndef NEW_VGM_OPLL2OPL3
             vgm_wait_60hz(&vgmctx.buffer, &vgmctx.status);
             #else
@@ -835,6 +856,8 @@ int main(int argc, char *argv[]) {
         }
         if (cmd == 0x63) {
             int written_bytes = 0;
+            fprintf(stderr, "[MAIN] cmd=0x%02X\n", cmd);
+
             vgmctx.cmd_type = VGMCommandType_Wait;
         #ifndef NEW_VGM_OPLL2OPL3
             written_bytes += vgm_wait_50hz(&vgmctx.buffer, &vgmctx.status);
@@ -865,6 +888,7 @@ int main(int argc, char *argv[]) {
         if (cmd == 0x66) {
             int written_bytes = 0;
             vgmctx.cmd_type = VGMCommandType_End;
+            fprintf(stderr, "[MAIN] cmd=0x%02X\n", cmd);
             written_bytes += vgm_append_byte(&vgmctx.buffer, 0x66);
             read_done_byte += 1;
 
@@ -1019,7 +1043,7 @@ int main(int argc, char *argv[]) {
         //printf("[YM2413] Min weight samples:%u \n", min_off_on_wait_samples);
         printf("[YM2413] Preset(-preset): %s\n",get_opll_preset_type(preset));
         printf("[YM2413] Preset source(-preset_source): %s\n",get_opll_preset_source(preset_source));
-
+        printf("[YM2413] Convert Method (-opll_convert_method): %s\n",get_opll_convert_method(opll_convert_method));
     }
 
     if (cmd_opts.debug.verbose) {
