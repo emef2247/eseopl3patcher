@@ -73,6 +73,7 @@ clone_or_update () {
   else
     (
       cd "$dest_dir"
+      # If on detached HEAD, switch to default branch
       if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
         default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
         [[ -n "$default_branch" ]] && git checkout -q "$default_branch"
@@ -89,6 +90,23 @@ validate_commit () {
     echo "ERROR: Commit hash malformed: $c" >&2
     exit 1
   fi
+}
+
+# return 0 if file looks like a binary executable (ELF/Mach-O/executable) and not an ASCII/text script
+_is_binary_executable() {
+  local f="$1"
+  [[ -f "$f" && -x "$f" ]] || return 1
+  local desc
+  desc="$(file -b -- "$f" 2>/dev/null || true)"
+  # must mention executable or ELF or PE or Mach-O
+  if echo "$desc" | grep -Ei 'executable|elf|mach-o|pe32' >/dev/null 2>&1; then
+    # but should not be ASCII text / script
+    if echo "$desc" | grep -Ei 'text|ascii' >/dev/null 2>&1; then
+      return 1
+    fi
+    return 0
+  fi
+  return 1
 }
 
 _build_with_cmake () {
@@ -115,7 +133,7 @@ _build_with_cmake () {
 }
 
 build_vgm2txt () {
-  local src_dir="$1" out="${BIN_DIR}/vgm2txt" logf
+  local src_dir="$1" out="${BIN_DIR}/vgm2txt" logf builddir found
   if [[ $FORCE -eq 0 && -x "$out" ]]; then
     log "vgm2txt exists (use --force to rebuild)."
     return
@@ -132,15 +150,35 @@ build_vgm2txt () {
       tail -n 200 "${logf}" >&2 || true
       exit 1
     fi
-    local found
-    found="$(find "${src_dir}/build" -type f -name 'vgm2txt*' -perm -u+x | head -n1 || true)"
-    [[ -n "$found" ]] || { echo "vgm2txt binary not found after CMake build" >&2; exit 1; }
-    cp "$found" "$out"
+
+    builddir="${src_dir}/build"
+
+    # Prefer top-level built binary
+    if _is_binary_executable "${builddir}/vgm2txt"; then
+      found="${builddir}/vgm2txt"
+    elif _is_binary_executable "${builddir}/bin/vgm2txt"; then
+      found="${builddir}/bin/vgm2txt"
+    else
+      # Search deeper but avoid CMakeFiles directory entries and prefer non-text executables
+      while IFS= read -r f; do
+        if [[ "$f" == *"/CMakeFiles/"* ]]; then
+          continue
+        fi
+        if _is_binary_executable "$f"; then
+          found="$f"
+          break
+        fi
+      done < <(find "${builddir}" -type f -name 'vgm2txt*' -perm -u+x 2>/dev/null || true)
+    fi
+
+    [[ -n "${found:-}" ]] || { echo "vgm2txt binary not found after CMake build" >&2; exit 1; }
+    cp -- "$found" "$out"
     chmod +x "$out"
-    log "vgm2txt built and copied to ${out}"
+    log "vgm2txt built and copied to ${out} (from ${found})"
     return
   fi
 
+  # fallback: try Makefile targets (older repos)
   if ! (cd "$src_dir" && make vgm2txt >"${logf}" 2>&1); then
     if ! (cd "$src_dir" && make >"${logf}" 2>&1); then
       echo "vgm2txt build failed (make). See ${logf}" >&2
@@ -150,17 +188,23 @@ build_vgm2txt () {
     fi
   fi
 
-  local cand
-  cand="$(cd "$src_dir" && find . -maxdepth 1 -type f -name 'vgm2txt*' -perm -u+x | head -n1 || true)"
-  [[ -n "$cand" ]] || { echo "vgm2txt binary not found" >&2; exit 1; }
-  cp "$src_dir/${cand#./}" "$out"
+  # Pick executable named vgm2txt* in source dir (non-text)
+  found=""
+  while IFS= read -r cand; do
+    if _is_binary_executable "${src_dir}/${cand#./}"; then
+      found="${src_dir}/${cand#./}"
+      break
+    fi
+  done < <(cd "$src_dir" && find . -maxdepth 1 -type f -name 'vgm2txt*' -perm -u+x 2>/dev/null || true)
+
+  [[ -n "${found}" ]] || { echo "vgm2txt binary not found" >&2; exit 1; }
+  cp -- "$found" "$out"
   chmod +x "$out"
   log "vgm2txt built and copied to ${out}"
 }
 
-# build_vgmplay: search for a Makefile (possibly in a subdir) and run make there
 build_vgmplay () {
-  local src_dir="$1" out_dir="${BIN_DIR}" logf
+  local src_dir="$1" out_dir="${BIN_DIR}" logf build_dir found
   logf="${LOG_DIR}/vgmplay-build-$(date -u +%Y%m%dT%H%M%SZ).log"
 
   if [[ $FORCE -eq 0 && ( -x "${BIN_DIR}/VGMPlay" || -x "${BIN_DIR}/vgmplay" ) ]]; then
@@ -195,14 +239,17 @@ build_vgmplay () {
     exit 1
   fi
 
-  # find resulting binary(s)
-  local found=""
+  # find resulting binary(s) (prefer non-text executables)
+  found=""
   while IFS= read -r f; do
-    if file "$f" | grep -qi 'executable'; then found="$f"; break; fi
-  done < <(find "${build_dir}" -maxdepth 2 -type f \( -name 'VGMPlay' -o -name 'vgmplay' \))
+    if _is_binary_executable "$f"; then
+      found="$f"
+      break
+    fi
+  done < <(find "${build_dir}" -maxdepth 2 -type f \( -name 'VGMPlay' -o -name 'vgmplay' \) 2>/dev/null || true)
 
   [[ -n "$found" ]] || { echo "VGMPlay binary not located" >&2; exit 1; }
-  cp "$found" "${out_dir}/$(basename "$found")"
+  cp -- "$found" "${out_dir}/$(basename "$found")"
   chmod +x "${out_dir}/$(basename "$found")"
   log "VGMPlay built and copied to ${out_dir}/$(basename "$found")"
 }
