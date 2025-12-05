@@ -9,11 +9,13 @@ TOOLS_DIR="${ROOT_DIR}/tools"
 SRC_DIR="${TOOLS_DIR}/_src"
 BIN_DIR="${TOOLS_DIR}/bin"
 VER_DIR="${TOOLS_DIR}/version"
+LOG_DIR="${TOOLS_DIR}/build-logs"
 LOG_PREFIX="[fetch_vgm_tools]"
 
-mkdir -p "${SRC_DIR}" "${BIN_DIR}" "${VER_DIR}"
+mkdir -p "${SRC_DIR}" "${BIN_DIR}" "${VER_DIR}" "${LOG_DIR}"
 
 FORCE=0; NO_UPDATE=0; SKIP_VGMTXT=0; SKIP_VGMPLAY=0; QUIET=0
+TARGETS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,7 +26,9 @@ while [[ $# -gt 0 ]]; do
     --quiet) QUIET=1 ;;
     -h|--help)
       cat <<'EOF'
-Usage: bash tools/fetch_vgm_tools.sh [options]
+Usage: bash tools/fetch_vgm_tools.sh [options] [vgm2txt] [vgmplay]
+  If no positional tool is given, both tools are processed (unless skipped).
+Options:
   --force          Force rebuild
   --no-update      Do not fetch remote changes
   --skip-vgm2txt   Skip vgm2txt
@@ -32,8 +36,13 @@ Usage: bash tools/fetch_vgm_tools.sh [options]
   --quiet          Suppress most logs
 EOF
       exit 0 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
-  esac; shift
+    vgm2txt|vgmplay)
+      TARGETS+=("$1") ;;
+    *)
+      echo "Unknown option or tool: $1" >&2
+      exit 1 ;;
+  esac
+  shift
 done
 
 log(){ [[ $QUIET -eq 1 ]] || echo "${LOG_PREFIX} $*" >&2; }
@@ -62,10 +71,8 @@ clone_or_update () {
   if [[ -n "${commit_env}" ]]; then
     (cd "$dest_dir" && git checkout -q "${commit_env}")
   else
-    # Try to stay on current default branch (origin/HEAD)
     (
       cd "$dest_dir"
-      # If on detached HEAD, switch to default branch
       if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
         default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
         [[ -n "$default_branch" ]] && git checkout -q "$default_branch"
@@ -84,45 +91,120 @@ validate_commit () {
   fi
 }
 
+_build_with_cmake () {
+  local src_dir="$1" logf="$2" builddir="${src_dir}/build"
+  mkdir -p "${builddir}"
+  local nproc=1
+  if command -v nproc >/dev/null 2>&1; then
+    nproc="$(nproc)"
+  elif command -v getconf >/dev/null 2>&1; then
+    nproc="$(getconf _NPROCESSORS_ONLN || echo 1)"
+  fi
+
+  if ! (cd "${builddir}" && cmake .. -DCMAKE_BUILD_TYPE=Release > "${logf}" 2>&1); then
+    echo "CMake configuration failed; see ${logf}" >&2
+    (cd "${builddir}" && cmake ..) || true
+    return 1
+  fi
+
+  if ! (cd "${builddir}" && cmake --build . --target vgm2txt -- -j"${nproc}" >> "${logf}" 2>&1); then
+    echo "CMake build failed; see ${logf}" >&2
+    return 1
+  fi
+  return 0
+}
+
 build_vgm2txt () {
-  local src_dir="$1" out="${BIN_DIR}/vgm2txt"
+  local src_dir="$1" out="${BIN_DIR}/vgm2txt" logf
   if [[ $FORCE -eq 0 && -x "$out" ]]; then
     log "vgm2txt exists (use --force to rebuild)."
     return
   fi
   log "Building vgm2txt"
-  if ! (cd "$src_dir" && make vgm2txt >/dev/null 2>&1); then
-    if ! (cd "$src_dir" && make >/dev/null 2>&1); then
-      echo "vgm2txt build failed" >&2
+
+  logf="${LOG_DIR}/vgm2txt-build-$(date -u +%Y%m%dT%H%M%SZ).log"
+
+  if [[ -f "${src_dir}/CMakeLists.txt" ]]; then
+    log "Detected CMakeLists.txt - using CMake"
+    if ! _build_with_cmake "${src_dir}" "${logf}"; then
+      echo "vgm2txt build failed (CMake). See ${logf}" >&2
+      echo "==== Build log (tail 200 lines) ====" >&2
+      tail -n 200 "${logf}" >&2 || true
+      exit 1
+    fi
+    local found
+    found="$(find "${src_dir}/build" -type f -name 'vgm2txt*' -perm -u+x | head -n1 || true)"
+    [[ -n "$found" ]] || { echo "vgm2txt binary not found after CMake build" >&2; exit 1; }
+    cp "$found" "$out"
+    chmod +x "$out"
+    log "vgm2txt built and copied to ${out}"
+    return
+  fi
+
+  if ! (cd "$src_dir" && make vgm2txt >"${logf}" 2>&1); then
+    if ! (cd "$src_dir" && make >"${logf}" 2>&1); then
+      echo "vgm2txt build failed (make). See ${logf}" >&2
+      echo "==== Build log (tail 200 lines) ====" >&2
+      tail -n 200 "${logf}" >&2 || true
       exit 1
     fi
   fi
-  # Pick executable named vgm2txt*
+
   local cand
   cand="$(cd "$src_dir" && find . -maxdepth 1 -type f -name 'vgm2txt*' -perm -u+x | head -n1 || true)"
   [[ -n "$cand" ]] || { echo "vgm2txt binary not found" >&2; exit 1; }
   cp "$src_dir/${cand#./}" "$out"
   chmod +x "$out"
+  log "vgm2txt built and copied to ${out}"
 }
 
+# build_vgmplay: search for a Makefile (possibly in a subdir) and run make there
 build_vgmplay () {
-  local src_dir="$1"
+  local src_dir="$1" out_dir="${BIN_DIR}" logf
+  logf="${LOG_DIR}/vgmplay-build-$(date -u +%Y%m%dT%H%M%SZ).log"
+
   if [[ $FORCE -eq 0 && ( -x "${BIN_DIR}/VGMPlay" || -x "${BIN_DIR}/vgmplay" ) ]]; then
     log "VGMPlay exists (use --force to rebuild)."
     return
   fi
+
   log "Building VGMPlay"
-  if ! (cd "$src_dir" && make >/dev/null 2>&1); then
-    echo "VGMPlay build failed" >&2
+
+  # If there's a top-level Makefile, use it
+  if [[ -f "${src_dir}/Makefile" ]]; then
+    build_dir="${src_dir}"
+  else
+    # Try to find a Makefile in common subdirs up to depth 3
+    build_dir="$(find "${src_dir}" -maxdepth 3 -type f -name 'Makefile' -print | head -n1 || true)"
+    if [[ -n "$build_dir" ]]; then
+      build_dir="$(dirname "$build_dir")"
+    fi
+  fi
+
+  if [[ -z "${build_dir:-}" ]]; then
+    echo "VGMPlay build failed: Makefile not found in ${src_dir}" >&2
     exit 1
   fi
+
+  log "Using Makefile in ${build_dir}"
+  # run make and save log
+  if ! (cd "${build_dir}" && make >"${logf}" 2>&1); then
+    echo "VGMPlay build failed; see ${logf}" >&2
+    echo "==== Build log (tail 200 lines) ====" >&2
+    tail -n 200 "${logf}" >&2 || true
+    exit 1
+  fi
+
+  # find resulting binary(s)
   local found=""
   while IFS= read -r f; do
     if file "$f" | grep -qi 'executable'; then found="$f"; break; fi
-  done < <(find "$src_dir" -maxdepth 2 -type f \( -name 'VGMPlay' -o -name 'vgmplay' \))
+  done < <(find "${build_dir}" -maxdepth 2 -type f \( -name 'VGMPlay' -o -name 'vgmplay' \))
+
   [[ -n "$found" ]] || { echo "VGMPlay binary not located" >&2; exit 1; }
-  cp "$found" "${BIN_DIR}/$(basename "$found")"
-  chmod +x "${BIN_DIR}/$(basename "$found")"
+  cp "$found" "${out_dir}/$(basename "$found")"
+  chmod +x "${out_dir}/$(basename "$found")"
+  log "VGMPlay built and copied to ${out_dir}/$(basename "$found")"
 }
 
 write_commit () {
@@ -145,6 +227,20 @@ EOF
 }
 
 [[ $SKIP_VGMTXT -eq 1 && $SKIP_VGMPLAY -eq 1 ]] && { echo "Nothing to do"; exit 0; }
+
+# Decide which tools to build
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
+  : # build defaults (both unless skipped)
+else
+  SKIP_VGMTXT=1
+  SKIP_VGMPLAY=1
+  for t in "${TARGETS[@]}"; do
+    case "$t" in
+      vgm2txt) SKIP_VGMTXT=0 ;;
+      vgmplay) SKIP_VGMPLAY=0 ;;
+    esac
+  done
+fi
 
 vgmtools_commit=""
 vgmplay_commit=""
@@ -172,3 +268,4 @@ if [[ $QUIET -eq 0 ]]; then
   echo "Binaries:"
   ls -1 "${BIN_DIR}"
 fi
+
