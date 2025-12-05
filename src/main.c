@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
         .override_opl3_clock = override_opl3_clock,
         .detune_limit = detune_limit,
         .fm_mapping_style = FM_MappingStyle_modern,
-        .is_port1_enabled = true,
+        .is_port1_enabled = false,
         .is_voice_zero_clear = false,
         .is_a0_b0_aligned = false,
         .is_keep_source_vgm = is_keep_source_vgm,
@@ -491,6 +491,7 @@ int main(int argc, char *argv[]) {
         vgmctx.source_fm_clock = -1.0;
     }
     vgmctx.target_fm_clock = OPL3_CLOCK;
+    vgmctx.target_fmchip = FMCHIP_YMF262;
     
     if (cmd_opts.debug.verbose) {
         printf("[VGM] FM chip usage:\n");
@@ -707,24 +708,6 @@ int main(int argc, char *argv[]) {
                 if (!vgmctx.opl3_state.opl3_mode_initialized) {
                     written_bytes += opl3_init(&vgmctx, FMCHIP_Y8950,&cmd_opts);
                     vgmctx.opl3_state.opl3_mode_initialized = true;
-                    if (cmd_opts.debug.test_tone) {
-                        // Simple additive test tone: mod muted, carrier AR=15 etc.
-                        // Port0 only
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0x05, 0x01, &cmd_opts); // ensure OPL3 mode
-                        // Operator settings (slot 0 carrier path simplified)
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0x20, 0x01, &cmd_opts); // mul=1
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0x40, 0x00, &cmd_opts); // TL=0
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0x60, 0xF4, &cmd_opts); // AR=F DR=4
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0x80, 0x02, &cmd_opts); // SL=0 RR=2
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0xE0, 0x00, &cmd_opts);
-                        // Set algorithm=1 (additive)
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0xC0, 0xC1, &cmd_opts); // FB=0 Alg=1
-                        // FNUM for ~A440 (example fnum=0x15B oct=4) => LSB
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0xA0, 0x5B, &cmd_opts);
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x01, &cmd_opts); // MSB=1, block=4, keyon
-                        written_bytes += vgm_wait_samples(&vgmctx,4410); // 100ms
-                        written_bytes += duplicate_write_opl3(&vgmctx, 0xB0, 0x20 | (4<<2) | 0x00, &cmd_opts); // key off
-                    }
                 }
                 written_bytes += duplicate_write_opl3(&vgmctx, reg, val, &cmd_opts);
             } else {

@@ -71,6 +71,10 @@ typedef enum {
     OPLL_PresetType_YM2423,
 } OPLL_PresetType;
 
+typedef enum {
+    OPLL_ConvertMethod_VGMCONV=0,
+    OPLL_ConvertMethod_COMMANDBUFFER,
+} OPLL_ConvertMethod;
 
 /** Global debug / diagnostic options */
 typedef struct {
@@ -108,6 +112,7 @@ typedef struct {
     bool is_keep_source_vgm;
     OPLL_PresetType preset;
     OPLL_PresetSource preset_source;
+    OPLL_ConvertMethod opll_convert_method;
     DebugOpts debug;
 } CommandOptions;
 #endif /* ESEOPL3PATCHER_FMCHIPTYPE_DEFINED */
@@ -201,8 +206,10 @@ typedef struct {
     VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
     VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */
     FMChipType    source_fmchip;   /**< The source FM chip type for conversion */
+    FMChipType    target_fmchip;   /**< The source FM chip type for conversion */
     double        source_fm_clock; /**< The source FM clock frequency */
     double        target_fm_clock; /**< The target FM clock frequency */
+    uint8_t       target_cmd;
     OPL3State     opl3_state;
     OPLLState     opll_state;
     uint8_t       ym2413_user_patch[8]; // YM2413ユーザーパッチ用（0x00〜0x07）
@@ -290,6 +297,8 @@ int vgm_wait_50hz(VGMContext *p_vgmctx);
  */
 bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockFlags *out_flags);
 
+int write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value);
+
 /**
  * Returns the name of the FM chip selected for conversion in chip_flags.
  * Only one chip should be selected for conversion; if multiple are selected, returns the first found.
@@ -300,6 +309,9 @@ const char* get_converted_opl_chip_name(const VGMChipClockFlags* chip_flags);
 const char* get_opll_preset_type(const OPLL_PresetType type);
 
 const char* get_opll_preset_source(const OPLL_PresetSource source);
+
+const char* get_opll_convert_method(const OPLL_ConvertMethod type);
+
 #ifdef __cplusplus
 }
 #endif

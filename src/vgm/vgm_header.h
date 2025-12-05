@@ -134,6 +134,8 @@ void set_ymz280b_clock(uint8_t *p_header, uint32_t value);
  */
 void vgm_export_header_and_gd3(const VGMContext *ctx, VGMBuffer *out_buf);
 
+int write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value);
+
 /**
  * Returns the FM chip name string for the given FMChipType enum value.
  * @param type FMChipType enum value.

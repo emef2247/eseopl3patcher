@@ -279,6 +279,39 @@ const char* fmchip_type_name(FMChipType type) {
     }
 }
 
+const char* get_vgm_chip_cmd(FMChipType fmChipType, int port) {
+    uint8_t cmd = 0x55;
+    switch (fmChipType) {
+        case FMCHIP_YM2413: cmd = 0x51; break;
+        case FMCHIP_YM2612: cmd = 0x52; break;
+        case FMCHIP_YM2151: cmd = 0x54; break;
+        case FMCHIP_YM2203: cmd = 0x55; break;
+        case FMCHIP_YM2608: cmd = 0x56; break;
+        case FMCHIP_YM2610: cmd = 0x58;break;
+        case FMCHIP_YM3812: cmd = 0x5A;break;
+        case FMCHIP_YM3526: cmd = 0x5B;break;
+        case FMCHIP_Y8950:  cmd = 0x5C;break;
+        case FMCHIP_YMF262: cmd = 0x5E;break;
+        case FMCHIP_YMF278B:cmd = 0xD0 ;break;
+        case FMCHIP_YMF271: cmd = 0xD1;break;
+        case FMCHIP_YMZ280B:cmd = 0x5D;break;
+        case FMCHIP_2xYM2413: cmd = 0xA1;break;
+        case FMCHIP_2xYM2612: cmd = 0xA2;break;
+        case FMCHIP_2xYM2151: cmd = 0xA4;break;
+        case FMCHIP_2xYM2203: cmd = 0xA5;break;
+        case FMCHIP_2xYM2608: cmd = 0xA6;break;
+        case FMCHIP_2xYM2610: cmd = 0xA8;break;
+        case FMCHIP_2xYM3812: cmd = 0xAA;break;
+        case FMCHIP_2xYM3526: cmd = 0xAB;break;
+        case FMCHIP_2xY8950:  cmd = 0xAC;break;
+        case FMCHIP_2xYMF262: cmd = 0xAE;break;
+        case FMCHIP_2xYMZ280B: cmd = 0xAD;break;
+        default : cmd = 0x5C;break;
+    }
+    cmd = cmd + port;
+    return cmd;
+}
+
 /**
  * Detect which FM chip is present in the VGM header and used in the input file.
  * Returns FMChipType value.

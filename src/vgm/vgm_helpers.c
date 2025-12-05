@@ -62,7 +62,7 @@ int vgm_append_byte(VGMBuffer *p_buf, uint8_t value) {
  * port: 0 for port 0 (0x5E), 1 for port 1 (0x5F)
  */
 int forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
-    uint8_t cmd = (port == 0) ? 0x5E : 0x5F;
+    uint8_t cmd = p_vgmctx->target_cmd;
     uint8_t bytes[3] = {cmd, reg, val};
     int add_bytes = 3;
     vgm_buffer_append(&(p_vgmctx->buffer), bytes, 3);
@@ -158,6 +158,25 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
     return true;
 }
 
+
+/**
+ * Write a value to the OPL3 register mirror and update internal state flags.
+ * Always writes to the register mirror (reg[]). Also writes to VGMBuffer.
+ */
+int write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value) {
+    int reg_addr = reg + (port ? 0x100 : 0x000);
+    int add_bytes = 0;
+
+    p_vpmctx->opl3_state.reg_stamp[reg_addr] = p_vpmctx->opl3_state.reg[reg_addr];
+    p_vpmctx->opl3_state.reg[reg_addr] = value;
+
+    // Write to VGM stream
+    p_vpmctx->target_cmd = get_vgm_chip_cmd(p_vpmctx->target_fmchip, port);
+     fprintf(stderr, "target_cmd: 0x%02x port(%d))\n", p_vpmctx->target_cmd,port);
+    add_bytes = forward_write(p_vpmctx, port, reg, value);
+    return add_bytes;
+}
+
 /**
  * Returns the name of the FM chip selected for conversion in chip_flags.
  * Only one chip should be selected for conversion; if multiple are selected, returns the first found.
@@ -183,6 +202,12 @@ const char* get_opll_preset_source(const OPLL_PresetSource source) {
     if (source == OPLL_PresetSource_YMVOICE)  return "YM-VOICE";
     if (source == OPLL_PresetSource_YMFM)  return "YMFM";
     if (source == OPLL_PresetSource_EXPERIMENT)  return "EXPERIMENT";
+    return "UNKNOWN";
+}
+
+const char* get_opll_convert_method(const OPLL_ConvertMethod type) {
+    if (type == OPLL_ConvertMethod_VGMCONV)  return "VGM-CONV";
+    if (type == OPLL_ConvertMethod_COMMANDBUFFER)  return "COMMAND_BUFFER";
     return "UNKNOWN";
 }
 
