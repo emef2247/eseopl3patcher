@@ -268,7 +268,7 @@ int opl3_write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value) {
     p_vpmctx->opl3_state.reg_stamp[reg_addr] = p_vpmctx->opl3_state.reg[reg_addr];
     p_vpmctx->opl3_state.reg[reg_addr] = value;
     // Write to VGM stream
-    add_bytes = forward_write(p_vpmctx, port, reg, value);
+    add_bytes = write_reg(p_vpmctx, port, reg, value);
     return add_bytes;
 }
 
@@ -501,7 +501,7 @@ int duplicate_write_opl3(
         }
     } else if (reg >= 0xB0 && reg <= 0xB8) {
         // Write B0 (KeyOn/Block/FnumMSB) and handle detune
-        // forward_write(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
+        // write_reg(ctx->p_music_data, 0, 0xB0 + ch, ctx->val);
         int ch = reg - 0xB0;
         uint8_t A_lsb = p_vpmctx->opl3_state.reg[0xA0 + ch];
 

@@ -61,13 +61,26 @@ int vgm_append_byte(VGMBuffer *p_buf, uint8_t value) {
  * Write an OPL3 register command (0x5E/0x5F) to the buffer.
  * port: 0 for port 0 (0x5E), 1 for port 1 (0x5F)
  */
-int forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
-    uint8_t cmd = p_vgmctx->target_cmd;
+int forward_aadd(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
+    uint8_t cmd = p_vgmctx->target_cmd + port;
     uint8_t bytes[3] = {cmd, reg, val};
     int add_bytes = 3;
-    vgm_buffer_append(&(p_vgmctx->buffer), bytes, 3);
+    vgm_buffer_append(&(p_vgmctx->buffer), bytes, add_bytes);
     return add_bytes;
 }
+
+/**
+ * Write an OPL3 register command (0x5E/0x5F) to the buffer.
+ * port: 0 for port 0 (0x5E), 1 for port 1 (0x5F)
+ */
+int forward_ppaadd(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val) {
+    uint8_t cmd = p_vgmctx->target_cmd;
+    uint8_t bytes[4] = {cmd, port, reg, val};
+    int add_bytes = 4;
+    vgm_buffer_append(&(p_vgmctx->buffer), bytes, add_bytes);
+    return add_bytes;
+}
+
 
 /**
  * Write a short wait command (0x70-0x7F) and update status.
@@ -158,7 +171,6 @@ bool vgm_parse_chip_clocks(const uint8_t *vgm_data, long filesize, VGMChipClockF
     return true;
 }
 
-
 /**
  * Write a value to the OPL3 register mirror and update internal state flags.
  * Always writes to the register mirror (reg[]). Also writes to VGMBuffer.
@@ -170,10 +182,27 @@ int write_reg(VGMContext *p_vpmctx, int port, uint8_t reg, uint8_t value) {
     p_vpmctx->opl3_state.reg_stamp[reg_addr] = p_vpmctx->opl3_state.reg[reg_addr];
     p_vpmctx->opl3_state.reg[reg_addr] = value;
 
+    p_vpmctx->target_cmd = get_vgm_chip_cmd(p_vpmctx->target_fmchip);
     // Write to VGM stream
-    p_vpmctx->target_cmd = get_vgm_chip_cmd(p_vpmctx->target_fmchip, port);
-     fprintf(stderr, "target_cmd: 0x%02x port(%d))\n", p_vpmctx->target_cmd,port);
-    add_bytes = forward_write(p_vpmctx, port, reg, value);
+    switch (p_vpmctx->target_fmchip) {
+        case FMCHIP_YM2413:
+        case FMCHIP_YM2203:
+        case FMCHIP_YM2608:
+        case FMCHIP_YM2612:
+        case FMCHIP_YM3812:
+        case FMCHIP_YM3526:
+        case FMCHIP_Y8950:
+        case FMCHIP_YMZ280B:
+        case FMCHIP_YMF262: add_bytes = forward_aadd(p_vpmctx, port, reg, value);break;
+        case FMCHIP_YMF278B: add_bytes = forward_ppaadd(p_vpmctx, port, reg, value);break;
+        case FMCHIP_YMF271: add_bytes = forward_ppaadd(p_vpmctx, port, reg, value);break;
+        default:add_bytes = forward_aadd(p_vpmctx, port, reg, value);break;
+    }
+
+    if (p_vpmctx->cmd_opts.is_msx_audio && reg != 0x05 && port == 0) {
+        p_vpmctx->target_cmd = get_vgm_chip_cmd(FMCHIP_Y8950);
+        add_bytes += forward_aadd(p_vpmctx, port, reg, value);
+    }
     return add_bytes;
 }
 

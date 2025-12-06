@@ -110,6 +110,8 @@ typedef struct {
     bool is_voice_zero_clear;
     bool is_a0_b0_aligned;
     bool is_keep_source_vgm;
+    bool is_msx_audio;
+    bool is_moon;
     OPLL_PresetType preset;
     OPLL_PresetSource preset_source;
     OPLL_ConvertMethod opll_convert_method;
@@ -199,20 +201,21 @@ typedef struct {
  *   - source_fmchip: The source FM chip type for conversion.
  */
 typedef struct {
-    VGMBuffer buffer;              /**< Data buffer for the VGM stream */
-    VGMTimeStamp timestamp;        /**< Sample clock/timestamp */
-    VGMCommandType cmd_type;
-    VGMStatus     status;          /**< Status (total samples etc.) */
-    VGMHeaderInfo header;          /**< VGM header (raw + parsed info) */
-    VGMGD3Tag     gd3;             /**< GD3 tag (raw/parsed) */
-    FMChipType    source_fmchip;   /**< The source FM chip type for conversion */
-    FMChipType    target_fmchip;   /**< The source FM chip type for conversion */
-    double        source_fm_clock; /**< The source FM clock frequency */
-    double        target_fm_clock; /**< The target FM clock frequency */
-    uint8_t       target_cmd;
-    OPL3State     opl3_state;
-    OPLLState     opll_state;
-    uint8_t       ym2413_user_patch[8]; // YM2413ユーザーパッチ用（0x00〜0x07）
+    VGMBuffer      buffer;              /**< Data buffer for the VGM stream */
+    VGMTimeStamp   timestamp;        /**< Sample clock/timestamp */
+    VGMCommandType  cmd_type;
+    VGMStatus       status;          /**< Status (total samples etc.) */
+    VGMHeaderInfo   header;          /**< VGM header (raw + parsed info) */
+    VGMGD3Tag       gd3;             /**< GD3 tag (raw/parsed) */
+    FMChipType      source_fmchip;   /**< The source FM chip type for conversion */
+    FMChipType      target_fmchip;   /**< The source FM chip type for conversion */
+    double          source_fm_clock; /**< The source FM clock frequency */
+    double          target_fm_clock; /**< The target FM clock frequency */
+    uint8_t         target_cmd;
+    OPL3State       opl3_state;
+    OPLLState       opll_state;
+    uint8_t         ym2413_user_patch[8]; // YM2413ユーザーパッチ用（0x00〜0x07）
+    CommandOptions  cmd_opts;
 } VGMContext;
 
 /**
@@ -267,9 +270,14 @@ void vgm_buffer_free(VGMBuffer *p_buf);
 int vgm_append_byte(VGMBuffer *p_buf, uint8_t value);
 
 /**
- * Write an OPL3 register command (0x5E/0x5F) to the buffer.
+ * Forward value dd register aa for target chip
  */
-int forward_write(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
+int forward_aadd(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
+
+/**
+ * Forward value dd register aa for target chip, port pp
+ */
+int forward_ppaadd(VGMContext *p_vgmctx, int port, uint8_t reg, uint8_t val);
 
 /**
  * Write a short wait command (0x70-0x7F) and update status.

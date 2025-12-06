@@ -151,6 +151,10 @@ const char* fmchip_type_name(FMChipType type);
  */
 FMChipType detect_fmchip_from_header(const unsigned char *p_vgm_data, long filesize);
 
+uint8_t  get_vgm_chip_cmd(FMChipType fmChipType);
+
+uint32_t get_vgm_default_chip_clock(FMChipType fmChipType);
+
 /**
  * Post-process the VGM header buffer to update clock fields for various chips.
  * This function sets clock values to zero for unused chips, and applies
