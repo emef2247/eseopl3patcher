@@ -279,6 +279,70 @@ const char* fmchip_type_name(FMChipType type) {
     }
 }
 
+uint8_t get_vgm_chip_cmd(FMChipType fmChipType) {
+    uint8_t cmd = 0x55;
+    switch (fmChipType) {
+        case FMCHIP_YM2413: cmd = 0x51; break;
+        case FMCHIP_YM2612: cmd = 0x52; break;
+        case FMCHIP_YM2151: cmd = 0x54; break;
+        case FMCHIP_YM2203: cmd = 0x55; break;
+        case FMCHIP_YM2608: cmd = 0x56; break;
+        case FMCHIP_YM2610: cmd = 0x58;break;
+        case FMCHIP_YM3812: cmd = 0x5A;break;
+        case FMCHIP_YM3526: cmd = 0x5B;break;
+        case FMCHIP_Y8950:  cmd = 0x5C;break;
+        case FMCHIP_YMF262: cmd = 0x5E;break;
+        case FMCHIP_YMF278B:cmd = 0xD0 ;break;
+        case FMCHIP_YMF271: cmd = 0xD1;break;
+        case FMCHIP_YMZ280B:cmd = 0x5D;break;
+        case FMCHIP_2xYM2413: cmd = 0xA1;break;
+        case FMCHIP_2xYM2612: cmd = 0xA2;break;
+        case FMCHIP_2xYM2151: cmd = 0xA4;break;
+        case FMCHIP_2xYM2203: cmd = 0xA5;break;
+        case FMCHIP_2xYM2608: cmd = 0xA6;break;
+        case FMCHIP_2xYM2610: cmd = 0xA8;break;
+        case FMCHIP_2xYM3812: cmd = 0xAA;break;
+        case FMCHIP_2xYM3526: cmd = 0xAB;break;
+        case FMCHIP_2xY8950:  cmd = 0xAC;break;
+        case FMCHIP_2xYMF262: cmd = 0xAE;break;
+        case FMCHIP_2xYMZ280B: cmd = 0xAD;break;
+        default : cmd = 0x5C;break;
+    }
+    return cmd;
+}
+
+uint32_t get_vgm_default_chip_clock(FMChipType fmChipType) {
+    uint32_t clock_in_hz = 4000000;
+    switch (fmChipType) {
+        case FMCHIP_YM2413: clock_in_hz = 3579545; break;
+        case FMCHIP_YM2612: clock_in_hz = 7670454 ; break;
+        case FMCHIP_YM2151: clock_in_hz = 4000000; break;
+        case FMCHIP_YM2203: clock_in_hz = 3000000; break;
+        case FMCHIP_YM2608: clock_in_hz = 8000000; break;
+        case FMCHIP_YM2610: clock_in_hz = 8000000;break;
+        case FMCHIP_YM3812: clock_in_hz = 3579545;break;
+        case FMCHIP_YM3526: clock_in_hz = 3579545;break;
+        case FMCHIP_Y8950:  clock_in_hz = 3579545;break;
+        case FMCHIP_YMF262: clock_in_hz = 14318180;break;
+        case FMCHIP_YMF278B:clock_in_hz = 33868800 ;break;
+        case FMCHIP_YMF271: clock_in_hz = 16934400;break;
+        case FMCHIP_YMZ280B:clock_in_hz = 16934400;break;
+        case FMCHIP_2xYM2413: clock_in_hz = 3579545;break;
+        case FMCHIP_2xYM2612: clock_in_hz = 7670454 ;break;
+        case FMCHIP_2xYM2151: clock_in_hz = 4000000;break;
+        case FMCHIP_2xYM2203: clock_in_hz = 3000000 ;break;
+        case FMCHIP_2xYM2608: clock_in_hz = 8000000;break;
+        case FMCHIP_2xYM2610: clock_in_hz = 8000000;break;
+        case FMCHIP_2xYM3812: clock_in_hz = 3579545;break;
+        case FMCHIP_2xYM3526: clock_in_hz = 3579545;break;
+        case FMCHIP_2xY8950:  clock_in_hz = 3579545;break;
+        case FMCHIP_2xYMF262: clock_in_hz = 14318180;break;
+        case FMCHIP_2xYMZ280B: clock_in_hz = 16934400;break;
+        default : clock_in_hz = 4000000;break;
+    }
+    return clock_in_hz;
+}
+
 /**
  * Detect which FM chip is present in the VGM header and used in the input file.
  * Returns FMChipType value.
@@ -352,25 +416,50 @@ void vgm_header_postprocess(
         }
     }
 
+    // If No --keep_source_vgm option
+    if (!p_cmd_opts->is_keep_source_vgm) {
+        // YM2413
+        if (p_ctx->source_fmchip == FMCHIP_YM2413) {
+            fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header, as this is the source chip\n" );
+            set_ym2413_clock(p_header_buf, 0);
+        }
+        // YM3812
+        if (p_ctx->source_fmchip == FMCHIP_YM3812) {
+            fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header, as this is the source chip\n" );
+            set_ym3812_clock(p_header_buf, 0);
+        }
+        // YM3526
+        if (p_ctx->source_fmchip == FMCHIP_YM3526) {
+            fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header, as this is the source chip\n" );
+            set_ym3526_clock(p_header_buf, 0);
+        }
+        // Y8950
+        if (p_ctx->source_fmchip == FMCHIP_Y8950) {
+            fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header, as this is the source chip\n" );
+            set_y8950_clock(p_header_buf, 0);
+        }
+    }
+
     // YM2413
-    if (p_ctx->source_fmchip == FMCHIP_YM2413) {
-        fprintf(stderr, "[VGM HEADER] Set YM2413 clock to zero in VGM Header, as this is the source chip\n" );
-        set_ym2413_clock(p_header_buf, 0);
+    if (p_ctx->target_fmchip == FMCHIP_YM2413) {
+        set_ym2413_clock(p_header_buf, get_vgm_default_chip_clock(FMCHIP_YM2413));
     }
     // YM3812
-   if (p_ctx->source_fmchip == FMCHIP_YM3812) {
-        fprintf(stderr, "[VGM HEADER] Set YM3812 clock to zero in VGM Header, as this is the source chip\n" );
-        set_ym3812_clock(p_header_buf, 0);
+    if (p_ctx->target_fmchip == FMCHIP_YM3812) {
+        set_ym3812_clock(p_header_buf, get_vgm_default_chip_clock(FMCHIP_YM3812));
     }
     // YM3526
-    if (p_ctx->source_fmchip == FMCHIP_YM3526) {
-        fprintf(stderr, "[VGM HEADER] Set YM3526 clock to zero in VGM Header, as this is the source chip\n" );
-        set_ym3526_clock(p_header_buf, 0);
+    if (p_ctx->target_fmchip == FMCHIP_YM3526) {
+        set_ym3526_clock(p_header_buf, get_vgm_default_chip_clock(FMCHIP_YM3526));
     }
     // Y8950
-    if (p_ctx->source_fmchip == FMCHIP_Y8950) {
-        fprintf(stderr, "[VGM HEADER] Set Y8950 clock to zero in VGM Header, as this is the source chip\n" );
-        set_y8950_clock(p_header_buf, 0);
+    if (p_ctx->target_fmchip == FMCHIP_Y8950) {
+        set_y8950_clock(p_header_buf,  get_vgm_default_chip_clock(FMCHIP_Y8950));
+    }
+
+    if (p_ctx->cmd_opts.is_msx_audio) {
+        set_y8950_clock(p_header_buf,  get_vgm_default_chip_clock(FMCHIP_Y8950));
+        set_ymf278b_clock(p_header_buf,  get_vgm_default_chip_clock(FMCHIP_YMF262));
     }
 
     // PSG/DCSG is not a target
